@@ -41,6 +41,7 @@ class ParallelContext:
     ep_degree: int = 1
 
     sp_enabled: bool = False
+    force_cpu: bool = False
 
     # torch.distributed objects — None on single-GPU
     device_mesh: Any | None = None   # torch.distributed.DeviceMesh
@@ -81,6 +82,7 @@ class ParallelContext:
         pp = int(getattr(cfg, "pp", 1))
         ep = int(getattr(cfg, "ep", 1))
         sp = bool(getattr(cfg, "sp", False))
+        force_cpu = bool(getattr(cfg, "force_cpu", False))
 
         if dp * tp * pp != world_size:
             raise ValueError(
@@ -89,8 +91,12 @@ class ParallelContext:
                 "Adjust parallel.dp/tp/pp so their product equals the total GPU count."
             )
 
-        # Build DeviceMesh with named dimensions
+        # Build DeviceMesh with named dimensions.
+        # When force_cpu=True, skip CUDA DeviceMesh entirely and fall directly to
+        # _create_groups_manual so gloo+CPU runs work without any CUDA context.
         try:
+            if force_cpu:
+                raise RuntimeError("force_cpu=True: using manual process groups (no CUDA mesh)")
             from torch.distributed.device_mesh import init_device_mesh
             mesh = init_device_mesh(
                 "cuda",
@@ -104,7 +110,7 @@ class ParallelContext:
             tp_rank = mesh.get_local_rank("tp")
             pp_rank = mesh.get_local_rank("pp")
         except Exception:
-            # Fallback for older PyTorch without init_device_mesh
+            # Fallback for older PyTorch or force_cpu=True
             mesh = None
             dp_rank, tp_rank, pp_rank = _compute_ranks(rank, dp, tp, pp)
             dp_group, tp_group, pp_group = _create_groups_manual(dp, tp, pp, rank)
@@ -120,6 +126,7 @@ class ParallelContext:
             dp_rank=dp_rank, tp_rank=tp_rank, pp_rank=pp_rank, ep_rank=ep_rank,
             dp_degree=dp, tp_degree=tp, pp_degree=pp, ep_degree=ep,
             sp_enabled=sp,
+            force_cpu=force_cpu,
             device_mesh=mesh,
             dp_group=dp_group, tp_group=tp_group,
             pp_group=pp_group, ep_group=ep_group,
@@ -131,6 +138,8 @@ class ParallelContext:
 
     @property
     def local_device(self) -> torch.device:
+        if self.force_cpu:
+            return torch.device("cpu")
         if torch.cuda.is_available():
             return torch.device(f"cuda:{self.local_rank}")
         return torch.device("cpu")

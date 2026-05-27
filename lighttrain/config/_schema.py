@@ -50,6 +50,7 @@ class ParallelSection(BaseModel):
     pp: int = 1
     ep: int = 1
     sp: bool = False
+    force_cpu: bool = False
     grad_sync: GradSyncConfig = Field(default_factory=GradSyncConfig)
     tensor_parallel: TPConfig | None = None
     pipeline: PipelineConfig | None = None

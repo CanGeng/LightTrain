@@ -266,6 +266,40 @@ The failure-first subsystem ensures a crashed run answers "what failed?" and
 
 ---
 
+## Distributed Training
+
+The `parallel:` block scales lighttrain from a single GPU to DDP, FSDP, DeepSpeed ZeRO, Tensor Parallelism, Pipeline Parallelism, Sequence Parallelism, and Expert Parallelism — no changes to model or trainer code required.
+
+**Supported paradigms**
+
+| Paradigm | `grad_sync.name` / strategy | Notes |
+|---|---|---|
+| DDP | `ddp` | All-reduce gradients; full model on every rank |
+| FSDP | `fsdp` | Shards params + grads + optimizer state |
+| DeepSpeed ZeRO | `deepspeed` | ZeRO-1/2/3 via DS engine |
+| Tensor Parallelism | `model_parallel_strategy: tensor_parallel` | ColWise/RowWise Linear surgery |
+| Pipeline Parallelism | `pipeline:` sub-block | 1F1B / GPipe schedules |
+| Sequence Parallelism | `model_parallel_strategy: sequence_parallel` | Pairs with TP |
+| Expert Parallelism | `ep:` degree | Sub-groups of the DP dimension |
+
+**Launch examples**
+
+```bash
+# Single-node DDP (4 GPUs)
+torchrun --nproc_per_node=4 -m lighttrain.cli train -c frontier_plugins/distributed/recipes/ddp.yaml
+
+# TP=2 + DDP=4 (8 GPUs)
+torchrun --nproc_per_node=8 -m lighttrain.cli train -c frontier_plugins/distributed/recipes/tp_ddp.yaml
+
+# gloo + CPU — multi-process communication test (no GPU required)
+torchrun --nproc_per_node=4 -m lighttrain.cli train -c frontier_plugins/distributed/recipes/nano_model.yaml
+```
+
+See [`frontier_plugins/distributed/recipes/`](frontier_plugins/distributed/recipes/) for full YAML examples (DDP, FSDP, ZeRO-2, TP+DDP, 3D parallel, gloo CPU test).
+See [`docs/user_guide.md`](docs/user_guide.md) for the complete `parallel:` field reference.
+
+---
+
 ## PEFT and Memory Efficiency
 
 ```yaml

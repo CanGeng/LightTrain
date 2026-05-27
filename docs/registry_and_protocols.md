@@ -87,7 +87,7 @@ class MyImpl:
 
 ## 2. 注册类别清单
 
-共 **29 个** `KNOWN_CATEGORIES`（另有 `metric` / `architecture` 供扩展，当前无内置实现）。
+共 **32 个** `KNOWN_CATEGORIES`（另有 `metric` / `architecture` 供扩展，当前无内置实现）。
 
 ### Core 8
 
@@ -142,6 +142,14 @@ class MyImpl:
 |------|------|--------------|
 | `invariant` | 运行时断言（返回 `bool`，失败则阻断步骤） | `invariants:` (列表) |
 | `rl_backend` | RL rollout 生成后端 | `rl_backend:` |
+
+### Distributed Strategies
+
+| 类别 | 已注册名称 | 对应 Protocol | YAML 挂载节点 |
+|------|-----------|--------------|--------------|
+| `grad_sync_strategy` | `noop` · `ddp` · `fsdp` · `deepspeed` | `GradSyncStrategy` | `parallel.grad_sync.name:` |
+| `model_parallel_strategy` | `tensor_parallel` · `tp_aware` · `sequence_parallel` · `expert_parallel` | `ModelParallelStrategy` | `parallel.tensor_parallel:` |
+| `pipeline_schedule` | `1f1b` · `gpipe` · `interleaved_1f1b` | `PipelineSchedule` | `parallel.pipeline.schedule:` |
 
 ---
 
@@ -1009,6 +1017,112 @@ def generate(self, model: Any, input_ids: torch.Tensor, **kwargs) -> torch.Tenso
 | name | 说明 | 文件 |
 |------|------|------|
 | `hf_generate` | 使用 HF `model.generate()` 采集 rollout | [rl/rollout.py](lighttrain/rl/rollout.py) |
+
+### 4.28 `grad_sync_strategy`
+
+**源文件**：[lighttrain/distributed/_protocols.py](lighttrain/distributed/_protocols.py)
+
+```python
+class GradSyncStrategy(Protocol):
+    def prepare(
+        self,
+        model: nn.Module,
+        optimizer_factory: Callable[[nn.Module], Any],
+        loader: Any,
+        parallel_ctx: "ParallelContext",
+        *,
+        device: torch.device,
+    ) -> tuple[nn.Module, Any, Any]: ...
+    # Returns (wrapped_model, optimizer, loader)
+
+    def accumulate(self, model: nn.Module) -> ContextManager: ...
+    # Context manager suppressing gradient sync (no_sync) during accumulation steps
+
+    def backward(self, loss: torch.Tensor, model: nn.Module) -> None: ...
+
+    def clip_grad_norm(
+        self, model: nn.Module, max_norm: float, parallel_ctx: "ParallelContext"
+    ) -> float: ...
+
+    def optimizer_step(self, optimizer: Any, model: nn.Module) -> None: ...
+
+    def unwrap_model(self, model: nn.Module) -> nn.Module: ...
+    # Returns the underlying unwrapped model (for checkpoint saving)
+
+    def save_checkpoint(self, model: nn.Module, path: Path, parallel_ctx: "ParallelContext") -> None: ...
+    def load_checkpoint(self, model: nn.Module, path: Path, parallel_ctx: "ParallelContext") -> None: ...
+```
+
+**内置注册项**
+
+| name | 说明 | 文件 |
+|------|------|------|
+| `noop` | 单卡直通，无分布式开销 | [lighttrain/distributed/_noop.py](lighttrain/distributed/_noop.py) |
+| `ddp` | `torch.nn.parallel.DistributedDataParallel` | [frontier_plugins/distributed/strategies/ddp.py](frontier_plugins/distributed/strategies/ddp.py) |
+| `fsdp` | `torch.distributed.fsdp.FullyShardedDataParallel` | [frontier_plugins/distributed/strategies/fsdp.py](frontier_plugins/distributed/strategies/fsdp.py) |
+| `deepspeed` | DeepSpeed ZeRO-1/2/3 engine | [frontier_plugins/distributed/strategies/zero.py](frontier_plugins/distributed/strategies/zero.py) |
+
+---
+
+### 4.29 `model_parallel_strategy`
+
+**源文件**：[lighttrain/distributed/_protocols.py](lighttrain/distributed/_protocols.py)
+
+```python
+class ModelParallelStrategy(Protocol):
+    def apply(
+        self,
+        model: nn.Module,
+        parallel_ctx: "ParallelContext",
+    ) -> nn.Module: ...
+    # Applies in-place tensor/sequence/expert parallelism surgery; returns the modified model
+
+    @property
+    def is_stateless(self) -> bool: ...
+    # True if apply() does not add trainable parameters (e.g., TP / SP)
+```
+
+**内置注册项**
+
+| name | 说明 | 文件 |
+|------|------|------|
+| `tensor_parallel` | ColWise/RowWise Linear 手术（llama / gpt2 / mistral 内置方案） | [frontier_plugins/distributed/model_parallel/tp_auto.py](frontier_plugins/distributed/model_parallel/tp_auto.py) |
+| `tp_aware` | 对已实现 `tp_plan()` 方法的模型做 TP 适配 | [frontier_plugins/distributed/model_parallel/tp_aware.py](frontier_plugins/distributed/model_parallel/tp_aware.py) |
+| `sequence_parallel` | 沿 seq 维度切分，与 TP 配合使用 | [frontier_plugins/distributed/model_parallel/sp.py](frontier_plugins/distributed/model_parallel/sp.py) |
+| `expert_parallel` | MoE 专家层 all-to-all dispatch | [frontier_plugins/distributed/model_parallel/ep.py](frontier_plugins/distributed/model_parallel/ep.py) |
+
+---
+
+### 4.30 `pipeline_schedule`
+
+**源文件**：[lighttrain/distributed/_protocols.py](lighttrain/distributed/_protocols.py)
+
+```python
+class PipelineSchedule(Protocol):
+    def prepare(
+        self,
+        model: nn.Module,
+        parallel_ctx: "ParallelContext",
+        n_microbatches: int,
+    ) -> Any: ...
+    # Returns a schedule object bound to the pipeline stages
+
+    def run_step(
+        self,
+        schedule: Any,
+        batch: Any,
+        loss_fn: Callable,
+    ) -> torch.Tensor: ...
+    # Executes one full pipeline step (all microbatches); returns aggregated loss
+```
+
+**内置注册项**
+
+| name | 说明 | 文件 |
+|------|------|------|
+| `1f1b` | One-Forward-One-Backward（均衡内存与效率） | [frontier_plugins/distributed/pipeline/schedules.py](frontier_plugins/distributed/pipeline/schedules.py) |
+| `gpipe` | GPipe 全前向后全后向（简单但峰值内存高） | [frontier_plugins/distributed/pipeline/schedules.py](frontier_plugins/distributed/pipeline/schedules.py) |
+| `interleaved_1f1b` | 交错 1F1B（多块 stage，进一步降低 bubble） | [frontier_plugins/distributed/pipeline/schedules.py](frontier_plugins/distributed/pipeline/schedules.py) |
 
 ---
 
