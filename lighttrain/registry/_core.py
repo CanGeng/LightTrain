@@ -57,6 +57,10 @@ KNOWN_CATEGORIES: tuple[str, ...] = (
     "invariant",
     # RL backends
     "rl_backend",
+    # Distributed strategies (implementations live in frontier_plugins/distributed/)
+    "grad_sync_strategy",
+    "model_parallel_strategy",
+    "pipeline_schedule",
 )
 
 

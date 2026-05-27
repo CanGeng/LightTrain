@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..distributed._context import ParallelContext
 
 
 @dataclass
@@ -43,6 +46,13 @@ class StepContext:
     mode: str = "lab"
     frozen_step_writer: Any | None = None
     diagnostics: dict[str, Any] = field(default_factory=dict)
+
+    # Distributed fields — always present; default to single-GPU values.
+    # parallel_ctx is ParallelContext.single_gpu() when not distributed.
+    # grad_sync is None for single-GPU (the update rule uses loss.backward()
+    # directly); set to a GradSyncStrategy instance for DDP/FSDP/ZeRO.
+    parallel_ctx: "ParallelContext | None" = None
+    grad_sync: Any | None = None
 
 
 __all__ = ["StepContext"]

@@ -12,6 +12,49 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class GradSyncConfig(BaseModel):
+    """Config for data-parallel / optimizer-sharding strategy."""
+
+    model_config = ConfigDict(extra="allow")
+
+    name: str = "noop"
+
+
+class TPConfig(BaseModel):
+    """Config for tensor parallelism surgery."""
+
+    model_config = ConfigDict(extra="allow")
+
+    auto_plan_for: str | None = None
+    plan: list[dict] | None = None
+
+
+class PipelineConfig(BaseModel):
+    """Config for pipeline parallelism schedule."""
+
+    model_config = ConfigDict(extra="allow")
+
+    n_microbatches: int = 4
+    schedule: str = "1f1b"
+    stage_spec: list[dict] | None = None
+
+
+class ParallelSection(BaseModel):
+    """Distributed topology knobs. Absent = single-GPU degenerate mode."""
+
+    model_config = ConfigDict(extra="allow")
+
+    backend: Literal["nccl", "gloo"] = "nccl"
+    dp: int = 1
+    tp: int = 1
+    pp: int = 1
+    ep: int = 1
+    sp: bool = False
+    grad_sync: GradSyncConfig = Field(default_factory=GradSyncConfig)
+    tensor_parallel: TPConfig | None = None
+    pipeline: PipelineConfig | None = None
+
+
 class ComponentSpec(BaseModel):
     """A registry-resolvable component reference.
 
@@ -84,7 +127,17 @@ class RootConfig(BaseModel):
 
     trainer: TrainerSection | None = None
     engine: EngineSection | None = None
+    parallel: ParallelSection | None = None
     user_modules: list[str] = Field(default_factory=list)
 
 
-__all__ = ["ComponentSpec", "EngineSection", "RootConfig", "TrainerSection"]
+__all__ = [
+    "ComponentSpec",
+    "EngineSection",
+    "GradSyncConfig",
+    "ParallelSection",
+    "PipelineConfig",
+    "RootConfig",
+    "TPConfig",
+    "TrainerSection",
+]

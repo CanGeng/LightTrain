@@ -5,6 +5,7 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 from .callbacks.base import EventBus, Signal
+from .distributed import ParallelContext
 from .checkpoint.manager import CheckpointManager
 from .config import (
     ComponentSpec,
@@ -60,6 +61,7 @@ __all__ = [
     "LineageStore",
     "LoggerBus",
     "NotRegisteredError",
+    "ParallelContext",
     "RegistryConflictError",
     "RegistryError",
     "RootConfig",

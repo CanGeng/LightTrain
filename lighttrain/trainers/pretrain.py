@@ -233,6 +233,8 @@ class PretrainTrainer(Trainer):
     ) -> None:
         """Drop a crash bundle under ``<run_dir>/diagnostics/crash_<ts>/``;
         also drop an OOM report if the exception looks like a CUDA OOM."""
+        if not self._is_main():
+            return
         rd = getattr(self, "_run_dir", None)
         if rd is None:
             return
@@ -367,6 +369,8 @@ class PretrainTrainer(Trainer):
     # ---- helpers ----------------------------------------------------------
 
     def _maybe_log(self, metrics: Mapping[str, Any]) -> None:
+        if not self._is_main():
+            return
         if self.logger is None or not metrics:
             return
         if self.ctx.step % self.log_every != 0:
@@ -417,6 +421,7 @@ class PretrainTrainer(Trainer):
             state=self._collect_state(),
             kind=kind,
             extras=dict(extras or {}),
+            parallel_ctx=self._pctx,
         )
         # Re-read manifest so callbacks can index by content without doing IO.
         manifest: dict[str, Any] | None = None
