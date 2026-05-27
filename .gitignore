@@ -1,0 +1,45 @@
+# IDE / editor
+.claude/
+.idea/
+.vscode/
+.codex/
+.agents/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+docs/dev-docs
+tests/
+acceptance/
+REVIEW_M0_M3.md
+REVIEW_ROUND2.md
+REVIEW_ROUND3.md
+docs/expriment-docs
+scripts/check_core_size.py
+
+# Run artifacts
+runs/
+/artifacts/
+
+# OS
+.DS_Store
+Thumbs.db
+DESIGN.md
+
+# Local secrets / HF endpoint config
+.env
+.env.*
+!.env.example
+scripts/

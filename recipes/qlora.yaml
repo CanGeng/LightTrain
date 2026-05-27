@@ -1,0 +1,84 @@
+# R13 — QLoRA on a small open base model (DESIGN §8.4 / §26.7).
+#
+# This recipe expects Linux + CUDA + bitsandbytes (see WSL acceptance
+# below). On Windows it will parse and `dry-run` fine, but constructing
+# the model raises a clear ImportError pointing to `pip install -e .[quant]`.
+#
+# WSL acceptance (docs/M5_INTERFACES.md):
+#   pip install -e ".[peft,quant,dev]"
+#   pytest -m heavy -k r13
+#   lighttrain estimate -c recipes/qlora.yaml    # trainable < 1%
+#   lighttrain train    -c recipes/qlora.yaml    # 200 steps; loss drops
+
+mode: lab
+seed: 42
+exp: r13_qlora
+run_root: runs
+
+model:
+  name: qlora
+  bits: 4
+  base:
+    name: hf_causal
+    pretrained: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+    dtype: bfloat16
+  lora:
+    r: 16
+    lora_alpha: 32
+    target_modules: [q_proj, k_proj, v_proj, o_proj]
+    lora_dropout: 0.05
+    task_type: CAUSAL_LM
+
+data:
+  name: simple
+  dataset:
+    name: line_file_text
+    path: tests/fixtures/tiny_corpus.txt
+    max_len: 256
+  tokenizer:
+    name: byte                    # OK for smoke; swap to hf tokenizer for real runs
+  collator:
+    name: causal_lm
+    max_len: 256
+  sampler:
+    name: shuffle
+    seed: ${seed}
+  batch_size: 1
+  num_workers: 0
+
+loss: { name: cross_entropy }
+
+optim:
+  name: adamw
+  lr: 2.0e-4
+  betas: [0.9, 0.95]
+  weight_decay: 0.0
+
+scheduler:
+  name: warmup_cosine
+  warmup_steps: 20
+  total_steps: ${trainer.max_steps}
+  min_lr_ratio: 0.1
+
+engine:
+  name: standard
+  mixed_precision: bf16
+
+trainer:
+  name: pretrain
+  max_steps: 200
+  val_every: 0
+  ckpt_every: 100
+  log_every: 20
+  grad_clip: 0.3
+  accumulate: 4
+
+callbacks:
+  - { name: throughput }
+  - { name: nan_skip }
+  - { name: invariants }
+  - { name: best_ckpt, monitor: loss, mode: min }
+
+logger:
+  - { name: console, log_every: 20 }
+  - { name: jsonl }

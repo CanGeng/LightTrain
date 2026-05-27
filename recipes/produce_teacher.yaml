@@ -1,0 +1,54 @@
+# R3 — Stage 1: offline teacher logits / hidden-states production (DESIGN §12.9).
+#
+# Produces a `safetensors-shards` artifact at `artifacts/teacher_tiny_v1/` that
+# downstream `recipes/student_kd.yaml` joins via ArtifactJoinedDataset.
+# Run with:
+#   lighttrain produce-artifact -c recipes/produce_teacher.yaml
+
+mode: lab
+seed: 7
+exp: r3_teacher
+run_root: runs
+
+# A larger TinyLM stands in for "teacher".
+model:
+  name: tiny_lm
+  vocab_size: 260
+  d_model: 192
+  n_layers: 6
+  n_heads: 6
+  max_seq_len: 128
+  output_hidden_states: true
+
+data:
+  name: simple
+  dataset:
+    name: line_file_text
+    path: tests/fixtures/tiny_corpus.txt
+    max_len: 128
+  tokenizer:
+    name: byte
+  collator:
+    name: causal_lm
+    max_len: 128
+  batch_size: 1            # producer iterates one sample at a time
+
+artifacts:
+  producer:
+    name: model_forward
+    extras:
+      - name: logits_topk_64
+        source: model.lm_head
+        transform: { topk: 64 }
+    collect_hidden_states: true
+    collect_outputs: []          # don't store the full logits matrix
+    header_overrides:
+      model_id: tiny_lm_teacher_v1
+      data_version: tiny_corpus_v1
+      preprocess_code_hash: hand_rolled
+    artifact_name: teacher_tiny
+    artifact_version: v1
+  store:
+    name: safetensors-shards
+    root: artifacts/teacher_tiny_v1
+    shard_size: 64

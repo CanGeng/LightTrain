@@ -1,0 +1,73 @@
+# R15 LR sweep base config (DESIGN §25.1 R15 canonical name).
+#
+# Identical to sweep_demo.yaml; exists so the DESIGN §25.1 recipe reference
+# resolves to an actual file.  The sweep spec is recipes/sweep_r15.yaml.
+#
+# Run:
+#   lighttrain sweep -c recipes/sweep_lr.yaml -s recipes/sweep_r15.yaml
+
+mode: lab
+seed: 1337
+exp: sweep_lr
+run_root: runs
+
+model:
+  name: tiny_lm
+  vocab_size: 260
+  d_model: 128
+  n_layers: 2
+  n_heads: 4
+  max_seq_len: 64
+  dropout: 0.0
+
+data:
+  name: simple
+  dataset:
+    name: line_file_text
+    path: tests/fixtures/tiny_corpus.txt
+    max_len: 64
+  tokenizer:
+    name: byte
+  collator:
+    name: causal_lm
+    max_len: 64
+  sampler:
+    name: shuffle
+    seed: ${seed}
+  batch_size: 4
+  num_workers: 0
+
+loss:
+  name: cross_entropy
+
+optim:
+  name: adamw
+  lr: 3.0e-4
+  betas: [0.9, 0.95]
+  weight_decay: 0.1
+
+scheduler:
+  name: warmup_cosine
+  warmup_steps: 5
+  total_steps: ${trainer.max_steps}
+  min_lr_ratio: 0.1
+
+engine:
+  name: standard
+  mixed_precision: "no"
+
+trainer:
+  name: pretrain
+  max_steps: 50
+  val_every: 0
+  ckpt_every: 0
+  log_every: 10
+  grad_clip: 1.0
+  accumulate: 1
+
+callbacks:
+  - { name: nan_skip, max_skips: 5 }
+
+logger:
+  - { name: console, log_every: 10 }
+  - { name: jsonl }

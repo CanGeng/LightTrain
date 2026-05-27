@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lighttrain"
+version = "1.0.0"
+description = "Single-GPU PyTorch LM training framework for research labs"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "lighttrain contributors" }]
+keywords = ["pytorch", "training", "language-model", "research", "lab"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "omegaconf>=2.3.0",
+    "pydantic>=2.0.0",
+    "typer>=0.9.0",
+    "rich",
+    "torch>=2.0.0",
+    "accelerate>=0.27.0",
+    "transformers>=5.0.0",
+    "safetensors>=0.4.0",
+    "tensorboard>=2.14.0",
+    "datasets>=2.16.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+peft = ["peft>=0.7"]
+quant = ["bitsandbytes>=0.43; platform_system == 'Linux'"]
+offload = []
+vllm = []
+optuna = []
+
+[project.scripts]
+lighttrain = "lighttrain.cli._app:app"
+
+[tool.setuptools.packages.find]
+include = ["lighttrain*", "frontier_plugins*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+markers = [
+    "heavy: long-running CPU or training-loop tests; opt-in via -m heavy",
+    "gpu: requires a CUDA device; opt-in via -m gpu",
+]
+addopts = '-v -m "not heavy and not gpu"'
+
+# Coverage is opt-in (some torch + coverage combos clash on _add_docstr):
+#   pytest --cov=lighttrain --cov-report=term-missing --cov-fail-under=75
+[tool.coverage.run]
+source = [
+    "lighttrain.callbacks",
+    "lighttrain.checkpoint",
+    "lighttrain.config",
+    "lighttrain.data.core",
+    "lighttrain.engine",
+    "lighttrain.logging",
+    "lighttrain.losses",
+    "lighttrain.optim",
+    "lighttrain.registry",
+    "lighttrain.trainers",
+    "lighttrain.update_rules",
+    "lighttrain.utils",
+]
+omit = ["**/_exceptions.py", "**/protocols.py"]
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
