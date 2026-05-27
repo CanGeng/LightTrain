@@ -43,3 +43,4 @@ DESIGN.md
 .env.*
 !.env.example
 scripts/
+/local_workspace/

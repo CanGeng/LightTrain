@@ -1,6 +1,7 @@
 # lighttrain
 
-Single-GPU PyTorch language model training framework for research labs.
+PyTorch language model training framework.
+Created by Claude Code.
 
 ---
 
