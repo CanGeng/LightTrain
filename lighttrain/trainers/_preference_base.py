@@ -226,6 +226,7 @@ class PreferenceTrainer(Trainer):
 
     def _preference_step(self, batch: dict[str, Any]) -> dict[str, Any]:
         """Compute preference loss and update parameters."""
+        self.bus.dispatch("on_step_begin", step=self.ctx.step, ctx=self.ctx, batch=batch)
         validate_batch(batch, [
             "chosen_input_ids", "chosen_labels",
             "rejected_input_ids", "rejected_labels",
@@ -275,11 +276,16 @@ class PreferenceTrainer(Trainer):
         self.bus.dispatch(
             "on_loss_computed", loss=loss, batch=enriched, ctx=self.ctx
         )
+        if self.ctx.extras.get("loss_signal") == Signal.SKIP_STEP:
+            return {"loss": float(loss.detach())}
 
         # Backward
         self.bus.dispatch("on_backward_pre", loss=loss, ctx=self.ctx)
         loss.backward()
         self.bus.dispatch("on_backward_post", ctx=self.ctx)
+        grad_norm = torch.nn.utils.clip_grad_norm_(
+            [p for p in self.model.parameters() if p.grad is not None], 1.0)
+        self.bus.dispatch("on_clip_grad", step=self.ctx.step, grad_norm=float(grad_norm))
 
         # Optimizer step
         self.bus.dispatch("on_optimizer_step_pre", ctx=self.ctx)
@@ -299,6 +305,7 @@ class PreferenceTrainer(Trainer):
 
         metrics = {k: float(v.detach()) if isinstance(v, torch.Tensor) else v
                    for k, v in loss_dict.items()}
+        self.bus.dispatch("on_step_end", step=self.ctx.step, ctx=self.ctx)
         return metrics
 
     def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
@@ -344,8 +351,6 @@ class PreferenceTrainer(Trainer):
         if self.ckpt_manager is None or self.ckpt_every <= 0:
             return
         if self.ctx.step % self.ckpt_every != 0:
-            return
-        if self.ckpt_manager is None:
             return
         self.ckpt_manager.save(
             step=self.ctx.step,

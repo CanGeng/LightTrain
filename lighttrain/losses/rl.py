@@ -94,7 +94,7 @@ class PPOSurrogateLoss:
         log_probs_new = _require_extra(ctx, "log_probs_new", "PPOSurrogateLoss")
         log_probs_old = _require_extra(ctx, "log_probs_old", "PPOSurrogateLoss")
         advantages = _require_extra(ctx, "advantages", "PPOSurrogateLoss")
-        mask = batch.get("attention_mask")
+        mask = (batch["labels"] != -100).bool() if "labels" in batch else batch.get("attention_mask")
         if isinstance(mask, torch.Tensor):
             mask = mask.bool()
 
@@ -133,7 +133,7 @@ class PPOSurrogateLoss:
         # Entropy bonus (approximate via -log_probs mean if full probs unavailable)
         entropy_loss = torch.tensor(0.0, device=policy_loss.device)
         if self.ent_coef > 0:
-            entropy_loss = _masked_mean(-log_probs_new.detach(), mask)
+            entropy_loss = _masked_mean(-log_probs_new, mask)
 
         total = policy_loss + self.vf_coef * value_loss - self.ent_coef * entropy_loss
         return {
@@ -188,12 +188,11 @@ class GRPOLoss:
         log_probs_new = _require_extra(ctx, "log_probs_new", "GRPOLoss")
         log_probs_old = _require_extra(ctx, "log_probs_old", "GRPOLoss")
         advantages_raw = _require_extra(ctx, "advantages", "GRPOLoss")
-        mask = batch.get("attention_mask")
+        mask = (batch["labels"] != -100).bool() if "labels" in batch else batch.get("attention_mask")
         if isinstance(mask, torch.Tensor):
             mask = mask.bool()
 
         # Sequence-level mean log-probs for advantage normalization per group
-        seq_logps_new = _masked_mean(log_probs_new, mask)  # (B,) if looped, scalar here
         # Per-token advantages (broadcast from sequence level if needed)
         advantages = advantages_raw
         if advantages.dim() == 1 and log_probs_new.dim() == 2:

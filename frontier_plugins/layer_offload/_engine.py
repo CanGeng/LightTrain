@@ -38,6 +38,8 @@ Known limitations:
 from __future__ import annotations
 
 import warnings
+from collections import deque
+from contextlib import nullcontext as _nullctx
 from typing import Any, Mapping
 
 import torch
@@ -108,6 +110,7 @@ class LayerOffloadEngine:
         # Round-robin window — layer name → "resident on device" flag.
         self._resident: dict[str, bool] = {}
         self._layer_order: list[str] = []
+        self._lru: deque[str] = deque(maxlen=self.resident_layers + self.prefetch)
 
     # ---- one-time wiring ------------------------------------------------
 
@@ -160,6 +163,8 @@ class LayerOffloadEngine:
                 # 1) ensure current layer is resident.
                 self._weights_storage.swap_in(name, _module)
                 self._resident[name] = True
+                if name in self._lru: self._lru.remove(name)
+                self._lru.appendleft(name)
                 # 2) prefetch next ``self.prefetch`` layers.
                 for j in range(1, self.prefetch + 1):
                     if idx + j < len(order):
@@ -168,25 +173,36 @@ class LayerOffloadEngine:
                         with self._streams.on_transfer() if self._streams else _nullctx():
                             self._weights_storage.swap_in(nxt_name, nxt)
                             self._resident[nxt_name] = True
-                # 3) evict any layer that's outside the resident window.
+                            if nxt_name in self._lru: self._lru.remove(nxt_name)
+                            self._lru.appendleft(nxt_name)
+                # 3) evict any layer outside the LRU window.
                 self._evict_outside_window(idx)
+            return _hook
+
+        def _bwd_hook(name: str):
+            def _hook(_module, _grad):
+                self._weights_storage.swap_in(name, _module)
+                self._resident[name] = True
+                if name in self._lru: self._lru.remove(name)
+                self._lru.appendleft(name)
+                self._evict_outside_window(-1)
             return _hook
 
         for i, h in enumerate(self._view.layers):
             handle = h.module.register_forward_pre_hook(_pre_hook(h.name, i))
             self._installed.append(handle)
+            bwd_handle = h.module.register_full_backward_pre_hook(_bwd_hook(h.name))
+            self._installed.append(bwd_handle)
 
-    def _evict_outside_window(self, current_idx: int) -> None:
-        """Page out any resident layer whose index is < current_idx - resident_layers."""
+    def _evict_outside_window(self, current_idx: int) -> None:  # noqa: ARG002
+        """Page out any resident layer not in the LRU window."""
         if self._view is None or self._weights_storage is None:
             return
-        keep_low = max(0, current_idx - (self.resident_layers - 1))
-        # Anything below ``keep_low`` should leave the device.
-        for i in range(0, keep_low):
-            name = self._layer_order[i]
-            if self._resident.get(name):
-                self._weights_storage.swap_out(name, self._view.layers[i].module)
-                self._resident[name] = False
+        keep = set(self._lru)
+        for h in self._view.layers:
+            if self._resident.get(h.name) and h.name not in keep:
+                self._weights_storage.swap_out(h.name, h.module)
+                self._resident[h.name] = False
 
     # ---- engine protocol -----------------------------------------------
 
@@ -232,11 +248,6 @@ class LayerOffloadEngine:
             self.close()
         except Exception:  # noqa: BLE001
             pass
-
-
-class _nullctx:
-    def __enter__(self): return None
-    def __exit__(self, *a): return None
 
 
 # Surface the ``activation: offload`` fallback as a one-time warning rather

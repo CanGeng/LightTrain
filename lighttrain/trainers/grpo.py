@@ -218,6 +218,7 @@ class GRPOTrainer(Trainer):
     # ------------------------------------------------------------------ grpo step
 
     def _grpo_step(self, batch: dict[str, Any]) -> dict[str, Any]:
+        self.bus.dispatch("on_step_begin", step=self.ctx.step, ctx=self.ctx, batch=batch)
         validate_batch(batch, [
             "input_ids", "log_probs_old", "group_ids", "rewards",
         ], "GRPOTrainer")
@@ -238,7 +239,7 @@ class GRPOTrainer(Trainer):
 
         if labels is not None:
             shift_logits = logits[:, :-1, :].contiguous()
-            shift_labels = labels[:, 1:].clamp(min=0).contiguous()
+            shift_labels = input_ids[:, 1:].contiguous()
             lp = F.log_softmax(shift_logits, dim=-1)
             log_probs_new = torch.gather(lp, -1, shift_labels.unsqueeze(-1)).squeeze(-1)
             log_probs_new = torch.cat(
@@ -267,12 +268,28 @@ class GRPOTrainer(Trainer):
         loss_dict = self._loss_fn(dummy, batch, loss_ctx)
         loss: torch.Tensor = loss_dict["loss"]
 
+        self.bus.dispatch("on_loss_computed", loss=loss, batch=batch, ctx=self.ctx)
+        if self.ctx.extras.get("loss_signal") == Signal.SKIP_STEP:
+            return {k: float(v.detach()) if isinstance(v, torch.Tensor) else v for k, v in loss_dict.items()}
+
+        self.bus.dispatch("on_backward_pre", loss=loss, ctx=self.ctx)
         loss.backward()
+        self.bus.dispatch("on_backward_post", ctx=self.ctx)
+        grad_norm = torch.nn.utils.clip_grad_norm_(
+            [p for p in self.model.parameters() if p.grad is not None], 1.0)
+        self.bus.dispatch("on_clip_grad", step=self.ctx.step, grad_norm=float(grad_norm))
+        self.bus.dispatch("on_optimizer_step_pre", ctx=self.ctx)
         if hasattr(self.optimizer, "step"):
             self.optimizer.step()
+        self.bus.dispatch("on_optimizer_step_post", ctx=self.ctx)
         if hasattr(self.optimizer, "zero_grad"):
             self.optimizer.zero_grad()
+        self.bus.dispatch("on_zero_grad", ctx=self.ctx)
+        if self.scheduler is not None and getattr(self.scheduler, "step_per_batch", True):
+            self.scheduler.step()
+            self.bus.dispatch("on_scheduler_step", ctx=self.ctx)
 
+        self.bus.dispatch("on_step_end", step=self.ctx.step, ctx=self.ctx)
         return {k: float(v.detach()) if isinstance(v, torch.Tensor) else v
                 for k, v in loss_dict.items()}
 

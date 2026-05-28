@@ -7,7 +7,7 @@ Created by Claude Code.
 
 ## Overview
 
-lighttrain is a compact, highly customizable training framework designed for single-GPU research workflows: pretraining small language models, supervised fine-tuning, preference learning, reinforcement learning, and distillation. The core — Registry, Config, Engine, UpdateRule, Trainer, EventBus, PrepGraph — is small enough to read end-to-end, while research-grade extensions (PEFT, vLLM, alternative architectures, sweep tooling) are available as opt-in [frontier plugins](frontier_plugins/).
+lighttrain is a compact, highly customizable training framework designed for research workflows: pretraining small language models, supervised fine-tuning, preference learning, reinforcement learning, and distillation. The core — Registry, Config, Engine, UpdateRule, Trainer, EventBus, PrepGraph — is small enough to read end-to-end, while research-grade extensions (PEFT, vLLM, alternative architectures, sweep tooling) are available as opt-in [frontier plugins](frontier_plugins/).
 
 Six design tenets govern the codebase:
 **registry-first**, **failure-first**, **plugin-clean**, **single-GPU honest**, **lab-friendly**, and **audit-ready**.

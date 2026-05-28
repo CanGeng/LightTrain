@@ -19,6 +19,7 @@ sandbox tests (no ``__import__``, no ``open``, no ``eval``).
 
 from __future__ import annotations
 
+import ast
 from typing import Any, Mapping
 
 import torch
@@ -84,6 +85,11 @@ def evaluate_check(
     if extra:
         for k, v in extra.items():
             ns.setdefault(k, v)
+    for _node in ast.walk(ast.parse(expr, mode="eval")):
+        if isinstance(_node, ast.Attribute) and (
+            _node.attr.startswith("__") or _node.attr.endswith("__")
+        ):
+            raise InvariantError(f"invariant check: dunder attribute access not allowed: {_node.attr!r}")
     try:
         result = eval(  # noqa: S307 — sandbox: builtins stripped below
             expr,

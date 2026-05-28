@@ -171,7 +171,7 @@ class RolloutEngine:
                 )
                 logits = logits.squeeze(0)              # (T_full, V)
                 shift_logits = logits[:-1]              # (T_full-1, V)
-                shift_labels = labels[1:].clamp(min=0)  # (T_full-1,)
+                shift_labels = seq[1:]                  # (T_full-1,)
                 per_token_lp = F.log_softmax(shift_logits, dim=-1)
                 gathered = per_token_lp.gather(
                     1, shift_labels.unsqueeze(1)

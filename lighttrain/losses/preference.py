@@ -203,7 +203,7 @@ class SimPOLoss:
 
         reward_chosen = chosen - self.gamma
         reward_rejected = rejected - self.gamma
-        logits = self.beta * (reward_chosen - reward_rejected)
+        logits = self.beta * (chosen - rejected) - self.gamma
         loss = -F.logsigmoid(logits).mean()
         return {
             "loss": loss,
