@@ -1,0 +1,8 @@
+{"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "What is 2+2?"}, {"role": "assistant", "content": "2+2 equals 4."}]}
+{"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Capital of France?"}, {"role": "assistant", "content": "The capital of France is Paris."}]}
+{"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Sort 3,1,2."}, {"role": "assistant", "content": "Sorted ascending: 1, 2, 3."}]}
+{"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Who wrote Hamlet?"}, {"role": "assistant", "content": "William Shakespeare wrote Hamlet."}]}
+{"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "What is the boiling point of water?"}, {"role": "assistant", "content": "Water boils at 100 degrees Celsius at sea level."}]}
+{"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Translate 'hello' to Spanish."}, {"role": "assistant", "content": "'Hello' in Spanish is 'hola'."}]}
+{"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Largest planet?"}, {"role": "assistant", "content": "Jupiter is the largest planet in our solar system."}]}
+{"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Define photosynthesis."}, {"role": "assistant", "content": "Photosynthesis is how plants convert sunlight into energy."}]}

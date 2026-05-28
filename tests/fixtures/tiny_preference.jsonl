@@ -1,0 +1,6 @@
+{"id": "pref_0", "chosen_input_ids": [72, 101, 108, 108, 111, 256], "chosen_labels": [72, 101, 108, 108, 111, 256], "rejected_input_ids": [72, 105, 256, 0, 0], "rejected_labels": [72, 105, 256, 0, 0]}
+{"id": "pref_1", "chosen_input_ids": [87, 111, 114, 108, 100, 256], "chosen_labels": [87, 111, 114, 108, 100, 256], "rejected_input_ids": [87, 111, 114, 108, 256, 0], "rejected_labels": [87, 111, 114, 108, 256, 0]}
+{"id": "pref_2", "chosen_input_ids": [84, 101, 115, 116, 256, 0], "chosen_labels": [84, 101, 115, 116, 256, 0], "rejected_input_ids": [84, 101, 115, 256, 0, 0], "rejected_labels": [84, 101, 115, 256, 0, 0]}
+{"id": "pref_3", "chosen_input_ids": [65, 108, 112, 104, 97, 256], "chosen_labels": [65, 108, 112, 104, 97, 256], "rejected_input_ids": [65, 108, 112, 256, 0, 0], "rejected_labels": [65, 108, 112, 256, 0, 0]}
+{"id": "pref_4", "chosen_input_ids": [70, 111, 111, 256, 0, 0], "chosen_labels": [70, 111, 111, 256, 0, 0], "rejected_input_ids": [70, 111, 256, 0, 0, 0], "rejected_labels": [70, 111, 256, 0, 0, 0]}
+{"id": "pref_5", "chosen_input_ids": [66, 97, 114, 256, 0, 0], "chosen_labels": [66, 97, 114, 256, 0, 0], "rejected_input_ids": [66, 97, 256, 0, 0, 0], "rejected_labels": [66, 97, 256, 0, 0, 0]}

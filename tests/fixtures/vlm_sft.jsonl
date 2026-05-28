@@ -1,0 +1,4 @@
+{"messages": [{"role": "user", "content": "<image> Describe this picture."}, {"role": "assistant", "content": "It's a colorful abstract pattern."}]}
+{"messages": [{"role": "user", "content": "<image> What's in the frame?"}, {"role": "assistant", "content": "A simple geometric drawing."}]}
+{"messages": [{"role": "user", "content": "<image> Caption please."}, {"role": "assistant", "content": "Synthetic image, used for testing."}]}
+{"messages": [{"role": "user", "content": "<image> Identify the subject."}, {"role": "assistant", "content": "Pixels arranged in a checker grid."}]}

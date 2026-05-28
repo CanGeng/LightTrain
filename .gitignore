@@ -21,7 +21,6 @@ dist/
 htmlcov/
 .tox/
 docs/dev-docs
-tests/
 acceptance/
 REVIEW_M0_M3.md
 REVIEW_ROUND2.md
