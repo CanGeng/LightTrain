@@ -226,10 +226,16 @@ class PPOTrainer(Trainer):
                 # ---- compute GAE -------------------------------------------
                 rewards = self._buffer.all_rewards()   # (N,)
 
+                # Populate ep.values via batched value-head inference (noop if head not ready)
+                self._compute_buffer_values()
+
                 # use value head if enabled, else zero baseline
                 if self._use_value_head and self._value_head is not None:
-                    values = self._buffer.all_values()  # (N,)
-                    values_for_gae = values.unsqueeze(1).to(rewards.device)  # (N, 1)
+                    values = self._buffer.all_values()  # (N, 1) — ep.values is (1,) scalar
+                    if values is not None:
+                        values_for_gae = values.to(rewards.device)      # (N, 1) ✅
+                    else:
+                        values_for_gae = torch.zeros_like(rewards.unsqueeze(1))
                 else:
                     values_for_gae = torch.zeros_like(rewards.unsqueeze(1))  # (N, 1)
 
@@ -375,12 +381,67 @@ class PPOTrainer(Trainer):
             "log_probs_old": log_probs_old,
             "advantages": advantages if advantages is not None else torch.zeros_like(log_probs_old[:, 0]),
             "values": values_new if values_new is not None else torch.zeros_like(log_probs_old),
-            "returns": returns if returns is not None else torch.zeros_like(log_probs_old),
+            "returns": returns.unsqueeze(1) if returns is not None else torch.zeros_like(log_probs_old),
             "model": self.model,
         })
         self.ctx.loss_fn = self._loss_fn
         self.ctx.model = self.model
         return self._rl_rule.step(self.model, batch, self.ctx)
+
+    def _compute_buffer_values(self) -> None:
+        """Batch-infer response-mean value for all buffered episodes via value head.
+
+        Populates ep.values = (1,) scalar for each episode so all_values() returns
+        (N, 1) suitable for the (N, 1)-shaped GAE call.  Noop if value head is not
+        yet initialized (first outer step → zero baseline GAE).
+        """
+        import warnings
+        if self._value_head is None or not self._buffer._episodes:
+            return
+        episodes = self._buffer._episodes
+        max_len = max(ep.input_ids.size(0) for ep in episodes)
+
+        ids_list, mask_list = [], []
+        for ep in episodes:
+            T = ep.input_ids.size(0)
+            pad = max_len - T
+            ids_list.append(torch.cat([ep.input_ids,
+                                       torch.zeros(pad, dtype=ep.input_ids.dtype)]))
+            mask_list.append(torch.cat([torch.ones(T, dtype=torch.long),
+                                        torch.zeros(pad, dtype=torch.long)]))
+        input_ids = torch.stack(ids_list).to(self.device)
+        attn_mask = torch.stack(mask_list).to(self.device)
+
+        self.model.eval()
+        with torch.no_grad():
+            try:
+                out = self.model(input_ids=input_ids, attention_mask=attn_mask,
+                                 output_hidden_states=True)
+            except TypeError:
+                out = self.model(input_ids=input_ids, attention_mask=attn_mask)
+
+            if isinstance(out, ModelOutput):
+                hidden = out.hidden_states[-1] if out.hidden_states else None
+            else:
+                hidden = None
+
+            if hidden is None:
+                warnings.warn(
+                    "PPOTrainer: value head enabled but model did not return hidden_states. "
+                    "Falling back to zero baseline. Set output_hidden_states=True in model config.",
+                    stacklevel=2,
+                )
+                self.model.train()
+                return
+
+            token_vals = self._value_head(hidden)   # (N, max_len)
+            for i, ep in enumerate(episodes):
+                T = ep.input_ids.size(0)
+                vals = token_vals[i, :T]
+                resp_mask = (ep.labels != -100).float().to(vals.device)
+                denom = resp_mask.sum().clamp(min=1)
+                ep.values = ((vals * resp_mask).sum() / denom).unsqueeze(0).cpu()
+        self.model.train()
 
     def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
         """Bridge to _ppo_step() for the unified train_step() protocol.

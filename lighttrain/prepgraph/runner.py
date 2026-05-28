@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import shutil
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Literal
@@ -168,14 +168,14 @@ class PrepRunner:
                                 self.workers,
                             )
                         ] = name
-                    for fut in futs:
+                    for fut in as_completed(futs):
                         results[futs[fut]] = fut.result()
             else:
                 with ThreadPoolExecutor(max_workers=self.workers) as ex:
                     futs = {
                         ex.submit(self._run_one, name, results): name for name in todo
                     }
-                    for fut in futs:
+                    for fut in as_completed(futs):
                         results[futs[fut]] = fut.result()
         return results
 

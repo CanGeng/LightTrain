@@ -201,14 +201,12 @@ class SimPOLoss:
         chosen = _require(batch, "chosen_logps", "SimPOLoss")
         rejected = _require(batch, "rejected_logps", "SimPOLoss")
 
-        reward_chosen = chosen - self.gamma
-        reward_rejected = rejected - self.gamma
         logits = self.beta * (chosen - rejected) - self.gamma
         loss = -F.logsigmoid(logits).mean()
         return {
             "loss": loss,
-            "reward_chosen": float(reward_chosen.mean().detach()),
-            "reward_rejected": float(reward_rejected.mean().detach()),
+            "reward_chosen": float(chosen.mean().detach()),
+            "reward_rejected": float(rejected.mean().detach()),
             "simpo_accuracy": float((logits > 0).float().mean().detach()),
         }
 

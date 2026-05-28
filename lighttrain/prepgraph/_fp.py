@@ -59,10 +59,7 @@ def canonical_config(value: Any) -> Any:
     if isinstance(value, Mapping):
         out: dict[str, Any] = {}
         for k in sorted(value):
-            v = canonical_config(value[k])
-            if v is None:
-                continue
-            out[str(k)] = v
+            out[str(k)] = canonical_config(value[k])
         return out
     if isinstance(value, (list, tuple)):
         return [canonical_config(v) for v in value]

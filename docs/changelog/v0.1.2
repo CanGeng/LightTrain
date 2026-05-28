@@ -1,0 +1,19 @@
+Change Log
+
+Refactoring
+lighttrain/update_rules/rl.py（新建）
+
+新增 RLUpdateRule（注册键 "update_rule"/"rl"）：集中封装 RL 训练的 backward / clip / optimizer / callback 完整序列，复刻 StandardUpdateRule 的三路分支（grad_sync / accelerator / 裸路径），不调用 model(**batch)
+
+lighttrain/trainers/grpo.py、ppo.py、_preference_base.py
+
+Refactor: _grpo_step / _ppo_step / _preference_step 保留各自 RL 特有的 forward 逻辑，删除内联的 ~30 行重复 backward 块，改为委托 self._rl_rule.step()；新增 grad_clip 构造参数（默认 1.0）
+
+lighttrain/update_rules/__init__.py
+
+新增 RLUpdateRule 导出
+
+Tests Added
+文件	新增测试
+tests/test_update_rules_rl.py	7 个单元测试：注册、基础 step、callback 序列、SKIP_STEP、grad_clip 上限、grad_clip=0 禁用、state_dict roundtrip
+677 tests pass, 0 regressions.
