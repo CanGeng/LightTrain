@@ -23,14 +23,14 @@ import torch.nn.functional as F
 
 import torch.nn as nn
 
-from ..callbacks.base import Signal
 from ..losses.rl import PPOSurrogateLoss
-from ..protocols import LossContext, ModelOutput, StepOutput
+from ..protocols import ModelOutput, StepOutput
 from ..registry import register
 from ..rl.buffers import RolloutBuffer
 from ..rl.gae import compute_gae, normalize_advantages
 from ..rl.ref_policy import ReferencePolicy, freeze_as_ref
 from ..rl.rollout import HFGenerateBackend, RolloutEngine
+from ..update_rules.rl import RLUpdateRule
 from ._utils import _device_of, _move_batch, validate_batch
 from .base import Trainer
 
@@ -115,6 +115,7 @@ class PPOTrainer(Trainer):
         ignore_index: int = -100,
         use_value_head: bool = False,
         value_head_dim: int | None = None,
+        grad_clip: float = 1.0,
     ) -> None:
         super().__init__(
             engine=engine,
@@ -153,6 +154,7 @@ class PPOTrainer(Trainer):
         self._loss_fn = PPOSurrogateLoss(
             clip_eps=clip_eps, vf_coef=vf_coef, ent_coef=ent_coef
         )
+        self._rl_rule = RLUpdateRule(grad_clip=grad_clip)
         backend = HFGenerateBackend(
             max_new_tokens=max_new_tokens, do_sample=True
         )
@@ -319,7 +321,6 @@ class PPOTrainer(Trainer):
     # ------------------------------------------------------------------ ppo step
 
     def _ppo_step(self, batch: dict[str, Any]) -> dict[str, Any]:
-        self.bus.dispatch("on_step_begin", step=self.ctx.step, ctx=self.ctx, batch=batch)
         validate_batch(batch, [
             "input_ids", "log_probs_old", "advantages_buf",
         ], "PPOTrainer")
@@ -336,6 +337,7 @@ class PPOTrainer(Trainer):
         kwargs: dict[str, Any] = {"input_ids": input_ids}
         if attention_mask is not None:
             kwargs["attention_mask"] = attention_mask
+        # TODO: Wrap this forward pass in accelerator.autocast() or torch.autocast() in the future for AMP memory efficiency.
         out = self.model(**kwargs)
         if isinstance(out, ModelOutput):
             logits = out.outputs["logits"]
@@ -367,47 +369,18 @@ class PPOTrainer(Trainer):
                     self.optimizer.add_param_group({"params": list(self._value_head.parameters())})
             values_new = self._value_head(hidden)   # (B, T)
 
-        returns = batch.get("returns_buf")
-        loss_ctx = LossContext(
-            step=self.ctx.step,
-            epoch=self.ctx.epoch,
-            extras={
-                "log_probs_new": log_probs_new,
-                "log_probs_old": log_probs_old,
-                "advantages": advantages if advantages is not None else torch.zeros_like(log_probs_old[:, 0]),
-                "values": values_new if values_new is not None else torch.zeros_like(log_probs_old),
-                "returns": returns if returns is not None else torch.zeros_like(log_probs_old),
-                "model": self.model,
-            },
-        )
-        dummy = ModelOutput(outputs={})
-        loss_dict = self._loss_fn(dummy, batch, loss_ctx)
-        loss: torch.Tensor = loss_dict["loss"]
-
-        self.bus.dispatch("on_loss_computed", loss=loss, batch=batch, ctx=self.ctx)
-        if self.ctx.extras.get("loss_signal") == Signal.SKIP_STEP:
-            return {k: float(v.detach()) if isinstance(v, torch.Tensor) else v for k, v in loss_dict.items()}
-
-        self.bus.dispatch("on_backward_pre", loss=loss, ctx=self.ctx)
-        loss.backward()
-        self.bus.dispatch("on_backward_post", ctx=self.ctx)
-        grad_norm = torch.nn.utils.clip_grad_norm_(
-            [p for p in self.model.parameters() if p.grad is not None], 1.0)
-        self.bus.dispatch("on_clip_grad", step=self.ctx.step, grad_norm=float(grad_norm))
-        self.bus.dispatch("on_optimizer_step_pre", ctx=self.ctx)
-        if hasattr(self.optimizer, "step"):
-            self.optimizer.step()
-        self.bus.dispatch("on_optimizer_step_post", ctx=self.ctx)
-        if hasattr(self.optimizer, "zero_grad"):
-            self.optimizer.zero_grad()
-        self.bus.dispatch("on_zero_grad", ctx=self.ctx)
-        if self.scheduler is not None and getattr(self.scheduler, "step_per_batch", True):
-            self.scheduler.step()
-            self.bus.dispatch("on_scheduler_step", ctx=self.ctx)
-
-        self.bus.dispatch("on_step_end", step=self.ctx.step, ctx=self.ctx)
-        return {k: float(v.detach()) if isinstance(v, torch.Tensor) else v
-                for k, v in loss_dict.items()}
+        # Populate ctx for RLUpdateRule (backward/callbacks delegated below)
+        self.ctx.extras.update({
+            "log_probs_new": log_probs_new,
+            "log_probs_old": log_probs_old,
+            "advantages": advantages if advantages is not None else torch.zeros_like(log_probs_old[:, 0]),
+            "values": values_new if values_new is not None else torch.zeros_like(log_probs_old),
+            "returns": returns if returns is not None else torch.zeros_like(log_probs_old),
+            "model": self.model,
+        })
+        self.ctx.loss_fn = self._loss_fn
+        self.ctx.model = self.model
+        return self._rl_rule.step(self.model, batch, self.ctx)
 
     def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
         """Bridge to _ppo_step() for the unified train_step() protocol.
@@ -416,6 +389,7 @@ class PPOTrainer(Trainer):
         minibatch policy update**, not one outer rollout step.  The outer rollout
         loop, GAE computation, and inner-epoch loop all remain in fit().
         """
+        self.ctx.extras.pop("loss_signal", None)
         raw = self._ppo_step(batch)
         return StepOutput(loss=raw.get("loss"), metrics=dict(raw))
 

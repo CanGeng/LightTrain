@@ -32,8 +32,9 @@ import torch
 import torch.nn.functional as F
 
 from ..callbacks.base import Signal
-from ..protocols import LossContext, ModelOutput, StepOutput
+from ..protocols import ModelOutput, StepOutput
 from ..registry import register
+from ..update_rules.rl import RLUpdateRule
 from ..utils.seed import restore_rng_state, rng_state
 from ._utils import _device_of, _move_batch, validate_batch
 from .base import Trainer
@@ -105,6 +106,7 @@ class PreferenceTrainer(Trainer):
         device: str | torch.device | None = None,
         ref_namespace: str = "ref",
         ignore_index: int = -100,
+        grad_clip: float = 1.0,
     ) -> None:
         super().__init__(
             engine=engine,
@@ -136,6 +138,7 @@ class PreferenceTrainer(Trainer):
         self._stop_requested = False
         # Subclass must assign before fit():
         self._loss_fn: Any = None
+        self._rl_rule = RLUpdateRule(grad_clip=grad_clip)
 
     # ------------------------------------------------------------------ fit
 
@@ -226,7 +229,6 @@ class PreferenceTrainer(Trainer):
 
     def _preference_step(self, batch: dict[str, Any]) -> dict[str, Any]:
         """Compute preference loss and update parameters."""
-        self.bus.dispatch("on_step_begin", step=self.ctx.step, ctx=self.ctx, batch=batch)
         validate_batch(batch, [
             "chosen_input_ids", "chosen_labels",
             "rejected_input_ids", "rejected_labels",
@@ -240,6 +242,7 @@ class PreferenceTrainer(Trainer):
         rejected_mask = batch.get("rejected_attention_mask")
         rejected_labels = batch["rejected_labels"]
 
+        # TODO: Wrap this forward pass in accelerator.autocast() or torch.autocast() in the future for AMP memory efficiency.
         # Forward on chosen
         chosen_logps, chosen_nll = _seq_logps_and_nll(
             self.model, chosen_ids, chosen_mask, chosen_labels,
@@ -263,50 +266,12 @@ class PreferenceTrainer(Trainer):
         if ref_rejected_key in batch:
             enriched["ref_rejected_logps"] = batch[ref_rejected_key].to(chosen_logps.device)
 
-        loss_ctx = LossContext(
-            step=self.ctx.step,
-            epoch=self.ctx.epoch,
-            extras={"model": self.model, **self.ctx.extras},
-        )
-        # model_output is a dummy; preference losses read from enriched batch
-        dummy_output = ModelOutput(outputs={})
-        loss_dict = self._loss_fn(dummy_output, enriched, loss_ctx)
-        loss: torch.Tensor = loss_dict["loss"]
-
-        self.bus.dispatch(
-            "on_loss_computed", loss=loss, batch=enriched, ctx=self.ctx
-        )
-        if self.ctx.extras.get("loss_signal") == Signal.SKIP_STEP:
-            return {"loss": float(loss.detach())}
-
-        # Backward
-        self.bus.dispatch("on_backward_pre", loss=loss, ctx=self.ctx)
-        loss.backward()
-        self.bus.dispatch("on_backward_post", ctx=self.ctx)
-        grad_norm = torch.nn.utils.clip_grad_norm_(
-            [p for p in self.model.parameters() if p.grad is not None], 1.0)
-        self.bus.dispatch("on_clip_grad", step=self.ctx.step, grad_norm=float(grad_norm))
-
-        # Optimizer step
-        self.bus.dispatch("on_optimizer_step_pre", ctx=self.ctx)
-        if hasattr(self.optimizer, "step"):
-            self.optimizer.step()
-        self.bus.dispatch("on_optimizer_step_post", ctx=self.ctx)
-
-        # Zero grad
-        if hasattr(self.optimizer, "zero_grad"):
-            self.optimizer.zero_grad()
-        self.bus.dispatch("on_zero_grad", ctx=self.ctx)
-
-        # Scheduler
-        if self.scheduler is not None and getattr(self.scheduler, "step_per_batch", True):
-            self.scheduler.step()
-            self.bus.dispatch("on_scheduler_step", ctx=self.ctx)
-
-        metrics = {k: float(v.detach()) if isinstance(v, torch.Tensor) else v
-                   for k, v in loss_dict.items()}
-        self.bus.dispatch("on_step_end", step=self.ctx.step, ctx=self.ctx)
-        return metrics
+        # Populate ctx for RLUpdateRule (backward/callbacks delegated below)
+        # enriched (not batch) is passed so preference losses can read chosen/rejected logps
+        self.ctx.extras["model"] = self.model
+        self.ctx.loss_fn = self._loss_fn
+        self.ctx.model = self.model
+        return self._rl_rule.step(self.model, enriched, self.ctx)
 
     def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
         """Bridge to _preference_step() for the unified train_step() protocol.

@@ -372,11 +372,13 @@ trainer:
   rollout_steps: 32
   ppo_epochs: 4
   clip_eps: 0.2
+  grad_clip: 1.0    # optional; default 1.0
 
 trainer:
   name: grpo
   group_size: 4
   clip_eps: 0.2
+  grad_clip: 1.0    # optional; default 1.0
 ```
 
 ### EvalSuite
@@ -417,9 +419,14 @@ Alternative update rules:
 
 ```yaml
 update_rule:
-  name: mezo      # or: sam | forward_forward | pcn | dfa | standard
+  name: mezo      # or: sam | forward_forward | pcn | dfa | standard | rl
   eps: 1e-3
 ```
+
+> **`rl` update rule**: Used internally by GRPO/PPO/Preference trainers. It skips
+> the standard `model(**batch)` forward (the trainer handles that) and runs only
+> the backward/clip/optimizer/callbacks sequence. Supports the same three dispatch
+> paths as `standard` (grad_sync, accelerator, bare).
 
 ---
 

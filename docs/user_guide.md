@@ -337,7 +337,7 @@ lighttrain doctor --run runs/tiny_pretrain/20260527-...
 |------|------|--------|------|
 | `name` | str | `"standard"` | 引擎实现名称 |
 | `mixed_precision` | `"no"` / `"fp16"` / `"bf16"` | `"bf16"` | 混合精度模式 |
-| `update_rule.name` | str | `"standard"` | 梯度更新规则（`standard` / `sam` / `mezo`） |
+| `update_rule.name` | str | `"standard"` | 梯度更新规则（`standard` / `sam` / `mezo` / `rl`） |
 
 #### `data:` 节点内部（SimpleDataModule）
 
@@ -684,6 +684,7 @@ engine:
 ├─────────────────────────────────────────────────────────────────────┤
 │  4. 引擎组装                                                         │
 │     update_rule = StandardUpdateRule(grad_clip, accumulate)         │
+│       （RL trainer 自持 RLUpdateRule，跳过 model(**batch) forward） │
 │     accelerator = build_accelerator(mixed_precision)                │
 │     engine = StandardEngine(update_rule, loss_fn, accelerator)      │
 │     ctx.parallel_ctx = parallel_ctx                                 │
@@ -703,7 +704,8 @@ engine:
 │         batch = next(data_loader)                                   │
 │         engine.step(batch, ctx)                                     │
 │           └─ update_rule.step(model, batch, ctx)                   │
-│               └─ loss_fn(model(batch), batch, ctx)  → loss         │
+│               ├─ [StandardUpdateRule] model(**batch) → loss_fn → loss │
+│               └─ [RLUpdateRule] 跳过 forward，ctx.loss_fn 直接得 loss │
 │               └─ grad_sync.backward(loss, model)    ← 含 no_sync   │
 │               └─ grad_sync.clip_grad_norm(...)                      │
 │               └─ grad_sync.optimizer_step(optimizer, model)         │

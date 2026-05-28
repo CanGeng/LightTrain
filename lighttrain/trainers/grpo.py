@@ -12,13 +12,13 @@ from typing import Any, Callable
 import torch
 import torch.nn.functional as F
 
-from ..callbacks.base import Signal
 from ..losses.rl import GRPOLoss
-from ..protocols import LossContext, ModelOutput, StepOutput
+from ..protocols import ModelOutput, StepOutput
 from ..registry import register
 from ..rl.buffers import RolloutBuffer
 from ..rl.ref_policy import freeze_as_ref
 from ..rl.rollout import HFGenerateBackend, RolloutEngine
+from ..update_rules.rl import RLUpdateRule
 from ._utils import _device_of, _move_batch, validate_batch
 from .base import Trainer
 
@@ -66,6 +66,7 @@ class GRPOTrainer(Trainer):
         lora_base_as_ref: bool = False,
         max_new_tokens: int = 128,
         ignore_index: int = -100,
+        grad_clip: float = 1.0,
     ) -> None:
         super().__init__(
             engine=engine,
@@ -98,6 +99,7 @@ class GRPOTrainer(Trainer):
         self._stop_requested = False
 
         self._loss_fn = GRPOLoss(clip_eps=clip_eps, beta_kl=beta_kl)
+        self._rl_rule = RLUpdateRule(grad_clip=grad_clip)
         backend = HFGenerateBackend(
             max_new_tokens=max_new_tokens,
             do_sample=True,
@@ -218,7 +220,6 @@ class GRPOTrainer(Trainer):
     # ------------------------------------------------------------------ grpo step
 
     def _grpo_step(self, batch: dict[str, Any]) -> dict[str, Any]:
-        self.bus.dispatch("on_step_begin", step=self.ctx.step, ctx=self.ctx, batch=batch)
         validate_batch(batch, [
             "input_ids", "log_probs_old", "group_ids", "rewards",
         ], "GRPOTrainer")
@@ -234,6 +235,7 @@ class GRPOTrainer(Trainer):
         kwargs: dict[str, Any] = {"input_ids": input_ids}
         if attention_mask is not None:
             kwargs["attention_mask"] = attention_mask
+        # TODO: Wrap this forward pass in accelerator.autocast() or torch.autocast() in the future for AMP memory efficiency.
         out = self.model(**kwargs)
         logits = out.outputs["logits"] if isinstance(out, ModelOutput) else out["logits"]
 
@@ -253,45 +255,17 @@ class GRPOTrainer(Trainer):
         if advantages.device != log_probs_new.device:
             advantages = advantages.to(log_probs_new.device)
 
-        loss_ctx = LossContext(
-            step=self.ctx.step,
-            epoch=self.ctx.epoch,
-            extras={
-                "log_probs_new": log_probs_new,
-                "log_probs_old": log_probs_old,
-                "advantages": advantages,
-                "group_ids": group_ids,
-                "model": self.model,
-            },
-        )
-        dummy = ModelOutput(outputs={})
-        loss_dict = self._loss_fn(dummy, batch, loss_ctx)
-        loss: torch.Tensor = loss_dict["loss"]
-
-        self.bus.dispatch("on_loss_computed", loss=loss, batch=batch, ctx=self.ctx)
-        if self.ctx.extras.get("loss_signal") == Signal.SKIP_STEP:
-            return {k: float(v.detach()) if isinstance(v, torch.Tensor) else v for k, v in loss_dict.items()}
-
-        self.bus.dispatch("on_backward_pre", loss=loss, ctx=self.ctx)
-        loss.backward()
-        self.bus.dispatch("on_backward_post", ctx=self.ctx)
-        grad_norm = torch.nn.utils.clip_grad_norm_(
-            [p for p in self.model.parameters() if p.grad is not None], 1.0)
-        self.bus.dispatch("on_clip_grad", step=self.ctx.step, grad_norm=float(grad_norm))
-        self.bus.dispatch("on_optimizer_step_pre", ctx=self.ctx)
-        if hasattr(self.optimizer, "step"):
-            self.optimizer.step()
-        self.bus.dispatch("on_optimizer_step_post", ctx=self.ctx)
-        if hasattr(self.optimizer, "zero_grad"):
-            self.optimizer.zero_grad()
-        self.bus.dispatch("on_zero_grad", ctx=self.ctx)
-        if self.scheduler is not None and getattr(self.scheduler, "step_per_batch", True):
-            self.scheduler.step()
-            self.bus.dispatch("on_scheduler_step", ctx=self.ctx)
-
-        self.bus.dispatch("on_step_end", step=self.ctx.step, ctx=self.ctx)
-        return {k: float(v.detach()) if isinstance(v, torch.Tensor) else v
-                for k, v in loss_dict.items()}
+        # Populate ctx for RLUpdateRule (backward/callbacks delegated below)
+        self.ctx.extras.update({
+            "log_probs_new": log_probs_new,
+            "log_probs_old": log_probs_old,
+            "advantages": advantages,
+            "group_ids": group_ids,
+            "model": self.model,
+        })
+        self.ctx.loss_fn = self._loss_fn
+        self.ctx.model = self.model
+        return self._rl_rule.step(self.model, batch, self.ctx)
 
     def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
         """Bridge to _grpo_step() for the unified train_step() protocol.
@@ -300,6 +274,7 @@ class GRPOTrainer(Trainer):
         minibatch policy update**.  Group-relative advantages are computed inside
         GRPOLoss per batch; the outer group rollout loop remains in fit().
         """
+        self.ctx.extras.pop("loss_signal", None)
         raw = self._grpo_step(batch)
         return StepOutput(loss=raw.get("loss"), metrics=dict(raw))
 
