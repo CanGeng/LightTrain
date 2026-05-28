@@ -10,8 +10,9 @@
 1. [一次完整训练的准入与产出 (I/O)](#1-io)
 2. [命令行工具 (CLI) 指南](#2-cli)
 3. [配置文件 (YAML) 编写指南](#3-yaml)
-4. [程序的默认防呆行为](#4-default-behaviors)
-5. [内部组件的耦合工作流](#5-under-the-hood)
+4. [分布式训练（parallel:）](#4-parallel)
+5. [程序的默认防呆行为](#5-default-behaviors)
+6. [内部组件的耦合工作流](#6-under-the-hood)
 
 ---
 
@@ -488,7 +489,117 @@ logger:
 
 ---
 
-## 4. 默认防呆行为
+## 4. 分布式训练（`parallel:`）
+
+`parallel:` 块让 lighttrain 从单卡自然扩展到多卡分布式，无需修改模型或 Trainer 代码。
+缺省不填 `parallel:` 等同于 `dp=tp=pp=ep=1`（单卡退化模式）。
+
+### 4.1 `parallel:` 字段说明
+
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `backend` | `"nccl"` \| `"gloo"` | `"nccl"` | `torch.distributed` 通信后端；gloo 用于 CPU / CI 测试 |
+| `dp` | int | 1 | Data Parallel 副本数 |
+| `tp` | int | 1 | Tensor Parallel 分片数（TP×DP×PP 须等于总 GPU 数） |
+| `pp` | int | 1 | Pipeline Parallel 阶段数 |
+| `ep` | int | 1 | Expert Parallel 大小；须整除 `dp`，是 DP 子分组 |
+| `sp` | bool | false | 是否启用 Sequence Parallelism（与 TP 配合使用） |
+| `force_cpu` | bool | false | 强制所有张量使用 CPU；配合 `backend: gloo` 做多进程通信测试，无需 GPU |
+| `grad_sync` | sub-block | `{name: noop}` | 梯度同步策略，见下表 |
+| `tensor_parallel` | sub-block \| null | null | TP 手术配置 |
+| `pipeline` | sub-block \| null | null | PP 调度配置 |
+
+### 4.2 `grad_sync:` 策略
+
+| `name` | 实现 | 说明 |
+|---|---|---|
+| `noop` | `NoopGradSyncStrategy` | 单卡直通（默认） |
+| `ddp` | `DDPStrategy` | `torch.nn.parallel.DistributedDataParallel` |
+| `fsdp` | `FSDPStrategy` | `torch.distributed.fsdp.FullyShardedDataParallel` |
+| `deepspeed` | `ZeROStrategy` | DeepSpeed ZeRO-1/2/3 engine |
+
+`ddp` 额外可选字段：`find_unused_parameters: false`
+`fsdp` 额外可选字段：`sharding_strategy`, `state_dict_type` (`"full"` 或 `"sharded"`)
+
+### 4.3 `tensor_parallel:` 子块
+
+```yaml
+tensor_parallel:
+  auto_plan_for: llama    # 内置方案：llama / gpt2 / mistral
+  # 或手动指定：
+  # plan:
+  #   - { path: "model.layers.*.self_attn.q_proj", style: colwise }
+  #   - { path: "model.layers.*.self_attn.o_proj", style: rowwise }
+```
+
+### 4.4 `pipeline:` 子块
+
+```yaml
+pipeline:
+  n_microbatches: 8          # 微批次数（建议 ≥ pp 阶段数）
+  schedule: 1f1b             # 调度方案：1f1b / gpipe / interleaved_1f1b
+  stage_spec:
+    - { layers: "model.embed_tokens,model.layers.0-15" }
+    - { layers: "model.layers.16-31,model.norm,lm_head" }
+```
+
+### 4.5 torchrun 启动格式
+
+```bash
+torchrun --nproc_per_node=<N> -m lighttrain.cli train -c <config.yaml>
+```
+
+多机多卡时另加 `--nnodes`, `--node_rank`, `--master_addr`, `--master_port`。
+
+### 4.6 典型配置示例
+
+**单机 DDP（4 GPU）**
+
+```yaml
+parallel:
+  backend: nccl
+  dp: 4
+  grad_sync:
+    name: ddp
+    find_unused_parameters: false
+```
+
+**FSDP + 梯度累积**
+
+```yaml
+parallel:
+  backend: nccl
+  dp: 8
+  grad_sync:
+    name: fsdp
+    sharding_strategy: FULL_SHARD
+    state_dict_type: full
+trainer:
+  accumulate: 4
+```
+
+**gloo + CPU 多进程通信测试（无 GPU）**
+
+```yaml
+parallel:
+  backend: gloo
+  dp: 4
+  force_cpu: true
+  grad_sync:
+    name: ddp
+    find_unused_parameters: false
+engine:
+  mixed_precision: "no"
+```
+
+> `force_cpu: true` 会跳过 CUDA DeviceMesh 初始化，所有张量在 CPU 上运行。
+> 适用于 CI 环境验证进程组初始化、AllReduce 通信、训练循环不死锁等场景。
+
+完整 recipe 示例见 [`frontier_plugins/distributed/recipes/`](../frontier_plugins/distributed/recipes/)。
+
+---
+
+## 5. 默认防呆行为
 
 如果你只提供 `model:` + `data:` + `optim:`，框架会自动填充以下默认值：
 
@@ -516,7 +627,7 @@ logger:
 
 ---
 
-## 5. 内部组件初始化顺序
+## 6. 内部组件初始化顺序
 
 以下是 `lighttrain train -c config.yaml` 执行时内部的完整流程（来源：`lighttrain/cli/_runtime.py:setup_run_from_config`）：
 
@@ -533,19 +644,39 @@ logger:
 ├─────────────────────────────────────────────────────────────────────┤
 │  3. 组件实例化（顺序严格）                                           │
 │                                                                     │
-│     model = build_model(cfg)                                        │
-│       └─ model.to(device)   ← CUDA 或 CPU 自动选择                 │
+│  [Phase A] 拓扑初始化                                                │
+│     parallel_ctx = _init_parallel(cfg)                              │
+│       └─ parallel: 缺省或 dp×tp×pp=1 → ParallelContext.single_gpu() │
+│       └─ 否则 → ParallelContext.from_env(cfg.parallel)              │
+│             init_process_group(backend) + DeviceMesh 构建           │
+│     device = parallel_ctx.local_device                              │
+│       └─ force_cpu=true → cpu；CUDA 可用 → cuda:{local_rank}        │
 │                                                                     │
+│  [Phase B] 模型构建 + Tensor/Sequence/Expert 并行手术               │
+│     model = build_model(cfg)                                        │
+│     mp_strategy = _build_model_parallel_strategy(cfg)               │
+│     if mp_strategy:                                                 │
+│         model = mp_strategy.apply(model, parallel_ctx)             │
+│         (TP/SP/EP 手术在此完成，参数已按 rank 切分)                 │
+│                                                                     │
+│  [Phase C] Pipeline 分阶段（pp > 1 时）                             │
+│     pipeline schedule 构建，模型按 stage_spec 切割到各 pp rank      │
+│                                                                     │
+│  [Phase D] 梯度同步包装                                             │
+│     grad_sync = _build_grad_sync_strategy(cfg)  ← noop/ddp/fsdp/ds │
+│     if grad_sync:                                                   │
+│         model, optimizer, loader =                                  │
+│             grad_sync.prepare(model, optimizer_factory,             │
+│                               loader, parallel_ctx, device=device)  │
+│         (FSDP 在 prepare 内包装后再调 optimizer_factory)            │
+│     else:                                                           │
+│         model = model.to(device)                                    │
+│         optimizer = build_optimizer(cfg, model)                     │
+│                                                                     │
+│  [公共] data_module / scheduler / loss / callbacks / logger / ckpt  │
 │     data_module = build_data(cfg)                                   │
 │       └─ tokenizer → dataset → collator → sampler → DataLoader     │
-│                                                                     │
-│     optimizer = build_optimizer(cfg, model)                         │
-│       └─ wrapper = Registry.get("optimizer", name)(**hyper_params)  │
-│       └─ wrapper.build(model)  ← 此时才真正构造 torch.optim 对象   │
-│                                                                     │
 │     scheduler = build_scheduler(cfg, optimizer)                     │
-│       └─ sched.attach(optimizer.optimizer)                          │
-│                                                                     │
 │     loss_fn   = build_loss(cfg)      ← 默认 CrossEntropyLoss       │
 │     callbacks = build_callbacks(cfg)                                │
 │     logger    = build_logger(cfg, run_dir)                          │
@@ -555,6 +686,8 @@ logger:
 │     update_rule = StandardUpdateRule(grad_clip, accumulate)         │
 │     accelerator = build_accelerator(mixed_precision)                │
 │     engine = StandardEngine(update_rule, loss_fn, accelerator)      │
+│     ctx.parallel_ctx = parallel_ctx                                 │
+│     ctx.grad_sync    = grad_sync                                    │
 ├─────────────────────────────────────────────────────────────────────┤
 │  5. Trainer 装配                                                     │
 │     trainer = Trainer(                                              │
@@ -571,19 +704,21 @@ logger:
 │         engine.step(batch, ctx)                                     │
 │           └─ update_rule.step(model, batch, ctx)                   │
 │               └─ loss_fn(model(batch), batch, ctx)  → loss         │
-│               └─ loss.backward()                                    │
-│               └─ clip_grad_norm_()                                  │
-│               └─ optimizer.step() + zero_grad()                     │
+│               └─ grad_sync.backward(loss, model)    ← 含 no_sync   │
+│               └─ grad_sync.clip_grad_norm(...)                      │
+│               └─ grad_sync.optimizer_step(optimizer, model)         │
 │               └─ scheduler.step()                                   │
-│         [每 log_every 步] logger.log_scalars(metrics)              │
-│         [每 ckpt_every 步] ckpt_manager.save(step, state)          │
+│         [每 log_every 步，rank-0] logger.log_scalars(metrics)      │
+│         [每 ckpt_every 步，rank-0] ckpt_manager.save(step, state)  │
 │       on_train_end → logger.flush()                                 │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 **设计要点：**
+- **并行拓扑先于一切**：`parallel_ctx` 在 model 构建前就绪，`device` 从它取，避免任何组件在错误设备上初始化。
+- **TP/SP/EP 必须在 FSDP/DDP 包装之前**：张量并行手术改变参数形状，sharding 必须看到切分后的形状。
+- **FSDP optimizer 后置**：`grad_sync.prepare()` 接受 `optimizer_factory: Callable`，在模型包装完毕后才调用，符合 FSDP 要求（先 wrap 再 build optimizer）。
+- **rank-0 gating**：`_is_main_process` 门控所有 IO（日志、checkpoint、crash bundle），多卡下只有 global rank 0 写出。
 - `optimizer.build(model)` 发生在 model 构建**之后**，确保 optimizer 能看到完整的参数组。
-- `scheduler.attach(optimizer)` 在 optimizer 构建**之后**，让 scheduler 拿到真实的 `param_groups`。
 - `loss_fn` 作为独立组件传入 `engine`，而不是写死在 trainer 里，因此可以通过配置随时替换。
-- `engine` 和 `update_rule` 解耦：engine 负责编排调用顺序，update_rule 负责"如何更新梯度"的逻辑（clip、累积、SAM 等）。
 - `manifest.json` 永远最后写入：中途崩溃不会产生被误读的"半截 checkpoint"。

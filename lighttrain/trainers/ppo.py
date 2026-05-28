@@ -275,7 +275,7 @@ class PPOTrainer(Trainer):
                 self.ctx.step += 1
                 self.ctx.global_step = self.ctx.step
 
-                if self.ctx.step % self.log_every == 0 and self.logger is not None:
+                if self.ctx.step % self.log_every == 0 and self.logger is not None and self._is_main():
                     scalar = {
                         k: v for k, v in last_metrics.items()
                         if isinstance(v, float) and math.isfinite(v)
@@ -292,6 +292,7 @@ class PPOTrainer(Trainer):
                         state={"model": self.model.state_dict(), "trainer": self.state_dict()},
                         kind="step",
                         extras={"metrics": last_metrics},
+                        parallel_ctx=self._pctx,
                     )
 
         except BaseException as exc:  # noqa: BLE001

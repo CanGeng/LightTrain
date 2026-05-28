@@ -23,6 +23,7 @@ exhaustion falls back to a soft SKIP_STEP and writes
 
 from __future__ import annotations
 
+from contextlib import nullcontext as _nullcontext
 from typing import Any, Mapping
 
 import torch
@@ -247,11 +248,27 @@ class StandardUpdateRule:
         if bus is not None:
             bus.dispatch("on_backward_pre", step=ctx.step, loss=loss)
 
+        grad_sync = getattr(ctx, "grad_sync", None)
+        parallel_ctx = getattr(ctx, "parallel_ctx", None)
+
+        # Determine accumulation state BEFORE incrementing micro_step so we can
+        # suppress inter-rank gradient sync (DDP/FSDP no_sync) on all but the
+        # last micro-batch.  After increment: accumulating = True means keep
+        # accumulating; False means this was the last micro-step — do optimizer.
+        pre_accumulating = (
+            (self._micro_step + 1) % self.accumulate_grad_batches
+        ) != 0
+
         scaled = loss / self.accumulate_grad_batches
-        if accelerator is not None and hasattr(accelerator, "backward"):
-            accelerator.backward(scaled)
-        else:
-            scaled.backward()
+        accum_ctx = grad_sync.accumulate(model) if (grad_sync and pre_accumulating) else _nullcontext()
+
+        with accum_ctx:
+            if grad_sync is not None:
+                grad_sync.backward(scaled, model)
+            elif accelerator is not None and hasattr(accelerator, "backward"):
+                accelerator.backward(scaled)
+            else:
+                scaled.backward()
 
         self._micro_step += 1
         accumulating = (self._micro_step % self.accumulate_grad_batches) != 0
@@ -263,18 +280,24 @@ class StandardUpdateRule:
         grad_norm = 0.0
         if not accumulating:
             if self.grad_clip and self.grad_clip > 0:
-                params = [p for p in model.parameters() if p.grad is not None]
-                if params:
-                    if accelerator is not None and hasattr(accelerator, "clip_grad_norm_"):
-                        gn = accelerator.clip_grad_norm_(params, max_norm=self.grad_clip)
-                    else:
-                        gn = torch.nn.utils.clip_grad_norm_(params, max_norm=self.grad_clip)
-                    grad_norm = float(gn)
+                if grad_sync is not None:
+                    grad_norm = grad_sync.clip_grad_norm(model, self.grad_clip, parallel_ctx)
+                else:
+                    params = [p for p in model.parameters() if p.grad is not None]
+                    if params:
+                        if accelerator is not None and hasattr(accelerator, "clip_grad_norm_"):
+                            gn = accelerator.clip_grad_norm_(params, max_norm=self.grad_clip)
+                        else:
+                            gn = torch.nn.utils.clip_grad_norm_(params, max_norm=self.grad_clip)
+                        grad_norm = float(gn)
             if bus is not None:
                 bus.dispatch("on_clip_grad", step=ctx.step, grad_norm=grad_norm)
                 bus.dispatch("on_optimizer_step_pre", step=ctx.step)
 
-            optimizer.step()
+            if grad_sync is not None:
+                grad_sync.optimizer_step(optimizer, model)
+            else:
+                optimizer.step()
 
             if bus is not None:
                 bus.dispatch("on_optimizer_step_post", step=ctx.step, model=model)

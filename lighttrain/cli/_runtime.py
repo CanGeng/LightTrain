@@ -19,6 +19,7 @@ from .. import __version__
 from ..checkpoint.manager import CheckpointManager
 from ..config import RootConfig, load_config
 from ..config._resolver import resolve as _resolve
+from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
 from ..engine.standard import StandardEngine
 from ..logging._bus import LoggerBus
@@ -129,13 +130,17 @@ def _eager_import_components() -> None:
         from ..models import peft as _peft  # noqa: F401
     except ImportError:
         pass
-    # Frontier plugins (layer_offload + quant). Same opt-in pattern.
+    # Frontier plugins (layer_offload + quant + distributed). Same opt-in pattern.
     try:
         import frontier_plugins.layer_offload as _lo_plugin  # noqa: F401
     except ImportError:
         pass
     try:
         import frontier_plugins.quant as _quant_plugin  # noqa: F401
+    except ImportError:
+        pass
+    try:
+        import frontier_plugins.distributed as _dist_plugin  # noqa: F401
     except ImportError:
         pass
 
@@ -279,6 +284,95 @@ def _select_device() -> torch.device:
     if torch.cuda.is_available():
         return torch.device("cuda")
     return torch.device("cpu")
+
+
+def _init_parallel(cfg: RootConfig) -> ParallelContext:
+    """Return ParallelContext from config.
+
+    When ``cfg.parallel`` is absent or all degrees==1, returns a plain
+    single_gpu() context without touching torch.distributed.
+    When ``cfg.parallel`` is present with dp/tp/pp > 1, initializes the
+    process group and DeviceMesh from the torchrun environment variables.
+    """
+    par = getattr(cfg, "parallel", None)
+    if par is None:
+        return ParallelContext.single_gpu()
+    # Presence of parallel section doesn't mean we need dist — check degrees.
+    dp = int(getattr(par, "dp", 1))
+    tp = int(getattr(par, "tp", 1))
+    pp = int(getattr(par, "pp", 1))
+    ep = int(getattr(par, "ep", 1))
+    if dp * tp * pp * ep == 1:
+        return ParallelContext.single_gpu()
+    return ParallelContext.from_env(par)
+
+
+def _build_grad_sync_strategy(cfg: RootConfig) -> Any | None:
+    """Build a GradSyncStrategy from cfg.parallel.grad_sync, or None for noop.
+
+    Returns None (not a NoopGradSyncStrategy instance) for the single-GPU
+    path so existing update-rule code keeps its fast path unchanged.
+    """
+    par = getattr(cfg, "parallel", None)
+    if par is None:
+        return None
+    grad_sync_cfg = getattr(par, "grad_sync", None)
+    if grad_sync_cfg is None:
+        return None
+    name = str(getattr(grad_sync_cfg, "name", "noop") or "noop")
+    if name == "noop":
+        return None
+    # Import and construct the strategy via the registry.
+    strategy_cls = _registry_get("grad_sync_strategy", name)
+    kwargs: dict[str, Any] = {}
+    if hasattr(grad_sync_cfg, "model_dump"):
+        raw = grad_sync_cfg.model_dump()
+    elif isinstance(grad_sync_cfg, Mapping):
+        raw = dict(grad_sync_cfg)
+    else:
+        raw = {}
+    for k, v in raw.items():
+        if k != "name":
+            kwargs[k] = v
+    return strategy_cls(**kwargs)
+
+
+def _build_model_parallel_strategy(cfg: RootConfig) -> Any | None:
+    """Build a ModelParallelStrategy from cfg.parallel.tensor_parallel, or None."""
+    par = getattr(cfg, "parallel", None)
+    if par is None:
+        return None
+    tp_cfg = getattr(par, "tensor_parallel", None)
+    if tp_cfg is None:
+        return None
+    tp = int(getattr(par, "tp", 1))
+    if tp <= 1:
+        return None
+    name = str(getattr(tp_cfg, "auto_plan_for", None) or "tensor_parallel")
+    try:
+        strategy_cls = _registry_get("model_parallel_strategy", "tensor_parallel")
+    except Exception:  # strategy not yet registered (frontier_plugins not loaded)
+        return None
+    kwargs: dict[str, Any] = {}
+    if hasattr(tp_cfg, "model_dump"):
+        kwargs = {k: v for k, v in tp_cfg.model_dump().items() if v is not None}
+    return strategy_cls(**kwargs)
+
+
+def _build_optimizer_factory(cfg: RootConfig):
+    """Return a Callable[[nn.Module], optimizer] that grad_sync.prepare can call.
+
+    FSDP requires the optimizer to be built AFTER model wrapping, so the
+    factory is lazy — it resolves the spec fresh each time it is called.
+    """
+    def factory(model: torch.nn.Module) -> Any:
+        spec = _to_dict(cfg.optim)
+        if not spec:
+            raise RuntimeError("recipe is missing `optim:` section")
+        wrapper = _resolve(spec, category="optimizer")
+        wrapper.build(model)
+        return wrapper
+    return factory
 
 
 def _diag_field(cfg: Any, key: str, default: Any) -> Any:
@@ -439,7 +533,11 @@ def setup_run_from_config(
 
             warnings.warn("code snapshot failed (see logs); continuing without it")
 
-    device = _select_device()
+    # Phase A: distributed topology.
+    # _init_parallel returns single_gpu() when cfg.parallel is absent,
+    # so all downstream code is topology-agnostic.
+    parallel_ctx = _init_parallel(cfg)
+    device = parallel_ctx.local_device
 
     # ----- lineage store --------------------------------------------------
     # Soft dependency. Per-run SQLite only — global aggregate is a
@@ -452,12 +550,50 @@ def setup_run_from_config(
     except Exception:
         lineage_store = None
 
-    model = _build_model(cfg).to(device)
-    data_module = _build_data(
-        cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
-    )
-    optimizer = _build_optimizer(cfg, model)
-    scheduler = _build_scheduler(cfg, optimizer)
+    # Phase B: model surgery (TP/SP/EP) — must run on bare model before FSDP/DDP.
+    model = _build_model(cfg)
+    mp_strategy = _build_model_parallel_strategy(cfg)
+    if mp_strategy is not None:
+        model = mp_strategy.apply(model, parallel_ctx)
+
+    # Phase C: pipeline splitting (PP) — after TP surgery, before DP wrap.
+    # PP support requires frontier_plugins/distributed/; skip for now when
+    # the PipelineSchedule implementation is not yet registered.
+    pipeline_schedule = None
+    par = getattr(cfg, "parallel", None)
+    if par is not None and int(getattr(par, "pp", 1)) > 1:
+        try:
+            ps_cls = _registry_get("pipeline_schedule", "1f1b")
+            pipeline_cfg = getattr(par, "pipeline", None)
+            ps_kwargs: dict[str, Any] = {}
+            if pipeline_cfg is not None and hasattr(pipeline_cfg, "model_dump"):
+                ps_kwargs = {k: v for k, v in pipeline_cfg.model_dump().items() if v is not None}
+            pipeline_schedule = ps_cls(**ps_kwargs)
+            model = pipeline_schedule.prepare(model, parallel_ctx)
+        except Exception:  # PP strategy not yet registered
+            pass
+
+    # Phase D: gradient-sync wrap (DDP/FSDP/ZeRO).
+    # When grad_sync is None (single-GPU / noop), fall back to the plain path.
+    grad_sync = _build_grad_sync_strategy(cfg)
+    if grad_sync is not None:
+        optimizer_factory = _build_optimizer_factory(cfg)
+        data_module = _build_data(
+            cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
+        )
+        _raw_loader = data_module.train_loader()
+        model, optimizer, _loader = grad_sync.prepare(
+            model, optimizer_factory, _raw_loader, parallel_ctx, device=device
+        )
+        # scheduler is built against the (possibly-wrapped) optimizer
+        scheduler = _build_scheduler(cfg, optimizer)
+    else:
+        model = model.to(device)
+        data_module = _build_data(
+            cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
+        )
+        optimizer = _build_optimizer(cfg, model)
+        scheduler = _build_scheduler(cfg, optimizer)
     loss_fn = _build_loss(cfg)
     callbacks = _build_callbacks(cfg)
     logger = _build_logger(cfg, run_dir)
@@ -600,6 +736,9 @@ def setup_run_from_config(
     # loss_attribution, file_signals) all read these off ctx.
     ctx.run_dir = run_dir
     ctx.mode = str(getattr(cfg, "mode", "lab") or "lab")
+    # Distributed fields — always set; single-GPU uses the defaults.
+    ctx.parallel_ctx = parallel_ctx
+    ctx.grad_sync = grad_sync
     # Stash run_dir on the trainer so LineageRecorderCallback can read it.
     try:
         trainer._run_dir = run_dir  # type: ignore[attr-defined]
@@ -630,6 +769,8 @@ def setup_run_from_config(
         "trainer": trainer,
         "device": device,
         "lineage_store": lineage_store,
+        "parallel_ctx": parallel_ctx,
+        "grad_sync": grad_sync,
     }
 
 

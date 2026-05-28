@@ -10,9 +10,10 @@ unrelated machinery.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from ..callbacks.base import EventBus
+from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
 from ..protocols import StepOutput
 
@@ -98,6 +99,17 @@ class Trainer(ABC):
         raise TypeError(
             f"_step() must return StepOutput or dict, got {type(result).__name__}"
         )
+
+    # ---- distributed helpers -----------------------------------------------
+
+    @property
+    def _pctx(self) -> ParallelContext:
+        """Active ParallelContext; falls back to single_gpu() when not distributed."""
+        return getattr(self.ctx, "parallel_ctx", None) or ParallelContext.single_gpu()
+
+    def _is_main(self) -> bool:
+        """True only on global rank 0. Guards checkpoint writes and logging."""
+        return self._pctx.is_main_process
 
     # ---- state ------------------------------------------------------------
 

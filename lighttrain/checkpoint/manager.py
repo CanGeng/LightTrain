@@ -92,14 +92,21 @@ class CheckpointManager:
         *,
         kind: str = "step",
         extras: Mapping[str, Any] | None = None,
-    ) -> Path:
+        parallel_ctx: Any | None = None,
+    ) -> Path | None:
         """Write a checkpoint atomically.
 
         ``state`` may include keys ``model`` (state_dict), ``optimizer``,
         ``scheduler``, ``rng``, ``trainer``. Manifest is the LAST file
         written, so a partial dir without ``manifest.json`` is recognized
         as incomplete and skipped on resume.
+
+        In distributed runs, pass ``parallel_ctx`` so that only rank-0
+        writes to disk.  Non-rank-0 processes return ``None`` immediately.
         """
+        if parallel_ctx is not None and not parallel_ctx.is_main_process:
+            return None
+
         target = self.ckpt_dir / f"step_{int(step)}"
         target.mkdir(parents=True, exist_ok=True)
 

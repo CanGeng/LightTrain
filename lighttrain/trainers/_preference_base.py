@@ -320,6 +320,8 @@ class PreferenceTrainer(Trainer):
         return []
 
     def _maybe_log(self, metrics: Mapping[str, Any]) -> None:
+        if not self._is_main():
+            return
         if self.logger is None or not metrics:
             return
         if self.ctx.step % self.log_every != 0:
@@ -350,6 +352,7 @@ class PreferenceTrainer(Trainer):
             state={"model": self.model.state_dict(), "trainer": self.state_dict()},
             kind="step",
             extras={"metrics": dict(metrics)},
+            parallel_ctx=self._pctx,
         )
 
     def state_dict(self) -> dict[str, Any]:
