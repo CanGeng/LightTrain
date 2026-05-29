@@ -13,6 +13,48 @@ from lighttrain.protocols import ModelOutput
 from lighttrain.registry import get_registry
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Register custom markers used by the adversarial suite."""
+    config.addinivalue_line(
+        "markers",
+        "slow: tests that spawn multiple processes or otherwise take >1s "
+        "wall-clock; skip with `-m 'not slow'`",
+    )
+
+
+@pytest.fixture
+def tmp_run_dir(tmp_path: Path) -> Path:
+    """Scratch run dir shaped like a real lighttrain run (has ``checkpoints/``)."""
+    run = tmp_path / "run"
+    (run / "checkpoints").mkdir(parents=True)
+    return run
+
+
+@pytest.fixture
+def lineage_store_factory(tmp_path: Path):
+    """Factory yielding fresh ``LineageStore`` instances; closed at teardown.
+
+    Use ``store = lineage_store_factory()`` to get a clean SQLite-backed store.
+    """
+    from lighttrain.lineage import LineageStore
+
+    stores: list[LineageStore] = []
+
+    def _make(name: str = "lineage.sqlite") -> LineageStore:
+        s = LineageStore(tmp_path / name)
+        stores.append(s)
+        return s
+
+    try:
+        yield _make
+    finally:
+        for s in stores:
+            try:
+                s.close()
+            except Exception:  # noqa: BLE001 — best-effort
+                pass
+
+
 @pytest.fixture
 def clean_registry():
     """Snapshot the global registry, yield, then restore.

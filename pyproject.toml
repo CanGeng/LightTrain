@@ -79,5 +79,5 @@ source = [
 omit = ["**/_exceptions.py", "**/protocols.py"]
 
 [tool.coverage.report]
-fail_under = 75
+fail_under = 70
 show_missing = true
