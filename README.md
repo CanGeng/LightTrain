@@ -9,10 +9,16 @@ Still in the testing phase.
 
 ## Overview
 
-lighttrain is a highly customizable training framework designed for research workflows: pretraining small language models, supervised fine-tuning, preference learning, reinforcement learning, and distillation. The core — Registry, Config, Engine, UpdateRule, Trainer, EventBus, PrepGraph — is small enough to read end-to-end, while research-grade extensions (PEFT, vLLM, alternative architectures, sweep tooling) are available as opt-in [frontier plugins](plugins/).
+lighttrain is a highly customizable training framework designed for research workflows: pretraining small language models, supervised fine-tuning, preference learning, reinforcement learning, and distillation. The core — Registry, Config, Engine, UpdateRule, Trainer, EventBus, PrepGraph — is small enough to read end-to-end, while research-grade extensions (PEFT, vLLM, alternative architectures, sweep tooling) are available as opt-in [plugins](plugins/).
+
+Designed for single-GPU researchers. Distributed training (DDP/FSDP/TP/PP) is available as an opt-in extension for scaling up, not the default path.
+
+Distributed training (DDP/FSDP/TP/PP/EP) is implemented and unit-tested via CPU-based multiprocess spawn tests. It has NOT been validated at scale on multi-node GPU clusters. Use at your own risk for production distributed workloads.
+
+While Claude Code assisted with implementation, all architectural decisions, test design, and quality gates were human-directed. The test suite (33K lines, 1600+ tests) includes adversarial regression tests verified via mutation testing.
 
 Design goals:
-**registry-first**, **failure-first**, **plugin-clean**, **single-GPU honest**, **lab-friendly**, and **audit-ready**.
+**registry-first**, **failure-first**, **plugin-clean**, **lab-friendly**, and **audit-ready**.
 
 ---
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lighttrain"
 version = "0.1.5-alpha"
-description = "Single-GPU PyTorch LM training framework for research labs"
+description = "PyTorch LM training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
