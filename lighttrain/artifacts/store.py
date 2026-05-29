@@ -196,10 +196,20 @@ class SafetensorsShardStore(_BaseStore):
                 self._index = {}
 
     def put(self, sample_id: str, tensors: Mapping[str, torch.Tensor]) -> None:
+        """Persist ``tensors`` for ``sample_id``.
+
+        Idempotent: if ``sample_id`` was already put — whether already
+        flushed to a shard (``_index``) or still buffered (``_pending``) —
+        the call is a no-op and the first write wins. This makes the
+        store resume-safe both across process restarts AND within a
+        single in-flight session before the first flush.
+        """
         if self._finalized:
             raise RuntimeError(f"store at {self.root} already finalized — cannot put more samples")
         if sample_id in self._index:
-            return  # idempotent — resume-safe
+            return  # first write already flushed to a shard
+        if sample_id in self._pending:
+            return  # first write still buffered — second put must not overwrite
         self._pending[sample_id] = {
             f"{sample_id}/{k}": v.detach().contiguous().cpu() for k, v in tensors.items()
         }

@@ -1,0 +1,107 @@
+# v0.1.6
+
+## 概览
+
+**v0.1.6 闭合 v0.1.5 遗留的两处「契约-实现不一致」缺口**，把对应行为锚定到测试里。共 **2 处源码修复 + 7 个新增对抗性测试**：
+
+- **关闭 1 个 xfail GAP**：`SAMUpdateRule` 现在响应 `Signal.SKIP_STEP` / `Signal.STOP_TRAINING`；对不支持的 `Signal.RETRY_STEP` 显式降级为 `SKIP_STEP` 并发 `UserWarning`，行为与 `StandardUpdateRule` 完全一致
+- **闭合 L2**：`SafetensorsShardStore.put()` 现在真正做到 first-write-wins — 同会话内无需 flush 也幂等
+
+全项目 **1865 + 3 slow = 1868 通过 + 1 skipped + 0 xfailed**（v0.1.5 是 1858 通过 + 1 skipped + 1 xfailed；xfailed 计数清零，新增 7 个测试）。两处修复均通过 mutation sanity check 验证（注释关键代码块 → 对应测试 FAIL → 还原通过）。
+
+L1（ParquetRowStore reload 缺失）与 L3（CheckpointManager 单写者无锁）维持原状，等后续 PR 决策。
+
+## 动机
+
+v0.1.5 在 [docs/changelog/v0.1.5](v0.1.5) 显式记录了：
+
+> **文档化 GAP**：SAM 不响应 `Signal.SKIP_STEP`（`@pytest.mark.xfail(strict=True)`）
+>
+> **Known limitations L2**：`SafetensorsShardStore.put` 的「idempotent — resume-safe」docstring 只在 flush 后成立；同会话内 sid 还在 `_pending` 里没 flush 时，第二次 put 静默覆写 dict entry
+
+两处都是「契约/docstring 暗示的语义」与「实际实现」不一致 — 不会丢数据、不算正确性 bug，但都是契约违反，应该在「记录 → 闭合」的轨道上闭合掉。本版本只处理这两项，L1/L3 显式保留（PR 范围控制）。
+
+## 源码改动（2 处）
+
+### `lighttrain/update_rules/sam.py:127-280`
+
+`SAMUpdateRule.step()` 在 `bus.dispatch("on_loss_computed", ...)` 处**捕获返回的 signal**（之前是丢弃），并在其后插入和 `StandardUpdateRule` 同形态的信号路径，前置于 `on_backward_pre`：
+
+| 输入 signal | 行为 |
+| --- | --- |
+| `CONTINUE` | 走完整 SAM 两步流程（无变化） |
+| `SKIP_STEP` | 跳过整步（包含第一次 backward 与第二次 forward）；`optimizer.zero_grad`、`_micro_step=0`、`metrics["skipped"]=1.0`、dispatch `on_step_end` 后 return |
+| `STOP_TRAINING` | 同 `SKIP_STEP`；额外通过 `ctx.extras["loss_signal"]` 把 `int(Signal.STOP_TRAINING)` 暴露给 trainer 外层循环判停 |
+| `RETRY_STEP` | 发 `warnings.warn(..., UserWarning)`，**降级为 `SKIP_STEP`**（SAM 两步 forward 是原子操作，retry 语义不清晰：要重放第一次？两次都重放？显式不支持比半正确实现安全） |
+
+所有非 `CONTINUE` 信号都写入 `ctx.extras["loss_signal"] = int(loss_signal)`，与 `StandardUpdateRule` 完全对齐。新增 import：`import warnings` 和 `from ..callbacks.base import Signal`。累积边界早返回路径未动 — 它处理不同维度（梯度累积 vs 信号 skip），信号 skip 自然前置于此 if-block。
+
+### `lighttrain/artifacts/store.py:198-218`
+
+`SafetensorsShardStore.put()` 在 `_index` 命中检查后追加 `_pending` 命中检查：
+
+```python
+if sample_id in self._index:
+    return  # first write already flushed to a shard
+if sample_id in self._pending:
+    return  # first write still buffered — second put must not overwrite
+```
+
+同时补完整 docstring：
+
+> Idempotent: if `sample_id` was already put — whether already flushed to a shard (`_index`) or still buffered (`_pending`) — the call is a no-op and the first write wins. This makes the store resume-safe both across process restarts AND within a single in-flight session before the first flush.
+
+## 测试改动
+
+### `tests/update_rules/test_sam.py`（+6 测，-1 xfail）
+
+- **移除 `@pytest.mark.xfail(strict=True)`**：原 `test_sam_skip_signal_currently_ignored_xfail` 改名为 `test_sam_honors_skip_step_signal_from_on_loss_computed`，加上对 `metrics["skipped"]=1.0` 和 `ctx.extras["loss_signal"]=int(SKIP_STEP)` 的额外断言
+- **新增** `test_sam_honors_stop_training_signal_and_surfaces_loss_signal`：STOP_TRAINING → 1 forward + 0 optimizer.step + `ctx.extras["loss_signal"] == int(Signal.STOP_TRAINING)`。镜像 [tests/update_rules/test_standard.py](../../tests/update_rules/test_standard.py) 同名测试
+- **新增** `test_sam_retry_step_degrades_to_skip_with_warning`：用 `pytest.warns(UserWarning, match="does not support RETRY_STEP")` 捕获 warning；断言 `ctx.extras["loss_signal"]` 记录**降级后**的 `int(SKIP_STEP)`（trainer 应该看到实际发生的事，而不是原始信号）
+- **新增** `test_sam_step_end_fires_even_on_skip_signal`（参数化 SKIP_STEP / STOP_TRAINING / RETRY_STEP 三个值）：断言每种 skip 信号下 `on_step_end` 都被 dispatch，logger/checkpoint callback 的观察契约不会因信号 skip 而断裂
+
+### `tests/artifacts/test_store.py`（+1 测）
+
+- **新增** `test_invariant_put_idempotent_within_session_no_flush_needed`：`shard_size=1000` 保证两次 put 都进 `_pending` 不触发自动 flush；`put("s1", t1) → put("s1", t2) → finalize → get("s1") == t1`，外加 `manifest["count"] == 1`。**与现有 `test_invariant_put_idempotent_first_write_wins[safetensors-shards]` 互补**：那个测试在两次 put 之间显式调 `_flush_shard()`，走 `_index` 命中分支；新测试两次 put 都不 flush，走 `_pending` 命中分支
+
+## 维度互不重叠（与现有测试的关系）
+
+| 已有测试 | 是否被本次修复影响 | 备注 |
+| --- | --- | --- |
+| `test_sam_two_passes_fire_perturb_then_restore_then_optimizer_step` | ✓ 仍通过 | 默认 CONTINUE 信号路径无变化 |
+| `test_sam_lifecycle_events_fire_in_exact_order` | ✓ 仍通过 | 正常路径事件顺序不变 |
+| `test_sam_accumulation_boundary_skips_perturbation` | ✓ 仍通过 | 累积早返回路径独立，未动 |
+| `test_sam_no_grad_sync_path_unsupported_gracefully` | ✓ 仍通过 | 本次未修 `grad_sync` 缺口（文档化但未 xfail），保留 |
+| `test_invariant_put_idempotent_first_write_wins[safetensors-shards]` | ✓ 仍通过 | 该测试显式 `_flush_shard()`，走 `_index` 分支不受 `_pending` 检查影响 |
+| `test_invariant_put_idempotent_first_write_wins[memmap-fixed/parquet-rows]` | ✓ 仍通过 | 后两个 backend 本次未动 |
+
+## Mutation Sanity Check（2/2 全部捕获）
+
+| 注入 | 期望 buggy 行为 | 抓住 |
+| --- | --- | --- |
+| `sam.py` 把 `if loss_signal in (SKIP_STEP, STOP_TRAINING):` 改为 `if False and ...` | SKIP/STOP/RETRY 三测的 `fwd_count` 应等于 2（第二次 forward 仍跑） | ✓ 3 个 signal-honor 测试同时 FAIL（`assert 2 == 1`） |
+| `store.py` 删除 `if sample_id in self._pending: return` | within-session put 应该让 `t2` 覆盖 `t1` | ✓ `test_invariant_put_idempotent_within_session_no_flush_needed` FAIL（`Tensor-likes are not close`，差异 8.0） |
+
+两次注入均在测试触发后立即还原；还原后 39 个相关测试全部通过。
+
+## Known limitations 状态
+
+| ID | 描述 | 状态 |
+| --- | --- | --- |
+| GAP-SAM-SKIP | SAM 不响应 `Signal.SKIP_STEP` | ✅ 已闭合（v0.1.6） |
+| GAP-SAM-GRADSYNC | SAM 不使用 `ctx.grad_sync`（文档化，无 xfail） | ⏳ 仍开放（PR 范围控制，待 DDP/FSDP 集成时一起处理） |
+| L1 | `ParquetRowStore` 构造不从磁盘 reload | ⏳ 仍开放 |
+| L2 | `SafetensorsShardStore.put` 同会话非幂等 | ✅ 已闭合（v0.1.6） |
+| L3 | `CheckpointManager` 单写者无锁 | ⏳ 仍开放 |
+
+## 执行结果
+
+| 指标 | 数值 |
+| --- | --- |
+| 新增测试 | **7**（SAM: 1 重命名 + 5 新增；artifacts: 1 新增） |
+| 源码改动 | **2** 处（`sam.py` 信号处理块 / `store.py` `_pending` 命中检查 + docstring） |
+| 关闭的 xfail GAP | **1**（GAP-SAM-SKIP） |
+| 关闭的 known limitation | **1**（L2） |
+| Mutation Sanity Check | **2/2** ✓ |
+| 全项目测试 | **1865 + 3 slow = 1868 通过 + 1 skipped + 0 xfailed**（8 heavy/gpu deselected） |
+| 全套测试执行时间 | ~56 秒（默认）+ ~20 秒（slow） |

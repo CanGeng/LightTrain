@@ -31,7 +31,6 @@ runs/
 # OS
 .DS_Store
 Thumbs.db
-DESIGN.md
 
 # Local secrets / HF endpoint config
 .env
@@ -39,3 +38,4 @@ DESIGN.md
 !.env.example
 scripts/
 /local_workspace/
+/experiments/

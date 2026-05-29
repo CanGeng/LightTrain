@@ -21,11 +21,13 @@ Registered as ``@register("update_rule", "sam")``.
 
 from __future__ import annotations
 
+import warnings
 from contextlib import nullcontext
 from typing import Any, Mapping
 
 import torch
 
+from ..callbacks.base import Signal
 from ..protocols import LossContext, ModelOutput
 from ..registry import register
 
@@ -163,10 +165,39 @@ class SAMUpdateRule:
         # --- Pass 1: forward + backward at θ ---------------------------
         outputs, loss, loss_dict = _forward_loss(batch)
 
+        loss_signal = Signal.CONTINUE
         if bus is not None:
             bus.dispatch("on_forward_post", step=ctx.step, outputs=outputs, model=model)
-            bus.dispatch("on_loss_computed", step=ctx.step, loss=loss, outputs=outputs,
-                         batch=batch, model=model, metrics=ctx.metrics)
+            loss_signal = bus.dispatch(
+                "on_loss_computed", step=ctx.step, loss=loss, outputs=outputs,
+                batch=batch, model=model, metrics=ctx.metrics,
+            )
+
+        if loss_signal == Signal.RETRY_STEP:
+            warnings.warn(
+                "SAMUpdateRule does not support RETRY_STEP (two-pass forward "
+                "is atomic); degrading to SKIP_STEP.",
+                UserWarning,
+                stacklevel=2,
+            )
+            loss_signal = Signal.SKIP_STEP
+
+        if loss_signal != Signal.CONTINUE:
+            ctx.extras["loss_signal"] = int(loss_signal)
+
+        if loss_signal in (Signal.SKIP_STEP, Signal.STOP_TRAINING):
+            optimizer.zero_grad(set_to_none=True)
+            self._micro_step = 0
+            ctx.metrics["loss"] = _to_metric(loss)
+            ctx.metrics["lr"] = _current_lr(optimizer)
+            ctx.metrics.setdefault("grad_norm", 0.0)
+            ctx.metrics["skipped"] = 1.0
+            if bus is not None:
+                bus.dispatch("on_step_end", step=ctx.step, metrics=ctx.metrics,
+                             batch=batch, model=model)
+            return dict(ctx.metrics)
+
+        if bus is not None:
             bus.dispatch("on_backward_pre", step=ctx.step, loss=loss)
 
         scaled = loss / self.accumulate_grad_batches

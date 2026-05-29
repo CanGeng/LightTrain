@@ -195,6 +195,44 @@ def test_invariant_put_idempotent_first_write_wins(
     assert manifest["count"] == 1
 
 
+def test_invariant_put_idempotent_within_session_no_flush_needed(
+    tmp_path: Path,
+) -> None:
+    """Regression pin (closed v0.1.6, L2): ``SafetensorsShardStore.put``
+    is idempotent even before the first ``_flush_shard()`` — same-session
+    duplicate puts to the same ``sample_id`` are no-ops without needing
+    to flush in between.
+
+    Pre-fix behavior: only ``_index`` (post-flush) was checked, so two
+    puts to the same sid while both still buffered in ``_pending`` would
+    silently overwrite each other, violating the resume-safe / first-
+    write-wins contract within a single producer session.
+
+    Pin: ``shard_size=1000`` ensures neither put triggers an auto-flush;
+    after ``finalize()`` the persisted value MUST equal the first put's
+    tensor, not the second's.
+    """
+    torch.manual_seed(0)
+    t1 = {"logits": torch.tensor([[1.0, 2.0]])}
+    t2 = {"logits": torch.tensor([[9.0, 9.0]])}
+
+    store = _make_store("safetensors-shards", tmp_path / "store", shard_size=1000)
+    store.put("s1", t1)
+    # No flush — both puts stay in ``_pending``; the second must no-op.
+    store.put("s1", t2)
+    store.finalize()
+
+    loaded = store.get("s1")
+    torch.testing.assert_close(
+        loaded["logits"], t1["logits"], atol=1e-5, rtol=1e-4,
+    )
+
+    manifest = json.loads(
+        (tmp_path / "store" / "MANIFEST_COMPLETE.json").read_text(encoding="utf-8")
+    )
+    assert manifest["count"] == 1
+
+
 # --------------------------------------------------------------------------- #
 # Common: MANIFEST_COMPLETE write order + atomicity                           #
 # --------------------------------------------------------------------------- #

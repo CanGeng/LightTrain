@@ -340,24 +340,14 @@ def test_sam_no_grad_sync_path_unsupported_gracefully():
     assert grad_sync_calls == []
 
 
-@pytest.mark.xfail(
-    strict=True, reason="SAM does not gate on Signal.SKIP_STEP (documented gap)"
-)
-def test_sam_skip_signal_currently_ignored_xfail():
-    """Goal: when SAM is fixed to honor Signal.SKIP_STEP returned from
-    ``on_loss_computed``, this xfail will XPASS and force a maintainer to
-    flip the assertion.
+def test_sam_honors_skip_step_signal_from_on_loss_computed():
+    """Regression pin (closed v0.1.6): when ``on_loss_computed`` returns
+    ``Signal.SKIP_STEP``, SAM must skip both the second forward and the
+    optimizer.step. The first backward is also skipped — SKIP_STEP means
+    "skip this whole step", matching ``StandardUpdateRule``.
 
-    What we want SAM to do (asserted here as the *correct* behavior):
-      - When on_loss_computed returns SKIP_STEP, the second forward and
-        the optimizer.step must NOT happen.
-
-    What SAM does today: ignores the returned signal entirely. So this test
-    fails on master — which is why we mark it ``xfail(strict=True)``.
-    When SAM gets the fix, the test will XPASS and CI fails loudly,
-    forcing the marker to be removed.
-
-    See: TODO/issue link tracking the SAM skip-step fix.
+    Pin: exactly one forward (no second pass) and ``optimizer.step`` is
+    never called.
     """
 
     class _Skipper:
@@ -377,8 +367,118 @@ def test_sam_skip_signal_currently_ignored_xfail():
     step_spy = MagicMock(wraps=optim.step)
     optim.step = step_spy
 
-    SAMUpdateRule().step(model, _batch(), ctx)
+    metrics = SAMUpdateRule().step(model, _batch(), ctx)
 
-    # Correct behavior: only one forward, no optimizer step.
     assert fwd_count[0] == 1
     step_spy.assert_not_called()
+    assert metrics["skipped"] == 1.0
+    assert ctx.extras.get("loss_signal") == int(Signal.SKIP_STEP)
+
+
+def test_sam_honors_stop_training_signal_and_surfaces_loss_signal():
+    """Regression pin (closed v0.1.6): STOP_TRAINING from on_loss_computed
+    surfaces via ``ctx.extras["loss_signal"]`` as ``int(Signal.STOP_TRAINING)``
+    so the trainer's outer loop (``pretrain.py``) can stop the run.
+
+    Mirrors ``test_stop_training_surfaces_strongest_signal_via_ctx_extras``
+    in ``test_standard.py``.
+    """
+
+    class _Stopper:
+        def on_loss_computed(self, **_):
+            return Signal.STOP_TRAINING
+
+    fwd_count = [0]
+
+    ctx, model, optim = _build_ctx(callbacks=[_Stopper()])
+    fwd_orig = model.forward
+
+    def _count_fwd(**kw):
+        fwd_count[0] += 1
+        return fwd_orig(**kw)
+
+    model.forward = _count_fwd
+    step_spy = MagicMock(wraps=optim.step)
+    optim.step = step_spy
+
+    metrics = SAMUpdateRule().step(model, _batch(), ctx)
+
+    assert fwd_count[0] == 1
+    step_spy.assert_not_called()
+    assert metrics["skipped"] == 1.0
+    assert ctx.extras.get("loss_signal") == int(Signal.STOP_TRAINING)
+
+
+def test_sam_retry_step_degrades_to_skip_with_warning():
+    """Regression pin (closed v0.1.6): SAM does NOT support RETRY_STEP
+    (the two-pass forward is atomic — re-running only the first pass
+    leaves the perturbation state ambiguous). The rule degrades to
+    SKIP_STEP and emits a ``UserWarning`` so callers learn the contract.
+
+    Pin: warning fires, ``optimizer.step`` is not called, ``ctx.extras
+    ["loss_signal"]`` records the *degraded* value (SKIP_STEP), not the
+    original RETRY_STEP — the trainer should see what actually happened.
+    """
+
+    class _Retrier:
+        def on_loss_computed(self, **_):
+            return Signal.RETRY_STEP
+
+    fwd_count = [0]
+
+    ctx, model, optim = _build_ctx(callbacks=[_Retrier()])
+    fwd_orig = model.forward
+
+    def _count_fwd(**kw):
+        fwd_count[0] += 1
+        return fwd_orig(**kw)
+
+    model.forward = _count_fwd
+    step_spy = MagicMock(wraps=optim.step)
+    optim.step = step_spy
+
+    with pytest.warns(UserWarning, match="does not support RETRY_STEP"):
+        metrics = SAMUpdateRule().step(model, _batch(), ctx)
+
+    assert fwd_count[0] == 1
+    step_spy.assert_not_called()
+    assert metrics["skipped"] == 1.0
+    assert ctx.extras.get("loss_signal") == int(Signal.SKIP_STEP)
+
+
+@pytest.mark.parametrize(
+    "signal", [Signal.SKIP_STEP, Signal.STOP_TRAINING, Signal.RETRY_STEP]
+)
+def test_sam_step_end_fires_even_on_skip_signal(signal):
+    """Regression pin (closed v0.1.6): ``on_step_end`` MUST fire on every
+    step path — including signal-driven skip, STOP_TRAINING, and the
+    RETRY_STEP-degraded skip. Loggers and checkpoint callbacks rely on
+    this event for bookkeeping; a refactor that early-returns before
+    ``on_step_end`` dispatch would silently break observability.
+
+    Mirrors ``test_step_end_always_fires_even_on_skip`` in
+    ``test_standard.py``.
+    """
+
+    class _Signaller:
+        def __init__(self) -> None:
+            self.events: list[str] = []
+
+        def on_loss_computed(self, **_):
+            return signal
+
+        def on_step_end(self, **_):
+            self.events.append("on_step_end")
+
+    cb = _Signaller()
+    ctx, model, _ = _build_ctx(callbacks=[cb])
+
+    import warnings as _warnings
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter("ignore", UserWarning)
+        SAMUpdateRule().step(model, _batch(), ctx)
+
+    assert cb.events == ["on_step_end"], (
+        f"on_step_end missing for signal {signal}; got {cb.events}"
+    )
