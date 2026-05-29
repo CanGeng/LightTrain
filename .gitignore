@@ -20,12 +20,8 @@ dist/
 .coverage.*
 htmlcov/
 .tox/
-docs/dev-docs
+docs/deprecated
 acceptance/
-REVIEW_M0_M3.md
-REVIEW_ROUND2.md
-REVIEW_ROUND3.md
-docs/expriment-docs
 scripts/check_core_size.py
 
 # Run artifacts
