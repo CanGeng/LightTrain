@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      fail-fast: false  # 如果 3.10 失败，不要自动取消 3.11 和 3.12 的测试
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"] # 完美契合你的 requires-python
+        python-version: ["3.12"]
 
     steps:
       - name: Checkout code
