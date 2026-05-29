@@ -11,11 +11,53 @@ The two routes are mutually exclusive (enforced by ComponentSpec validator).
 from __future__ import annotations
 
 import importlib
+import inspect
+import warnings
 from typing import Any, Mapping
 
 from ..registry import get as _registry_get
 from ._exceptions import ConfigResolveError
 from ._schema import ComponentSpec
+
+
+def _filter_kwargs(factory: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Drop kwargs not in ``factory``'s signature; warn on drops.
+
+    Pass-through when the factory accepts ``**kwargs`` (``VAR_KEYWORD``) or
+    when the signature cannot be introspected (builtins / C extensions).
+
+    Drops are warned, not raised, so a recipe authored against one model can
+    still build another model when the user CLI-overrides ``model.name`` —
+    the OmegaConf-merged ``model:`` block carries all sibling keys and we
+    cannot ask the user to ``~model.n_layers`` before every switch.
+    Bare ``*args``-only signatures still pass through this filter; positional
+    args can't be expressed via kwargs anyway.
+    """
+    try:
+        sig = inspect.signature(factory)
+    except (ValueError, TypeError):
+        return kwargs
+    params = sig.parameters
+    if any(p.kind == p.VAR_KEYWORD for p in params.values()):
+        return kwargs
+    accepted = {
+        name for name, p in params.items()
+        if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)
+    }
+    accepted.discard("self")
+    filtered = {k: v for k, v in kwargs.items() if k in accepted}
+    dropped = sorted(set(kwargs) - set(filtered))
+    if dropped:
+        factory_name = getattr(factory, "__name__", repr(factory))
+        sample = dropped[:5]
+        suffix = "..." if len(dropped) > 5 else ""
+        warnings.warn(
+            f"Dropped {len(dropped)} unknown kwargs for {factory_name!r}: "
+            f"{sample}{suffix}",
+            UserWarning,
+            stacklevel=2,
+        )
+    return filtered
 
 
 def _coerce(spec: ComponentSpec | Mapping[str, Any]) -> ComponentSpec:
@@ -136,11 +178,15 @@ def resolve(
     kwargs = dict(cs.params)
     if extra_kwargs:
         kwargs.update(extra_kwargs)
+    kwargs = _filter_kwargs(factory, kwargs)
     try:
         return factory(**kwargs)
     except TypeError as e:
+        factory_name = getattr(factory, "__name__", repr(factory))
         raise ConfigResolveError(
-            f"Failed to construct {factory!r} with params {kwargs}: {e}"
+            f"Failed to construct {factory_name}:\n"
+            f"  Cause: {type(e).__name__}: {e}\n"
+            f"  Params: {kwargs!r}"
         ) from e
 
 

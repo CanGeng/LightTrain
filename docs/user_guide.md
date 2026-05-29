@@ -96,6 +96,11 @@ runs/
 
 > **关键约定**：`manifest.json` 是 checkpoint 目录中最后写入的文件。只有它存在，该 checkpoint 才被认为完整。断点续训时，程序会自动跳过不完整的目录。
 
+> **`last.json` / `best.json` schema**：两个指针文件都形如
+> `{"target": "<step_N>"}`，其中 `<step_N>` 是 `checkpoints/` 下的**目录名**（不是绝对路径）。
+> 解析方式：`<run_dir>/checkpoints/<target>`。下游 launcher 直接读 `target`
+> 拼出 checkpoint 目录即可，不要假设有 `path` 字段。
+
 ---
 
 ## 2. CLI 指南

@@ -10,6 +10,7 @@ Pins:
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -168,7 +169,10 @@ def test_train_step_raises_on_invalid_return_type():
 
 def test_state_dict_load_state_dict_roundtrip():
     """Goal: step/epoch/global_step/max_steps roundtrip exactly through
-    state_dict → load_state_dict.
+    state_dict → load_state_dict when recipe-side max_steps matches the
+    saved value (matching is the only case where roundtrip is meaningful;
+    the mismatch case is covered separately to lock the keep-current
+    invariant from Issue #8).
     """
     trainer = _DictStepTrainer(**_base_kwargs(max_steps=10))
     trainer.ctx.step = 5
@@ -178,12 +182,53 @@ def test_state_dict_load_state_dict_roundtrip():
     sd = trainer.state_dict()
     assert sd == {"step": 5, "epoch": 2, "global_step": 7, "max_steps": 10}
 
-    trainer2 = _DictStepTrainer(**_base_kwargs(max_steps=1))
+    trainer2 = _DictStepTrainer(**_base_kwargs(max_steps=10))
     trainer2.load_state_dict(sd)
     assert trainer2.ctx.step == 5
     assert trainer2.ctx.epoch == 2
     assert trainer2.ctx.global_step == 7
     assert trainer2.max_steps == 10
+
+
+def test_invariant_load_checkpoint_does_not_clobber_max_steps():
+    """Goal (Issue #8): load_state_dict must NOT restore max_steps from the
+    checkpoint. It is recipe-controlled — the caller's current value wins.
+
+    Without this guard, resuming from a step-5 checkpoint with a recipe
+    asking for max_steps=10 silently sets max_steps=5, and fit() returns
+    immediately with no training and no warning.
+    """
+    trainer = _DictStepTrainer(**_base_kwargs(max_steps=10))
+    with pytest.warns(UserWarning, match="max_steps"):
+        trainer.load_state_dict(
+            {"step": 5, "epoch": 0, "global_step": 5, "max_steps": 5}
+        )
+
+    assert trainer.max_steps == 10
+    assert trainer.ctx.step == 5
+    assert trainer.ctx.global_step == 5
+
+
+def test_load_checkpoint_warns_when_max_steps_differs():
+    """Goal (Issue #8): when the checkpoint's max_steps disagrees with the
+    current value, load_state_dict emits a UserWarning so the divergence is
+    surfaced (not silent).
+    """
+    trainer = _DictStepTrainer(**_base_kwargs(max_steps=10))
+    with pytest.warns(UserWarning, match="differs from current"):
+        trainer.load_state_dict({"step": 1, "max_steps": 7})
+
+
+def test_load_checkpoint_does_not_warn_when_max_steps_matches():
+    """Goal (Issue #8): matching values must NOT trigger a warning —
+    otherwise normal resume would spam stderr every time.
+    """
+    trainer = _DictStepTrainer(**_base_kwargs(max_steps=10))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # turn any warning into a test failure
+        trainer.load_state_dict({"step": 3, "max_steps": 10})
+    assert trainer.ctx.step == 3
+    assert trainer.max_steps == 10
 
 
 # ===========================================================================

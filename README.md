@@ -423,6 +423,63 @@ lighttrain train -c recipes/ff_demo.yaml           # Forward-Forward
 lighttrain train -c recipes/mezo_sft.yaml          # MeZO zero-order SFT
 ```
 
+### Writing model adapters (recommended pattern)
+
+When integrating third-party architectures (e.g. SSMs from `state-spaces/mamba`,
+`flash-linear-attention`, or any package that ships multiple variants),
+**prefer importing the lowest-level module** and assembling the full model
+yourself, rather than calling a high-level factory function.
+
+```python
+# Good — module-level, resilient to upstream changes:
+from mamba_ssm.modules.mamba3 import Mamba3
+# ...wire your own embedding/head/norm around it inside the adapter.
+
+# Avoid when possible — high-level factory often carries hidden whitelists:
+# from mamba_ssm.models.mixer_seq_simple import MambaLMHeadModel
+# MambaLMHeadModel(..., ssm_layer="Mamba3")   # may not accept new variants
+```
+
+High-level factories often have internal whitelists (e.g.
+`mixer_seq_simple.create_block` only accepts `Mamba1`/`Mamba2` even when
+`mamba3.py` ships in the same checkout), version-specific assumptions, or
+implicit C-extension dependencies. By assembling at the module level your
+adapter controls which layer class is used, which kwargs reach it, and
+which dependencies are pulled in — so it stays working when upstream adds
+a new variant or refactors the factory.
+
+> **Tip — third-party SSM packages.** Some SSM packages (e.g. `mamba_ssm`)
+> eagerly import CUDA C extensions in their `__init__.py`. If your model
+> never calls that path but the import still fails on a CPU-only / mismatched
+> CUDA install, stub the missing extension before importing the package
+> from your `user_modules` file:
+>
+> ```python
+> import sys, types
+> sys.modules.setdefault(
+>     "selective_scan_cuda", types.ModuleType("selective_scan_cuda")
+> )
+> import mamba_ssm  # safe now
+> ```
+
+### Known third-party limitations
+
+Encountered while reproducing Mamba-3 on lighttrain; these live in upstream
+packages, not in lighttrain itself.
+
+- **`state-spaces/mamba`** — `mixer_seq_simple.create_block` only whitelists
+  `Mamba1`/`Mamba2`. Following the **module-level adapter pattern above**
+  sidesteps this entirely: you instantiate `Mamba3` yourself and never hit
+  `create_block`.
+- **`state-spaces/mamba`** — Mamba-2's fast path (`use_mem_eff_path=True`)
+  requires the `causal_conv1d` CUDA extension. Set `use_mem_eff_path=False`
+  to fall back to pure-Triton SSD + `nn.Conv1d` (works out of the box,
+  ~3× slower).
+- **`tilelang==0.1.8` + `apache-tvm-ffi==0.1.11`** — crashes in
+  `NestedLoopChecker` during MIMO chunk-bwd lowering. For GatedDeltaNet,
+  set `FLA_TILELANG=0` to force the Triton backend. Mamba-3 MIMO has no
+  fallback in this env — use the SISO variant.
+
 Alternative update rules:
 
 ```yaml

@@ -9,6 +9,7 @@ unrelated machinery.
 
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Mapping
 
@@ -16,6 +17,12 @@ from ..callbacks.base import EventBus
 from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
 from ..protocols import StepOutput
+
+# Keys that describe the *recipe*, not the run progress. They are written to
+# state_dict() for audit, but load_state_dict() never restores them — resuming
+# from a step-5 checkpoint with a recipe asking for max_steps=10 must keep
+# max_steps=10, otherwise fit() returns immediately with no training (Issue #8).
+_RECIPE_CONTROLLED_KEYS: tuple[str, ...] = ("max_steps", "max_epochs")
 
 
 class Trainer(ABC):
@@ -122,10 +129,22 @@ class Trainer(ABC):
         }
 
     def load_state_dict(self, sd: Mapping[str, Any]) -> None:
+        sd = dict(sd)
+        for key in _RECIPE_CONTROLLED_KEYS:
+            saved = sd.pop(key, None)
+            if saved is None:
+                continue
+            current = getattr(self, key, None)
+            if current is not None and int(saved) != int(current):
+                warnings.warn(
+                    f"Trainer.{key} from checkpoint ({saved}) differs from "
+                    f"current recipe value ({current}); keeping current.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         self.ctx.step = int(sd.get("step", 0))
         self.ctx.epoch = int(sd.get("epoch", 0))
         self.ctx.global_step = int(sd.get("global_step", self.ctx.step))
-        self.max_steps = int(sd.get("max_steps", self.max_steps))
 
 
 __all__ = ["StepOutput", "Trainer"]

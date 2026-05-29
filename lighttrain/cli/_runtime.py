@@ -30,16 +30,35 @@ from ..utils.run_dir import make_run_dir, slugify
 from ..utils.seed import seed_everything
 
 
+_IMPORTED_USER_MODULES: set[str] = set()
+
+
 def _import_user_modules(modules: list[str]) -> None:
     """Import every entry in ``user_modules`` so @register decorators execute.
 
     Accepts dotted module names (``mypkg.mymod``) and file paths
     (``./plugins/my_optim.py``, ``/abs/path/module.py``).
     Must be called after config loading but before any component resolution.
+
+    Idempotent within a process (Issue #9): the second and later calls for a
+    given module are no-ops. Without this guard, a second call would re-run
+    every ``@register(...)`` decorator and raise ``RegistryConflictError``,
+    which blocks resuming or multi-stage scripts that build several runs in
+    the same Python process.
+
     Raises ImportError with context on the first failure.
     """
     for mod in modules:
         _is_path = mod.endswith(".py") or "/" in mod or "\\" in mod
+        if _is_path:
+            try:
+                key = str(Path(mod).expanduser().resolve())
+            except (OSError, RuntimeError):
+                key = mod  # fall back to raw string if resolve() blows up
+        else:
+            key = mod
+        if key in _IMPORTED_USER_MODULES:
+            continue
         try:
             if _is_path:
                 p = Path(mod).expanduser().resolve()
@@ -55,6 +74,7 @@ def _import_user_modules(modules: list[str]) -> None:
                 f"user_modules: failed to import {mod!r}. "
                 "Check that the path exists or the dotted name is on sys.path."
             ) from exc
+        _IMPORTED_USER_MODULES.add(key)
 
 
 def _eager_import_components() -> None:
@@ -465,7 +485,7 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
 
 
 def setup_run_from_config(
-    config_path: Path,
+    config: "str | Path | RootConfig",
     *,
     overrides: list[str] | None = None,
     mode: str | None = None,
@@ -474,6 +494,13 @@ def setup_run_from_config(
     allow_stale_artifact: bool = False,
 ) -> dict[str, Any]:
     """Load+validate config, build run dir, instantiate components.
+
+    ``config`` may be either a config path (``str``/``Path``) or an
+    already-parsed ``RootConfig``. The path form is the common case (CLI);
+    the RootConfig form lets the programmatic API skip the redundant
+    ``load_config`` step (Issues #2, #10). ``overrides`` is only valid with
+    the path form — pass them via ``load_config`` first if you already have
+    a RootConfig.
 
     When ``existing_run_dir`` is given (used by ``lighttrain resume``), no new
     run dir is created — all I/O (logs / checkpoints / lineage.sqlite) targets
@@ -488,8 +515,25 @@ def setup_run_from_config(
     trainer.  Caller decides whether to ``trainer.fit()``.
     """
     _eager_import_components()
-    snapshot_yaml = Path(config_path).read_text(encoding="utf-8")
-    cfg = load_config(config_path, overrides=overrides or [])
+    if isinstance(config, (str, Path)):
+        config_path: Path | None = Path(config)
+        snapshot_yaml = config_path.read_text(encoding="utf-8")
+        cfg = load_config(config_path, overrides=overrides or [])
+    else:
+        if not isinstance(config, RootConfig):
+            raise TypeError(
+                "config must be a str/Path to a YAML file or a parsed "
+                f"RootConfig; got {type(config).__name__}."
+            )
+        if overrides:
+            raise ValueError(
+                "Cannot apply `overrides` to an already-parsed RootConfig. "
+                "Pass a config path instead, or apply overrides via "
+                "load_config() before calling setup_run_from_config()."
+            )
+        cfg = config
+        config_path = None
+        snapshot_yaml = OmegaConf.to_yaml(OmegaConf.create(cfg.model_dump()))
     if mode is not None:
         cfg.mode = mode  # type: ignore[union-attr]
 
@@ -518,7 +562,10 @@ def setup_run_from_config(
             resolved_yaml=resolved_yaml,
             extra_env={
                 "lighttrain_version": __version__,
-                "config_path": str(config_path),
+                "config_path": (
+                    str(config_path) if config_path is not None
+                    else "<in-memory RootConfig>"
+                ),
             },
         )
         # Code snapshot: best-effort; failures degrade to writing a plain

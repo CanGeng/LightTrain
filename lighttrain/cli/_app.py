@@ -628,13 +628,13 @@ def eval_cmd(
     to also write the full EvalReport to disk.
     """
     import json
-    from ..config import load_config
     from ..eval.metrics import perplexity
 
     load_dotenv_if_present()
-    cfg = load_config(config)
 
-    trainer, _run_dir = setup_run_from_config(cfg)
+    bundle = setup_run_from_config(config)
+    trainer = bundle["trainer"]
+    cfg = bundle["cfg"]
 
     if checkpoint is not None:
         ckpt_manager = getattr(trainer, "ckpt_manager", None)
@@ -725,8 +725,8 @@ def regression_gate_cmd(
     from ..eval.suite import EvalReport, RegressionGate
 
     load_dotenv_if_present()
-    cfg = load_config(config)
-    trainer, _run_dir = setup_run_from_config(cfg)
+    bundle = setup_run_from_config(config)
+    trainer = bundle["trainer"]
 
     if checkpoint is not None:
         ckpt_manager = getattr(trainer, "ckpt_manager", None)

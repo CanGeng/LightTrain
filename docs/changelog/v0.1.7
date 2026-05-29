@@ -1,0 +1,205 @@
+# v0.1.7
+
+## 概览
+
+**v0.1.7 关闭在 lighttrain 上复现 Mamba-3 时反馈的 8 个落在 lighttrain 范围内的 issue**
+涵盖 **3 个 P0 框架 Bug（含一个静默正确性 Bug：resume 时 `max_steps` 被覆盖导致训练立刻空跑）+ 3 个 P1 可用性改进 + 2 个文档补充**。
+
+- **5 处源码修复 + 11 个新增测试**，原有测试无回归。
+- 改动文件：
+  - [lighttrain/trainers/base.py](../../lighttrain/trainers/base.py)（Issue #8）
+  - [lighttrain/cli/_runtime.py](../../lighttrain/cli/_runtime.py)（Issue #2/#9/#10）
+  - [lighttrain/cli/_app.py](../../lighttrain/cli/_app.py)（Issue #10）
+  - [lighttrain/config/_resolver.py](../../lighttrain/config/_resolver.py)（Issue #1/#11）
+  - [docs/user_guide.md](../user_guide.md)（Issue #3）
+  - [README.md](../../README.md)（Issue #4/#5）
+
+## 来源
+
+来源于把 Mamba-3 论文实验迁移到 lighttrain 时记录的问题清单。其中：
+
+| 类别 | 数量 | Issue # |
+|------|------|---------|
+| 框架 Bug（必须修） | 3 | #8, #9, #10 |
+| 可用性改进（应该修） | 3 | #1, #2, #11 |
+| 文档补充 | 2 | #3, #4 |
+| 第三方上游问题（v0.1.7 不修） | 3 | #5, #6, #7 |
+
+## 源码改动（5 处）
+
+### Issue #8 — `Trainer.load_state_dict` 不再覆盖 `max_steps`（P0，静默正确性 Bug）
+
+**文件**：[lighttrain/trainers/base.py](../../lighttrain/trainers/base.py) — `load_state_dict()` 增加 recipe-controlled keys 守卫。
+
+修复前：`Trainer.state_dict()` 写入 `max_steps`，`load_state_dict()` 盲目恢复。Resume 训练时 recipe 要求 `max_steps=10`，但 checkpoint 里写着 `max_steps=5`（上次的训练目标），结果 `self.max_steps` 被覆盖回 5，`while ctx.step < max_steps` 立即为假，`fit()` 微秒级返回 —— **没有报错，没有警告，看似训练完成实际没跑一步**。
+
+修复：
+
+```python
+_RECIPE_CONTROLLED_KEYS: tuple[str, ...] = ("max_steps", "max_epochs")
+
+def load_state_dict(self, sd):
+    sd = dict(sd)
+    for key in _RECIPE_CONTROLLED_KEYS:
+        saved = sd.pop(key, None)
+        if saved is None:
+            continue
+        current = getattr(self, key, None)
+        if current is not None and int(saved) != int(current):
+            warnings.warn(
+                f"Trainer.{key} from checkpoint ({saved}) differs from "
+                f"current recipe value ({current}); keeping current.",
+                UserWarning, stacklevel=2,
+            )
+    # 正常恢复其余字段
+```
+
+`state_dict()` **仍写入 `max_steps`**（用于审计 / 可追溯），只是 load 路径不再恢复。`max_epochs` 当前基类未使用，但纳入常量做未来防御。
+
+### Issue #10 — `lighttrain eval` / `regression-gate` CLI 100% 必现 crash（P0）
+
+**文件**：[lighttrain/cli/_app.py](../../lighttrain/cli/_app.py) — `eval_cmd` 和 `regression_gate_cmd` 两处 bundle 解包错误。
+
+修复前两处都是：
+
+```python
+cfg = load_config(config)
+trainer, _run_dir = setup_run_from_config(cfg)   # 两处错：
+                                                  # 1. setup_run_from_config 要 Path 不要 RootConfig
+                                                  # 2. 返回 dict bundle 不是 tuple
+```
+
+修复后采用 `train_cmd` 已有的正确模式：
+
+```python
+bundle = setup_run_from_config(config)
+trainer = bundle["trainer"]
+cfg = bundle["cfg"]
+```
+
+### Issue #9 — `_import_user_modules` 进程内幂等（P0）
+
+**文件**：[lighttrain/cli/_runtime.py](../../lighttrain/cli/_runtime.py) — 增加 `_IMPORTED_USER_MODULES: set[str]` 模块级缓存。
+
+修复前：每次 `setup_run_from_config` 都无条件 `spec.loader.exec_module(...)`，重复执行 `@register(...)` 装饰器，第二次起抛 `RegistryConflictError`。任何在同一进程跑多次 setup（resume / 多阶段训练 / notebook 反复实验）都中招。
+
+修复：路径键用 `str(Path(mod).expanduser().resolve())`，dotted name 用原字符串。`set` 命中即 `continue`。
+
+### Issue #2 + #10 统一 — `setup_run_from_config` 接受 `Path | str | RootConfig`（P1）
+
+**文件**：[lighttrain/cli/_runtime.py](../../lighttrain/cli/_runtime.py) — `setup_run_from_config` 签名扩展 + `isinstance` 分发。
+
+修复前：函数只接受 `config_path: Path`，但 README 和 `examples/pretrain_causal.py` 都示范了传 `RootConfig` 的写法 —— 任何按 example 复制粘贴的用户都会撞 `TypeError: argument should be a str or an os.PathLike object`.
+
+修复：
+
+```python
+def setup_run_from_config(
+    config: "str | Path | RootConfig", *,
+    overrides: list[str] | None = None,
+    ...
+):
+    if isinstance(config, (str, Path)):
+        config_path = Path(config)
+        snapshot_yaml = config_path.read_text(encoding="utf-8")
+        cfg = load_config(config_path, overrides=overrides or [])
+    else:
+        if not isinstance(config, RootConfig):
+            raise TypeError(...)
+        if overrides:
+            raise ValueError("Cannot apply overrides to an already-parsed RootConfig...")
+        cfg = config
+        config_path = None
+        snapshot_yaml = OmegaConf.to_yaml(OmegaConf.create(cfg.model_dump()))
+    ...
+```
+
+[examples/pretrain_causal.py](../../examples/pretrain_causal.py) 当前就写着 `bundle = setup_run_from_config(cfg)`（RootConfig），本次修完即自动可用，无需改 example。
+
+### Issue #1 — `resolve()` 用 `inspect.signature` 过滤未知 kwargs（P1）
+
+**文件**：[lighttrain/config/_resolver.py](../../lighttrain/config/_resolver.py) — 新增 `_filter_kwargs` helper，`resolve()` 在 `factory(**kwargs)` 前调用。
+
+修复前：OmegaConf 合并 config 时不会因为 CLI `model.name=mamba2_lm` 就丢掉同 block 下原本属于 Transformer 的兄弟 key（`n_layers`/`n_heads`/`max_seq_len`/`dropout`），整个 `model:` 字典原样作为 kwargs 转给 Mamba 构造函数 → `TypeError: got an unexpected keyword argument 'n_layers'`.
+
+修复策略（双层守卫）：
+
+| 工厂函数签名 | 行为 |
+|------|------|
+| 含 `**kwargs`（VAR_KEYWORD） | fast-path，pass-through 全部 kwargs |
+| 无法 introspect（builtin / C 扩展） | pass-through |
+| 普通签名 | 用 `inspect.signature` 算 `accepted` 集合（POSITIONAL_OR_KEYWORD + KEYWORD_ONLY），drop 未声明的 key 并 `warnings.warn(UserWarning, ...)` |
+
+为何安全：所有 component spec → 构造函数的 kwargs 都途经 `resolve()`；接受 `**kwargs` 的 adapter 完全无变化；其余只丢真正不被声明的 key，不会丢声明过的 key。`*args`-only 签名按 Python 语义本来就不能从 kwargs 调，drop + warn 是正确的。
+
+### Issue #11 — `ConfigResolveError` 把 Cause 放在 Params 之前（P1）
+
+**文件**：[lighttrain/config/_resolver.py](../../lighttrain/config/_resolver.py) — 重排错误消息布局。
+
+修复前：
+
+```
+ConfigResolveError: Failed to construct <class 'X'> with params {...300 chars...}: TypeError: ...
+```
+
+巨大 params dict 把真正的 cause 推到了终端右侧外。修复后：
+
+```
+ConfigResolveError: Failed to construct X:
+  Cause: TypeError: <真正的报错>
+  Params: {...}
+```
+
+`__cause__` chaining（`from e`）维持不变，traceback 链完整。
+
+## 文档改动（2 处）
+
+### Issue #3 — `last.json` schema
+
+**文件**：[docs/user_guide.md](../user_guide.md) — checkpoint 章节追加 schema 说明。
+
+之前 README/user_guide 只暗示「`last.json` 记录最新 checkpoint 的位置」，没说字段名 / 值类型。实际是 `{"target": "<step_N>"}`，相对 `<run_dir>/checkpoints/` 解析。本次写进 user_guide.md，避免下游 launcher 假设 `"path"` 字段。
+
+### Issue #4 + #5 — README 第三方架构指引
+
+**文件**：[README.md](../../README.md) — "Alternative Architectures" 段后新增三块内容：
+
+1. **Writing model adapters (recommended pattern)** —— 明确推荐 *导入第三方包的最低层模块*（如 `mamba_ssm.modules.mamba3.Mamba3`），而不是调用高层 factory（如 `MambaLMHeadModel(ssm_layer=...)`）。理由：高层 factory 经常带内部 whitelist（issue #5 即是 `create_block` 只接受 Mamba1/Mamba2），module-level adapter 对 upstream 改动更鲁棒。这是 issue #5 的"治本"对策。
+2. **SSM stub tip** —— 第三方包（典型例 `mamba_ssm`）在 `__init__.py` 里热加载 CUDA C 扩展，CPU-only / CUDA 不匹配时 `import` 直接炸；用 `sys.modules.setdefault(...)` 在 `user_modules` 顶部 stub 掉即可。
+3. **Known third-party limitations** —— 记录 #5/#6/#7 三个上游问题及绕过方式，明确"不修代码、用户已知"。
+
+## 测试改动（+11 新增 / 1 调整，无回归）
+
+### [tests/trainers/test_base.py](../../tests/trainers/test_base.py) — Issue #8（+3 新增，1 微调）
+
+- **`test_state_dict_load_state_dict_roundtrip`**：把 `trainer2` 的 `max_steps` 从 `1` 改成 `10`，让二者保持相同值。原断言一字未动，roundtrip 语义不变（max_steps 不同时的行为由下面两个测试独占）。
+- **`test_invariant_load_checkpoint_does_not_clobber_max_steps`**：trainer2(max_steps=10) load `{"max_steps": 5, "step": 5}` → `trainer2.max_steps == 10` + `pytest.warns(UserWarning, match="max_steps")`。
+- **`test_load_checkpoint_warns_when_max_steps_differs`**：`pytest.warns(UserWarning, match="differs from current")`.
+- **`test_load_checkpoint_does_not_warn_when_max_steps_matches`**：`warnings.simplefilter("error")`，确保正常 resume 不会刷 warning。
+
+### [tests/config/test_resolver.py](../../tests/config/test_resolver.py) — Issue #1/#11（+3 新增）
+
+- **`test_resolve_drops_unknown_kwargs_with_warning`**：注册一个 `NarrowModel(a, b=0)`，spec 含 `bogus`/`extra` → 构造成功 + warning 提到 `bogus`。
+- **`test_resolve_keeps_kwargs_when_var_keyword_present`**：`WideModel(**kw)` 收到全部 kwargs；`simplefilter("error")` 保证 fast-path 不发 warning。
+- **`test_config_resolve_error_puts_cause_before_params`**：断言 `Cause:` 文本位置 < `Params:` 位置；`__cause__` 是原 TypeError。
+
+### [tests/cli/test_runtime.py](../../tests/cli/test_runtime.py) — Issue #2/#9（新文件，+4 新增）
+
+- **`test_import_user_modules_idempotent`**：写临时 `.py` 注册一个 dummy；两次 `_import_user_modules([path])` 不应抛 `RegistryConflictError`。
+- **`test_import_user_modules_dedupes_via_resolved_path`**：绝对路径 + 相对路径解析到同一文件时只 import 一次。
+- **`test_setup_run_from_config_rejects_overrides_with_rootconfig`**：传 RootConfig + overrides → `ValueError`。
+- **`test_setup_run_from_config_rejects_wrong_type`**：传 `42` → `TypeError` 提到 `RootConfig`。
+
+### [tests/cli/test_app.py](../../tests/cli/test_app.py) — Issue #10（+1 新增）
+
+- **`test_eval_cmd_does_not_crash_on_config_path`**：CliRunner 调 `eval -c <minimal_recipe>`，断言输出**不包含**「`argument should be a str`」「`not 'RootConfig'`」「`cannot unpack non-iterable dict`」三个 pre-fix 错误签名 —— 这是 v0.1.7 之前 100% crash 的回归屏障。
+
+## 未修复 / 不在范围（保留记录）
+
+| Issue | 责任方 | v0.1.7 处理 |
+|-------|--------|-----|
+| #5 — `state-spaces/mamba` `create_block` 不识别 Mamba-3 | upstream | **不改代码**；通过新的 "Writing model adapters" 文档指引（module-level adapter pattern）让用户绕开 `create_block`，并在 "Known third-party limitations" 段做明确记录 |
+| #6 — Mamba-2 fast path 依赖 `causal_conv1d` 扩展 | upstream | 文档已建议 `use_mem_eff_path=False` 走 Triton 慢路径 |
+| #7 — `tilelang==0.1.8` ↔ `apache-tvm-ffi==0.1.11` MIMO 崩 | upstream | GDN 设 `FLA_TILELANG=0` 走 Triton；Mamba-3 MIMO 无 fallback，建议用 SISO 变体复现 |
+
+三个第三方 issue 都在 README "Known third-party limitations" 段落里记录，未来 upstream 修复后再回头评估。

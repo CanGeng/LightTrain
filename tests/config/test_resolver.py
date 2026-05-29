@@ -191,3 +191,93 @@ def test_resolve_target_one_part_only_raises():
     with pytest.raises(ConfigResolveError) as exc:
         resolve({"_target_": "singleword"})
     assert "singleword" in str(exc.value) or "Invalid" in str(exc.value)
+
+
+# ===========================================================================
+# Issue #1 — inspect.signature kwarg filtering
+# ===========================================================================
+
+
+def test_resolve_drops_unknown_kwargs_with_warning(clean_registry):
+    """Goal (Issue #1): when the OmegaConf-merged config carries kwargs that
+    the registered class doesn't declare, ``resolve()`` drops them and
+    instantiates the class with what it does declare — emitting a UserWarning
+    so the user can spot it.
+
+    Without this, a CLI override flipping ``model.name`` from a Transformer
+    to Mamba would forward ``n_layers``/``n_heads``/``max_seq_len`` to
+    Mamba's constructor and raise ``TypeError`` 100% of the time.
+    """
+    class NarrowModel:
+        def __init__(self, a: int, b: int = 0) -> None:
+            self.a = a
+            self.b = b
+
+    register("model", "narrow_v1", NarrowModel)
+
+    with pytest.warns(UserWarning, match="bogus"):
+        obj = resolve(
+            {"name": "narrow_v1", "a": 1, "b": 2, "bogus": 99, "extra": "x"},
+            category="model",
+        )
+
+    assert isinstance(obj, NarrowModel)
+    assert obj.a == 1
+    assert obj.b == 2
+
+
+def test_resolve_keeps_kwargs_when_var_keyword_present(clean_registry):
+    """Goal (Issue #1): classes that accept ``**kwargs`` MUST receive every
+    kwarg unchanged — they typically forward them to an inner class (adapters
+    do this) and the filter must not get in the way. No UserWarning either.
+    """
+    import warnings as _warnings
+
+    class WideModel:
+        def __init__(self, **kw: object) -> None:
+            self.kw = kw
+
+    register("model", "wide_v1", WideModel)
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter("error")  # any UserWarning becomes a failure
+        obj = resolve(
+            {"name": "wide_v1", "x": 1, "y": 2, "z": 3},
+            category="model",
+        )
+    assert obj.kw == {"x": 1, "y": 2, "z": 3}
+
+
+# ===========================================================================
+# Issue #11 — ConfigResolveError layout (Cause before Params)
+# ===========================================================================
+
+
+def test_config_resolve_error_puts_cause_before_params(clean_registry):
+    """Goal (Issue #11): when the underlying constructor raises TypeError,
+    the wrapped ConfigResolveError must put a ``Cause:`` line BEFORE the
+    ``Params:`` dump. Otherwise the giant params dict shoves the real cause
+    off the terminal.
+
+    Also pins that __cause__ chaining is preserved (the original TypeError
+    is reachable via ``exc.__cause__``).
+    """
+    class BadInit:
+        def __init__(self, a: int) -> None:
+            raise TypeError("synthetic_specific_failure")
+
+    register("model", "bad_init_v1", BadInit)
+
+    with pytest.raises(ConfigResolveError) as exc_info:
+        resolve({"name": "bad_init_v1", "a": 1}, category="model")
+
+    msg = str(exc_info.value)
+    cause_idx = msg.find("Cause:")
+    params_idx = msg.find("Params:")
+    assert cause_idx != -1, "missing Cause: line in error message"
+    assert params_idx != -1, "missing Params: line in error message"
+    assert cause_idx < params_idx, (
+        f"Cause must come before Params; got:\n{msg}"
+    )
+    assert "synthetic_specific_failure" in msg
+    assert isinstance(exc_info.value.__cause__, TypeError)

@@ -209,3 +209,28 @@ def test_pin_train_mode_cli_override_bypasses_schema_revalidation(runner, tmp_pa
     # model_config; the current code DOES assign without raising.
     assert res.exit_code == 0, res.stdout
     assert "mode: bogus" in res.stdout
+
+
+# ===========================================================================
+# Issue #10 — `lighttrain eval` CLI must not crash with TypeError
+# ===========================================================================
+
+
+def test_eval_cmd_does_not_crash_on_config_path(runner, tmp_path):
+    """Goal (Issue #10): ``lighttrain eval -c <path>`` must NOT raise the
+    pre-fix ``TypeError: argument should be a str or an os.PathLike object ...
+    not 'RootConfig'`` (or a ``cannot unpack non-iterable dict`` TypeError
+    from the wrong bundle unpacking).
+
+    The minimal recipe lacks the model/data/optimizer fields needed to
+    build a trainer, so ``setup_run_from_config`` will still fail downstream
+    — but that failure mode is different from the regression we guard.
+    """
+    cfg = _write_minimal_recipe(tmp_path)
+    res = runner.invoke(app, ["eval", "-c", str(cfg)])
+    combined = (res.stdout or "") + (str(res.exception) if res.exception else "")
+    # Pre-fix the eval command crashed with one of these signatures. Any
+    # appearance of them means the regression is back.
+    assert "argument should be a str" not in combined
+    assert "not 'RootConfig'" not in combined
+    assert "cannot unpack non-iterable dict" not in combined
