@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false  # 如果 3.10 失败，不要自动取消 3.11 和 3.12 的测试
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"] # 完美契合你的 requires-python
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies (with CPU-only PyTorch)
+        run: |
+          python -m pip install --upgrade pip
+          # 💡 核心优化：强制从 PyTorch 官方源下载 CPU 版本的 torch，体积小 80%，极大提升 CI 速度！
+          pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+          # 安装你的项目自身及其 dev 依赖
+          pip install -e ".[dev]"
+
+      - name: Run Pytest
+        run: |
+          # 你的 toml 已经配置了自动跳过 gpu 和 heavy 测试，这里直接跑即可
+          pytest
+          
+      # （可选）代码覆盖率测试。
+      # - name: Run Pytest with Coverage
+      #   if: success() # 上一步普通测试通过后，才运行 coverage
+      #   run: |
+      #     pytest --cov=lighttrain --cov-report=xml --cov-fail-under=75

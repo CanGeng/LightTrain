@@ -6,7 +6,7 @@ Three protocols cover the full parallelism spectrum:
 * ``ModelParallelStrategy`` — model-aware intra-op: TP / SP / EP
 * ``PipelineSchedule``      — layer-structure-aware: PP (1F1B / GPipe)
 
-Implementations live in ``frontier_plugins/distributed/``.  The protocols
+Implementations live in ``plugins/distributed/``.  The protocols
 themselves live here (core) so that ``StandardEngine``, ``StandardUpdateRule``,
 and ``CheckpointManager`` can type-check against them without pulling in
 heavy optional dependencies (torch.distributed, deepspeed, etc.).

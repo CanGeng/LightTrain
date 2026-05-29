@@ -10,10 +10,10 @@ We snapshot:
 * every entry in ``cfg.user_modules`` (one path per entry; files are copied
   verbatim into ``code.snapshot/user_modules/<basename>``).
 
-We deliberately do **not** snapshot ``frontier_plugins/`` here — those are
+We deliberately do **not** snapshot ``plugins/`` here — those are
 plugins installed alongside lighttrain and follow the same registry contract;
 their source paths are written into ``env.json`` so the snapshot stays small
-(typical lighttrain tree ≈ 1 MB; frontier_plugins could balloon to many MB
+(typical lighttrain tree ≈ 1 MB; plugins could balloon to many MB
 once 4-bit kernels and friends land).
 
 Failure mode: this function is best-effort. If it can't copy something it

@@ -60,7 +60,10 @@ _DEFAULT_CRITICAL = ("LineageRecorderCallback", "CheckpointCallback", "Invariant
 
 
 class EventBus:
-    """Dispatches lifecycle events to a list of callbacks."""
+    """Dispatches lifecycle events to a list of callbacks.
+
+    Thread-safety: NOT thread-safe. Call only from the main training thread.
+    """
 
     EVENTS: tuple[str, ...] = CALLBACK_EVENTS
 

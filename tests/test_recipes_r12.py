@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 # Force eager registration of frontier plug-ins.
-import frontier_plugins.layer_offload  # noqa: F401
+import plugins.layer_offload  # noqa: F401
 
 from lighttrain.cli._runtime import setup_run_from_config
 

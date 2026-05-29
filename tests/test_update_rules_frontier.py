@@ -3,9 +3,9 @@ import pytest
 import torch
 import torch.nn as nn
 
-from frontier_plugins.update_rules.forward_forward import ForwardForwardUpdateRule
-from frontier_plugins.update_rules.pcn import PCNUpdateRule
-from frontier_plugins.update_rules.dfa import DFAUpdateRule
+from plugins.update_rules.forward_forward import ForwardForwardUpdateRule
+from plugins.update_rules.pcn import PCNUpdateRule
+from plugins.update_rules.dfa import DFAUpdateRule
 
 
 def _ctx(model=None):

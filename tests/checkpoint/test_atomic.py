@@ -434,17 +434,20 @@ def _parallel_writer_proc(run_dir: str, step: int, seed: int) -> None:
     mgr.save(step, {"model": model.state_dict()})
 
 
-def test_parallel_writers_produce_valid_manifests(tmp_path) -> None:
-    """Two writers running in parallel — each on its own run dir — both produce
-    valid JSON manifests.
+def test_invariant_atomic_writes_no_partial_bytes_under_concurrency(tmp_path) -> None:
+    """The ``.tmp + os.replace`` primitive yields valid JSON under real parallel
+    scheduling — even when two writers run truly concurrently at the OS level.
 
-    Invariant: the ``.tmp + os.replace`` write protocol is safe under parallel
-    scheduling at the OS level. No reader observes half-written bytes, no
-    JSON parse failures, regardless of interleaving.
+    Invariant: byte-level atomicity of the write primitive. No reader observes
+    half-written manifest bytes; ``json.loads`` succeeds on every manifest.
 
-    Note: ``CheckpointManager`` is designed for single-rank-0 use; this test
-    does NOT exercise two writers on the same dir (that races on
-    ``last.json.tmp`` and is a documented limitation).
+    Setup: spawn two processes, **each writing into its own run dir** (not
+    the same dir). This is NOT a test of CheckpointManager's race protection
+    — the manager is designed for single-rank-0 use and does not protect
+    against concurrent writers sharing one dir (they would race on
+    ``last.json.tmp``, see test_pin_checkpoint_manager_is_single_writer).
+    What this test pins is that the OS-level atomic-rename primitive is
+    safe under genuine parallel scheduling stress.
     """
     procs = []
     ctx = mp.get_context("spawn")
@@ -467,3 +470,34 @@ def test_parallel_writers_produce_valid_manifests(tmp_path) -> None:
         assert manifest.exists()
         data = json.loads(manifest.read_text(encoding="utf-8"))  # would raise on partial bytes
         assert data["step"] == step
+
+
+# --------------------------------------------------------------------------- #
+# Single-writer contract — make the implicit assumption explicit              #
+# --------------------------------------------------------------------------- #
+
+
+def test_pin_checkpoint_manager_is_single_writer() -> None:
+    """Pin the implicit single-writer contract: ``CheckpointManager.save``
+    expects only rank-0 to write to disk.
+
+    Currently this contract lives only as a comment in ``save()``'s docstring
+    ("In distributed runs, pass ``parallel_ctx`` so that only rank-0 writes
+    to disk."). It is not enforced by code — two writers sharing one run dir
+    will race on ``last.json.tmp`` (see exitcode-1 failure observed when
+    initially drafting test_invariant_atomic_writes_no_partial_bytes_under_concurrency
+    against a shared dir). This test makes the contract a hard requirement
+    of the code base, so anyone adding multi-writer support has to
+    consciously update the docstring at the same time.
+
+    If this behavior is intentionally changed (e.g. adding fcntl-based
+    locking for multi-writer support), update this test AND document the
+    new concurrency contract in CheckpointManager docstring.
+    """
+    save_doc = CheckpointManager.save.__doc__ or ""
+    assert "only rank-0" in save_doc, (
+        "CheckpointManager.save docstring must contain the literal "
+        "'only rank-0' to pin the single-writer contract. If you removed "
+        "that phrase intentionally, update this test AND document the new "
+        "concurrency contract."
+    )

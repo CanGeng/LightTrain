@@ -7,7 +7,7 @@ Equivalent CLI:
 from lighttrain.config import load_config
 from lighttrain.cli._runtime import setup_run_from_config
 
-import frontier_plugins.architectures.rwkv  # registers TinyRWKVModel  # noqa: F401
+import plugins.architectures.rwkv  # registers TinyRWKVModel  # noqa: F401
 
 cfg = load_config("recipes/pretrain_rwkv.yaml")
 bundle = setup_run_from_config(cfg)

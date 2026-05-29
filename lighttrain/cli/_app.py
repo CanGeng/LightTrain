@@ -63,7 +63,12 @@ def _flatten_patch_to_overrides(patch: object, prefix: str = "") -> list[str]:
             try:
                 import yaml as _yaml
 
-                out.append(f"++{key}={_yaml.safe_dump(list(v)).strip()}")
+                # Flow style is required: _parse_override_value only dispatches
+                # to YAML for inputs starting with ``[ { ' "``, so block-style
+                # sequences would otherwise be stored as a multi-line string.
+                out.append(
+                    f"++{key}={_yaml.safe_dump(list(v), default_flow_style=True).strip()}"
+                )
             except Exception:  # noqa: BLE001
                 out.append(f"++{key}={v!r}")
         elif v is None:

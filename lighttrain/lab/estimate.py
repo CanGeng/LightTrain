@@ -204,7 +204,7 @@ def _offload_estimate(
     # Try to import the plugin to get accurate per-layer probing; fall back
     # to a coarse estimate if it isn't installed.
     try:
-        from frontier_plugins.layer_offload._io import (
+        from plugins.layer_offload._io import (
             probe_layer_bandwidth,
         )
 

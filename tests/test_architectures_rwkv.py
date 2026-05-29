@@ -2,7 +2,7 @@
 import pytest
 import torch
 
-from frontier_plugins.architectures.rwkv import TinyRWKVConfig, TinyRWKVModel, rwkv_profile
+from plugins.architectures.rwkv import TinyRWKVConfig, TinyRWKVModel, rwkv_profile
 
 
 def _model(vocab_size=32, embed_dim=16, num_layers=2, chunk_size=8):

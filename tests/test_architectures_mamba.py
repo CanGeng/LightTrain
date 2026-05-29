@@ -2,7 +2,7 @@
 import pytest
 import torch
 
-from frontier_plugins.architectures.mamba import TinyMambaConfig, TinyMambaModel, mamba_profile
+from plugins.architectures.mamba import TinyMambaConfig, TinyMambaModel, mamba_profile
 
 
 def _model(vocab_size=32, d_model=16, d_state=8, num_layers=2):

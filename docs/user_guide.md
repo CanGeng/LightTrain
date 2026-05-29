@@ -595,7 +595,7 @@ engine:
 > `force_cpu: true` 会跳过 CUDA DeviceMesh 初始化，所有张量在 CPU 上运行。
 > 适用于 CI 环境验证进程组初始化、AllReduce 通信、训练循环不死锁等场景。
 
-完整 recipe 示例见 [`frontier_plugins/distributed/recipes/`](../frontier_plugins/distributed/recipes/)。
+完整 recipe 示例见 [`frontier_plugins/distributed/recipes/`](../plugins/distributed/recipes/)。
 
 ---
 

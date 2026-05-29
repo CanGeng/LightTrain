@@ -15,7 +15,7 @@ from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 import torch
 
 # Distributed strategy protocols — imported here so that core components can
-# type-check against them without depending on frontier_plugins.
+# type-check against them without depending on plugins.
 from .distributed._protocols import (
     GradSyncStrategy as GradSyncStrategyProtocol,
     ModelParallelStrategy as ModelParallelStrategyProtocol,

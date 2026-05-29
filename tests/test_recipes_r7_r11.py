@@ -12,7 +12,7 @@ import torch.nn as nn
 # ---------------------------------------------------------------------------
 
 def test_r7_rwkv_smoke():
-    from frontier_plugins.architectures.rwkv import TinyRWKVConfig, TinyRWKVModel, rwkv_profile
+    from plugins.architectures.rwkv import TinyRWKVConfig, TinyRWKVModel, rwkv_profile
     cfg = TinyRWKVConfig(vocab_size=32, embed_dim=16, num_layers=2, chunk_size=8)
     model = TinyRWKVModel(cfg)
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
@@ -110,7 +110,7 @@ def test_r9_jepa_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r10a_pcn_smoke():
-    from frontier_plugins.update_rules.pcn import PCNUpdateRule
+    from plugins.update_rules.pcn import PCNUpdateRule
     from lighttrain.engine._context import StepContext
 
     model = nn.Sequential(nn.Linear(8, 16), nn.Linear(16, 4))
@@ -143,7 +143,7 @@ def test_r10a_pcn_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r10b_ff_smoke():
-    from frontier_plugins.update_rules.forward_forward import ForwardForwardUpdateRule
+    from plugins.update_rules.forward_forward import ForwardForwardUpdateRule
     from lighttrain.engine._context import StepContext
 
     model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 4))

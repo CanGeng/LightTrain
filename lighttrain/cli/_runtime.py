@@ -132,15 +132,15 @@ def _eager_import_components() -> None:
         pass
     # Frontier plugins (layer_offload + quant + distributed). Same opt-in pattern.
     try:
-        import frontier_plugins.layer_offload as _lo_plugin  # noqa: F401
+        import plugins.layer_offload as _lo_plugin  # noqa: F401
     except ImportError:
         pass
     try:
-        import frontier_plugins.quant as _quant_plugin  # noqa: F401
+        import plugins.quant as _quant_plugin  # noqa: F401
     except ImportError:
         pass
     try:
-        import frontier_plugins.distributed as _dist_plugin  # noqa: F401
+        import plugins.distributed as _dist_plugin  # noqa: F401
     except ImportError:
         pass
 
@@ -351,7 +351,7 @@ def _build_model_parallel_strategy(cfg: RootConfig) -> Any | None:
     name = str(getattr(tp_cfg, "auto_plan_for", None) or "tensor_parallel")
     try:
         strategy_cls = _registry_get("model_parallel_strategy", "tensor_parallel")
-    except Exception:  # strategy not yet registered (frontier_plugins not loaded)
+    except Exception:  # strategy not yet registered (plugins not loaded)
         return None
     kwargs: dict[str, Any] = {}
     if hasattr(tp_cfg, "model_dump"):
@@ -557,7 +557,7 @@ def setup_run_from_config(
         model = mp_strategy.apply(model, parallel_ctx)
 
     # Phase C: pipeline splitting (PP) — after TP surgery, before DP wrap.
-    # PP support requires frontier_plugins/distributed/; skip for now when
+    # PP support requires plugins/distributed/; skip for now when
     # the PipelineSchedule implementation is not yet registered.
     pipeline_schedule = None
     par = getattr(cfg, "parallel", None)

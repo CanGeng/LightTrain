@@ -17,6 +17,8 @@ class JSONLLogger:
     Path defaults to ``<run_dir>/logs/metrics.jsonl`` if ``run_dir`` is given;
     otherwise ``path`` is used directly. The file handle is kept open and
     flushed after every record so a SIGKILL still preserves prior lines.
+
+    Thread-safety: NOT thread-safe. Call only from the main training thread.
     """
 
     def __init__(

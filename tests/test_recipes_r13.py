@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 # Force eager registration of frontier plug-ins.
-import frontier_plugins.quant  # noqa: F401
+import plugins.quant  # noqa: F401
 
 import torch
 
