@@ -23,13 +23,25 @@ from ._schema import ComponentSpec
 def _filter_kwargs(factory: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Drop kwargs not in ``factory``'s signature; warn on drops.
 
-    Pass-through when the factory accepts ``**kwargs`` (``VAR_KEYWORD``) or
-    when the signature cannot be introspected (builtins / C extensions).
+    Default rules:
+      * ``**kwargs`` (``VAR_KEYWORD``) in the signature → pass-through, the
+        class is semantically claiming it wants every key. The recipe-side
+        leak protection (Issue #1) only kicks in for classes with *explicit*
+        signatures — the recommended pattern for registered adapters.
+      * Signature cannot be introspected (builtins / C extensions) →
+        pass-through.
+      * Otherwise → drop anything not in
+        ``POSITIONAL_OR_KEYWORD | KEYWORD_ONLY`` and warn.
+
+    Opt-in (``**kwargs`` adapters that *also* want filtering): set the class
+    attribute ``__lighttrain_filtered_kwargs__ = True`` on the registered
+    class. With the opt-in, ``**kwargs`` is treated as "forward to inner
+    builder" only, and recipe-side kwargs are still filtered against the
+    explicit positional/keyword params — anything that would otherwise fall
+    into ``**kw`` is dropped + warned.
 
     Drops are warned, not raised, so a recipe authored against one model can
-    still build another model when the user CLI-overrides ``model.name`` —
-    the OmegaConf-merged ``model:`` block carries all sibling keys and we
-    cannot ask the user to ``~model.n_layers`` before every switch.
+    still build another model when the user CLI-overrides ``model.name``.
     Bare ``*args``-only signatures still pass through this filter; positional
     args can't be expressed via kwargs anyway.
     """
@@ -38,7 +50,9 @@ def _filter_kwargs(factory: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     except (ValueError, TypeError):
         return kwargs
     params = sig.parameters
-    if any(p.kind == p.VAR_KEYWORD for p in params.values()):
+    has_varkw = any(p.kind == p.VAR_KEYWORD for p in params.values())
+    strict_opt_in = bool(getattr(factory, "__lighttrain_filtered_kwargs__", False))
+    if has_varkw and not strict_opt_in:
         return kwargs
     accepted = {
         name for name, p in params.items()

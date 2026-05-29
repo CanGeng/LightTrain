@@ -227,9 +227,12 @@ def test_resolve_drops_unknown_kwargs_with_warning(clean_registry):
 
 
 def test_resolve_keeps_kwargs_when_var_keyword_present(clean_registry):
-    """Goal (Issue #1): classes that accept ``**kwargs`` MUST receive every
-    kwarg unchanged — they typically forward them to an inner class (adapters
-    do this) and the filter must not get in the way. No UserWarning either.
+    """Goal (Issue #1): classes that accept ``**kwargs`` without opting in
+    MUST receive every kwarg unchanged — they typically forward them to an
+    inner class and the filter must not get in the way. No UserWarning.
+
+    Recipe-side leak protection requires either an explicit signature OR the
+    ``__lighttrain_filtered_kwargs__`` opt-in (see the test below).
     """
     import warnings as _warnings
 
@@ -246,6 +249,43 @@ def test_resolve_keeps_kwargs_when_var_keyword_present(clean_registry):
             category="model",
         )
     assert obj.kw == {"x": 1, "y": 2, "z": 3}
+
+
+def test_resolve_filters_kwargs_when_var_keyword_adapter_opts_in(clean_registry):
+    """Goal (Issue #1 follow-up): an adapter that *needs* ``**kwargs`` for
+    downstream forwarding can still opt into v0.1.7's recipe-leak filter via
+    ``__lighttrain_filtered_kwargs__ = True``. The resolver then filters
+    against the adapter's *explicit* params; anything that would have fallen
+    into ``**kw`` is dropped + warned.
+
+    This is the escape hatch for adapters whose inner builder still rejects
+    Transformer-shaped keys, but who can't drop ``**kwargs`` from their own
+    signature (e.g. forwarding internal config / experimental kwargs).
+    """
+    class OptInAdapter:
+        __lighttrain_filtered_kwargs__ = True
+
+        def __init__(self, *, d_model: int, n_layer: int, **kw: object) -> None:
+            self.d_model = d_model
+            self.n_layer = n_layer
+            self.kw = kw
+
+    register("model", "opt_in_adapter_v1", OptInAdapter)
+
+    with pytest.warns(UserWarning, match="bogus"):
+        obj = resolve(
+            {
+                "name": "opt_in_adapter_v1",
+                "d_model": 128,
+                "n_layer": 4,
+                "bogus": 99,
+            },
+            category="model",
+        )
+    assert obj.d_model == 128
+    assert obj.n_layer == 4
+    # The drop is hard — the dropped key did NOT fall into **kw either.
+    assert obj.kw == {}
 
 
 # ===========================================================================

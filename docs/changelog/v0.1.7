@@ -5,7 +5,7 @@
 **v0.1.7 关闭在 lighttrain 上复现 Mamba-3 时反馈的 8 个落在 lighttrain 范围内的 issue**
 涵盖 **3 个 P0 框架 Bug（含一个静默正确性 Bug：resume 时 `max_steps` 被覆盖导致训练立刻空跑）+ 3 个 P1 可用性改进 + 2 个文档补充**。
 
-- **5 处源码修复 + 11 个新增测试**，原有测试无回归。
+- **5 处源码修复 + 12 个新增测试**，原有测试无回归。
 - 改动文件：
   - [lighttrain/trainers/base.py](../../lighttrain/trainers/base.py)（Issue #8）
   - [lighttrain/cli/_runtime.py](../../lighttrain/cli/_runtime.py)（Issue #2/#9/#10）
@@ -132,6 +132,17 @@ def setup_run_from_config(
 
 为何安全：所有 component spec → 构造函数的 kwargs 都途经 `resolve()`；接受 `**kwargs` 的 adapter 完全无变化；其余只丢真正不被声明的 key，不会丢声明过的 key。`*args`-only 签名按 Python 语义本来就不能从 kwargs 调，drop + warn 是正确的。
 
+**已知边界 — `**kwargs` adapter 的默认 fast-path**：注册到 registry 的类如果写 `def __init__(self, **kw)`，按 Python 语义就是"我要全部 key"，resolver 直接 pass-through，**filter 不生效**。这是这次修复设计上的有意取舍 —— resolver 看不穿 adapter 内部转发给哪个 builder。结论：**v0.1.7 的契约是"注册到 registry 的类必须写显式签名"**，README 新增的 "Writing model adapters" 段把这条作为 Rule 2 写死。
+
+**Opt-in 逃生口** — 给那些**必须**保留 `**kwargs`（向下游 builder 转发开放 kwargs）但又想要 recipe 侧 leak 防护的 adapter：在类上声明 `__lighttrain_filtered_kwargs__ = True`，resolver 会按显式参数过滤、把本该掉进 `**kw` 的 recipe-side key 也 drop 掉（仍然 warn），`**kwargs` 仅用于内部 forwarding。`_filter_kwargs` 的 docstring + README "Writing model adapters" 段都给了示例。
+
+```python
+@register("model", "foo_lm")
+class FooLM:
+    __lighttrain_filtered_kwargs__ = True
+    def __init__(self, *, d_model: int, n_layer: int, **kw) -> None: ...
+```
+
 ### Issue #11 — `ConfigResolveError` 把 Cause 放在 Params 之前（P1）
 
 **文件**：[lighttrain/config/_resolver.py](../../lighttrain/config/_resolver.py) — 重排错误消息布局。
@@ -181,6 +192,7 @@ ConfigResolveError: Failed to construct X:
 
 - **`test_resolve_drops_unknown_kwargs_with_warning`**：注册一个 `NarrowModel(a, b=0)`，spec 含 `bogus`/`extra` → 构造成功 + warning 提到 `bogus`。
 - **`test_resolve_keeps_kwargs_when_var_keyword_present`**：`WideModel(**kw)` 收到全部 kwargs；`simplefilter("error")` 保证 fast-path 不发 warning。
+- **`test_resolve_filters_kwargs_when_var_keyword_adapter_opts_in`**：`__lighttrain_filtered_kwargs__ = True` 时，即便签名含 `**kw`，未声明的 `bogus` 也被 drop + warn，确认 opt-in 逃生口生效。
 - **`test_config_resolve_error_puts_cause_before_params`**：断言 `Cause:` 文本位置 < `Params:` 位置；`__cause__` 是原 TypeError。
 
 ### [tests/cli/test_runtime.py](../../tests/cli/test_runtime.py) — Issue #2/#9（新文件，+4 新增）

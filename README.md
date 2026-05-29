@@ -427,8 +427,9 @@ lighttrain train -c recipes/mezo_sft.yaml          # MeZO zero-order SFT
 
 When integrating third-party architectures (e.g. SSMs from `state-spaces/mamba`,
 `flash-linear-attention`, or any package that ships multiple variants),
-**prefer importing the lowest-level module** and assembling the full model
-yourself, rather than calling a high-level factory function.
+follow these two rules. They are independent — both matter.
+
+**Rule 1 — Import the lowest-level module, not a high-level factory.**
 
 ```python
 # Good — module-level, resilient to upstream changes:
@@ -443,10 +444,69 @@ from mamba_ssm.modules.mamba3 import Mamba3
 High-level factories often have internal whitelists (e.g.
 `mixer_seq_simple.create_block` only accepts `Mamba1`/`Mamba2` even when
 `mamba3.py` ships in the same checkout), version-specific assumptions, or
-implicit C-extension dependencies. By assembling at the module level your
-adapter controls which layer class is used, which kwargs reach it, and
-which dependencies are pulled in — so it stays working when upstream adds
-a new variant or refactors the factory.
+implicit C-extension dependencies. Module-level assembly keeps you in
+control of which layer class, which kwargs, and which dependencies are
+pulled in — so the adapter survives upstream refactors.
+
+**Rule 2 — Declare an explicit signature on the registered class. Do not
+write `def __init__(self, **kwargs)` on the class that carries
+`@register(...)`.**
+
+```python
+# Good — explicit signature; v0.1.7's resolver filters recipe-side kwargs
+# (e.g. Transformer's n_layers / n_heads when the recipe carries a
+# transformer-shaped sibling block) and your inner builder only sees keys
+# it actually understands:
+@register("model", "mamba2_lm")
+class Mamba2LM(_MambaLMAdapter):
+    def __init__(
+        self,
+        *,
+        d_model: int,
+        n_layer: int,
+        vocab_size: int,
+        d_state: int = 128,
+        # ...explicit, named, no **kwargs.
+    ) -> None:
+        super().__init__(layer="Mamba2", d_model=d_model, n_layer=n_layer, ...)
+
+# Bad — recipe-side leak vector. The resolver sees **kwargs, treats the
+# class as "wants every key", and forwards Transformer-shaped siblings
+# straight to your inner builder, which then raises TypeError:
+@register("model", "mamba2_lm")
+class Mamba2LM(_MambaLMAdapter):
+    def __init__(self, **kw) -> None:
+        super().__init__(layer="Mamba2", **kw)
+```
+
+This matters because lighttrain's resolver
+([`_filter_kwargs`](lighttrain/config/_resolver.py)) drops unknown recipe
+kwargs **based on the registered class's signature**. A `**kwargs`
+declaration on the registered class semantically claims "I want every key",
+so the resolver passes everything through and the filter is a no-op. With
+an explicit signature, sibling keys from a Transformer-shaped base recipe
+(or any stale kwargs left after a CLI `model.name=…` override) get dropped
+with a `UserWarning` before reaching your inner builder.
+
+> **Escape hatch — adapters that genuinely need `**kwargs`.** If your
+> adapter has to forward an open-ended set of kwargs to a downstream
+> builder (e.g. when the upstream class itself takes runtime-determined
+> kwargs), set the class attribute
+> `__lighttrain_filtered_kwargs__ = True`. With the opt-in, the resolver
+> filters recipe-side kwargs against the *explicit* params on your
+> signature and drops anything that would otherwise have fallen into
+> `**kw`. You keep `**kwargs` for inner forwarding; the recipe-side leak
+> protection still kicks in.
+>
+> ```python
+> @register("model", "foo_lm")
+> class FooLM:
+>     __lighttrain_filtered_kwargs__ = True
+>     def __init__(self, *, d_model: int, n_layer: int, **kw) -> None:
+>         # kw only carries keys you explicitly route from below — recipe
+>         # cannot inject arbitrary keys into kw anymore.
+>         ...
+> ```
 
 > **Tip — third-party SSM packages.** Some SSM packages (e.g. `mamba_ssm`)
 > eagerly import CUDA C extensions in their `__init__.py`. If your model
