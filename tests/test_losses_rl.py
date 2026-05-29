@@ -143,3 +143,59 @@ def test_grpo_response_only_mask_excludes_prompt():
     out_labeled = GRPOLoss()(_DUMMY, {"labels": labels}, ctx)
     out_plain = GRPOLoss()(_DUMMY, {}, ctx)
     assert float(out_labeled["loss"]) != float(out_plain["loss"])
+
+
+# ---- GRPO min(unclipped, clipped) (bug fix verification) -------------------
+
+def test_grpo_uses_min_clipping_when_advantage_negative():
+    """When A<0 and ratio>1+eps, min(unclipped, clipped) must select the
+    unclipped (more punitive) branch.
+
+    Set lp_new - lp_old = log(2.0) so ratio ≈ 2.0 (well above clip 1.2).
+    Set A = -1.0 everywhere → unclipped surr = 2.0 * -1 = -2.0;
+                              clipped   surr = 1.2 * -1 = -1.2.
+    min picks -2.0 → policy_loss = -mean(-2.0) = 2.0.
+    The OLD (clip-only) buggy version would give policy_loss = 1.2.
+    """
+    B, T = 2, 4
+    lp_old = torch.zeros(B, T)
+    lp_new = torch.full((B, T), float(torch.log(torch.tensor(2.0))))
+    adv = torch.full((B, T), -1.0)
+    ctx = LossContext(extras={
+        "log_probs_new": lp_new, "log_probs_old": lp_old, "advantages": adv,
+    })
+    out = GRPOLoss(clip_eps=0.2)(_DUMMY, {}, ctx)
+    # min selects ratio*adv = -2.0 (more negative), so -mean = 2.0
+    assert abs(float(out["policy_loss"]) - 2.0) < 1e-4
+
+
+# ---- GRPO KL k3 estimator (bug fix verification) ---------------------------
+
+def test_grpo_kl_is_nonneg():
+    """k3 estimator must give non-negative KL."""
+    B, T = 2, 4
+    lp_old = torch.zeros(B, T)
+    lp_new = torch.full((B, T), -0.5)
+    lp_ref = torch.full((B, T), 0.5)        # different from new
+    adv = torch.ones(B, T)
+    ctx = LossContext(extras={
+        "log_probs_new": lp_new, "log_probs_old": lp_old,
+        "advantages": adv, "log_probs_ref": lp_ref,
+    })
+    out = GRPOLoss(beta_kl=1.0)(_DUMMY, {}, ctx)
+    assert float(out["kl"]) >= 0.0
+
+
+def test_grpo_kl_zero_when_new_equals_ref():
+    """k3 KL is exactly 0 when log_probs_new == log_probs_ref."""
+    B, T = 2, 4
+    lp_old = torch.zeros(B, T)
+    lp_new = torch.full((B, T), -0.3)
+    lp_ref = lp_new.clone()
+    adv = torch.ones(B, T)
+    ctx = LossContext(extras={
+        "log_probs_new": lp_new, "log_probs_old": lp_old,
+        "advantages": adv, "log_probs_ref": lp_ref,
+    })
+    out = GRPOLoss(beta_kl=1.0)(_DUMMY, {}, ctx)
+    assert abs(float(out["kl"])) < 1e-5

@@ -89,6 +89,33 @@ def test_prune_keeps_only_n_recent(tmp_path: Path):
     assert remaining == ["step_3", "step_4"]
 
 
+def test_prune_preserves_last_pointer(tmp_path: Path):
+    """If `last` pointer disagrees with list_steps()[-1] (e.g. newer step's
+    manifest is missing/corrupt), _prune must still protect what `last`
+    points to so the symlink doesn't go dangling."""
+    mgr = CheckpointManager(tmp_path, keep_last_n=1)
+    # Save 3 valid steps; `last` points to step_30 after the loop.
+    mgr.save(step=10, state=_toy_state())
+    mgr.save(step=20, state=_toy_state())
+    mgr.save(step=30, state=_toy_state())
+
+    last_before = mgr._read_pointer("last")
+    assert last_before is not None and last_before.name == "step_30"
+
+    # Simulate corruption: step_30's manifest disappears, so list_steps() no
+    # longer sees it; but the `last` pointer still references step_30.
+    (last_before / "manifest.json").unlink()
+
+    # list_steps() now returns [step_10, step_20]; latest()-based prune would
+    # protect step_20 only, deleting step_10. The `last`-aware prune must keep
+    # step_30 (pointed to by `last`) plus the most-recent valid step.
+    mgr._prune()
+    remaining = {p.name for p in mgr.list_steps()}
+    # step_30 has no manifest so list_steps() excludes it; but the directory
+    # must still exist on disk so the symlink isn't dangling.
+    assert (mgr.ckpt_dir / "step_30").exists(), "last pointer target was pruned"
+
+
 def test_save_load_tied_weights(tmp_path: Path):
     """CheckpointManager must not crash on tied weights and must preserve values."""
     from lighttrain.models.adapters.tiny_lm import TinyCausalLM

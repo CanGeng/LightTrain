@@ -6,6 +6,7 @@ then applies a clipped surrogate update. No value model is needed.
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any, Callable
 
@@ -21,6 +22,8 @@ from ..rl.rollout import HFGenerateBackend, RolloutEngine
 from ..update_rules.rl import RLUpdateRule
 from ._utils import _device_of, _move_batch, validate_batch
 from .base import Trainer
+
+_log = logging.getLogger(__name__)
 
 
 @register("trainer", "grpo")
@@ -202,18 +205,18 @@ class GRPOTrainer(Trainer):
                     "on_exception", trainer=self, exception=exc, step=self.ctx.step, batch=None
                 )
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed secondary exception in on_exception dispatch", exc_info=True)
             raise
         finally:
             try:
                 self.bus.dispatch("on_train_end", trainer=self, ctx=self.ctx, metrics=last_metrics)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed exception in on_train_end dispatch", exc_info=True)
             if self.logger is not None:
                 try:
                     self.logger.flush()
                 except Exception:  # noqa: BLE001
-                    pass
+                    _log.warning("Suppressed exception in logger.flush", exc_info=True)
 
         return last_metrics
 
@@ -240,6 +243,9 @@ class GRPOTrainer(Trainer):
         logits = out.outputs["logits"] if isinstance(out, ModelOutput) else out["logits"]
 
         if labels is not None:
+            # NOTE: `labels` is used as a None-sentinel only; the actual next-token
+            # targets come from input_ids[:, 1:]. Prompt positions are masked by
+            # GRPOLoss via (labels != -100), not by skipping them here.
             shift_logits = logits[:, :-1, :].contiguous()
             shift_labels = input_ids[:, 1:].contiguous()
             lp = F.log_softmax(shift_logits, dim=-1)

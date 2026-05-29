@@ -256,10 +256,16 @@ class CheckpointManager:
         excess = len(steps) - self.keep_last_n
         if excess <= 0:
             return
-        # Don't delete a step that is the current 'best' target.
-        best = self.best()
+        # Don't delete a step that is the current 'best' or 'last' pointer target.
+        # Use _read_pointer so we protect what the on-disk pointer actually points
+        # to (which may disagree with list_steps()[-1] if the latest manifest is
+        # corrupt or the pointer was updated out-of-sync with manifest writes).
+        best = self._read_pointer("best")
+        last = self._read_pointer("last")
         for path in steps[:excess]:
             if best is not None and path.resolve() == best.resolve():
+                continue
+            if last is not None and path.resolve() == last.resolve():
                 continue
             shutil.rmtree(path, ignore_errors=True)
 

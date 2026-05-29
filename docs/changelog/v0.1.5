@@ -1,0 +1,271 @@
+# v0.1.5
+
+## Tests — Adversarial Suite for losses / rl / objectives
+
+> 测试专项：覆盖 `lighttrain/losses/`、`lighttrain/rl/`、`lighttrain/objectives/` 三个模块。
+> **不修改任何源码**，只新增对抗性测试。
+
+### 动机
+
+现有 `tests/test_losses_*.py`、`tests/test_rl_*.py`、`tests/test_objectives.py` 大量陷入「形状测试陷阱」——
+仅断言 key 存在、`tensor.shape`、`loss` 是 finite。
+若把 `torch.min(surr1, surr2)` 偷偷改成 `surr2`（永远 clipped），
+或把 GRPO k3 KL 的 `Δ = log_ref - log_new` 写反，
+现有测试**全部仍然通过**——shape/finite 检查无法识别算法错误。
+
+本次新增的对抗性测试通过 5 种手段把数学正确性钉到测试里：
+
+1. **解析解对比**：构造输入使数学解可手算，断言 `|实际 - 解析解| < 1e-5`
+2. **极端边界**：故意触发算法分支切换（负 advantage + ratio>1+ε 触发 PPO/GRPO `min` 分支等）
+3. **不变量断言**：KL ≥ 0、ratio=1 时 surrogate = advantages、概率和 = 1±1e-6
+4. **梯度方向测试**：`loss.backward()` 后断言关键参数的 grad 符号
+5. **回归 pin**：每个已知/疑似 bug 配一个 `test_regression_<bug_id>`
+
+### 共享约定
+
+1. 数值断言一律用 `torch.testing.assert_close(actual, expected, atol=1e-5, rtol=1e-4)`
+2. 禁止用 `assert "key" in output` 或 `assert tensor.shape == (...)` 作为唯一断言
+3. 每个测试函数顶部 docstring 写明：**测试目标 / 输入构造 / 解析解推导**
+4. 已知修复过的 bug 必须有 `test_regression_<bug_id>` 反向 pin
+5. 共用 fixtures 放 `tests/losses/conftest.py`：`seeded_rng`（autouse）/ `dummy_ctx` / `dummy_model_output`
+6. 测试目录镜像源码：`lighttrain/losses/preference.py` → `tests/losses/test_preference.py`
+7. 新文件与现有扁平 `tests/test_losses_*.py` 并存，旧文件不动
+
+## 新增文件
+
+```
+tests/
+├── losses/
+│   ├── __init__.py
+│   ├── conftest.py                # seeded_rng / dummy_ctx / dummy_model_output
+│   ├── test_core.py               # CE / MaskedLM / ZLoss / Composite
+│   ├── test_aux.py                # InfoNCE / MoEBalance
+│   ├── test_preference.py         # BT / DPO / IPO / SimPO / ORPO / KTO
+│   ├── test_rl.py                 # PPO / GRPO + 攻击路径测试
+│   └── test_distill.py            # KLDiv / HiddenMSE / HiddenCosine / AttnXfer
+├── rl/
+│   ├── __init__.py
+│   ├── test_gae.py                # compute_gae / normalize_advantages
+│   ├── test_buffers.py            # RolloutBuffer FIFO / padding
+│   └── test_ref_policy.py         # _sequence_log_probs / freeze_as_ref
+└── objectives/
+    ├── __init__.py
+    ├── test_next_token.py
+    ├── test_diffusion.py
+    ├── test_flow_matching.py
+    ├── test_jepa.py
+    └── test_masked_denoising.py
+```
+
+## 测试规模
+
+| 文件 | 测试数 | 覆盖的算法错误类型 |
+| --- | ---: | --- |
+| `tests/losses/test_core.py` | 18 | CE causal shift、Z-loss 平方、label smoothing、ignore_index |
+| `tests/losses/test_aux.py` | 11 | InfoNCE 双向 CE、MoE balance hard mask vs soft routing |
+| `tests/losses/test_preference.py` | 26 | DPO 符号方向、SimPO γ 抵消、KTO `detach`、ORPO clamp |
+| `tests/losses/test_rl.py` | 31 | PPO/GRPO `min` vs clipped、k3 KL 方向、population vs sample std |
+| `tests/losses/test_distill.py` | 25 | τ² 缩放、layer mapping、attention 归一化顺序 |
+| `tests/rl/test_gae.py` | 11 | 反向递推方向、`done` mask、λ/γ 边界、mask-aware std |
+| `tests/rl/test_buffers.py` | 3 | FIFO 溢出、batch padding |
+| `tests/rl/test_ref_policy.py` | 7 | causal shift、`no_grad` 不泄漏 |
+| `tests/objectives/test_next_token.py` | 4 | 与 `CrossEntropyLoss` 数值一致性 |
+| `tests/objectives/test_diffusion.py` | 6 | `eps`/`x0`/`v` dispatch、linear vs cosine schedule |
+| `tests/objectives/test_flow_matching.py` | 5 | rectified flow `ut = x1 - x0`、OT-CFM permutation |
+| `tests/objectives/test_jepa.py` | 5 | target 路径 stop-grad、EMA decay 公式 |
+| `tests/objectives/test_masked_denoising.py` | 5 | 期望 mask 比例、attention_mask 排除 padding |
+| **合计** | **157** | |
+
+## 回归 pin 列表（18 项 `test_regression_*`）
+
+| Bug ID | 描述 | Pin 测试 |
+| --- | --- | --- |
+| `simpo_gamma_cancels` | γ 在 `chosen-rejected` 里相消 | `test_regression_simpo_gamma_cancels_in_subtraction` |
+| `ppo_min_replaced_by_clipped` | `torch.min(surr1, surr2)` 改为 `surr2` | `test_regression_ppo_min_not_clipped_only` |
+| `grpo_kl_direction` | k3 中 `log_diff = log_new - log_ref`（反） | `test_regression_grpo_kl_sign` |
+| `grpo_std_unbiased` | 用 `unbiased=True` (N-1) 而非 pop std | `test_regression_grpo_population_vs_sample_std` |
+| `dpo_sign_direction` | DPO logits 方向反 | `test_regression_dpo_sign_direction` |
+| `ce_shift_off_by_one` | 缺少 logits/labels shift | `test_regression_ce_shift_off_by_one` |
+| `zloss_missing_square` | 缺少 `logsumexp` 的平方 | `test_regression_zloss_missing_square` |
+| `kl_temperature_linear` | 蒸馏 KL 用 τ 而非 τ² | `test_regression_kl_temperature_not_linear` |
+| `kto_kl_attached` | 未 `detach` KL 估计 → 梯度污染 | `test_regression_kto_kl_not_attached_to_graph` |
+| `gae_recursion_direction` | 反向递推方向写反 | `test_regression_gae_backward_recursion_direction` |
+| `ref_logprob_grad_leak` | 参考策略 logprobs 带 grad | `test_regression_ref_logprobs_must_be_detached` |
+| `diffusion_target_dispatch` | `eps`/`x0`/`v` dispatch 错位 | `test_regression_diffusion_target_dispatch` |
+| `flow_velocity_sign` | `ut` 写成 `x0 - x1` | `test_regression_flow_matching_velocity_sign` |
+| `jepa_target_grad` | target 编码器路径带 grad | `test_regression_jepa_target_must_not_have_grad` |
+| `orpo_clamp_inf` | 缺 clamp 时 `log1mexp` 输入越界 | `test_regression_orpo_clamp_prevents_inf` |
+| `infonce_one_sided` | 只算一边 CE | `test_regression_infonce_symmetric_not_one_sided` |
+| `hidden_mse_sum_instead_of_mean` | hidden MSE 归约写成 sum 而非 mean | `test_regression_hidden_mse_mean_not_sum` |
+| `attn_xfer_normalization_order` | 先做差再归一化 | `test_regression_attn_xfer_normalization_applied_before_difference` |
+
+## 「恶意 PR 审查员」攻击路径
+
+在 `tests/losses/test_rl.py` 末尾追加 `test_attack_*` 测试，专门堵以下偷懒改法：
+
+- **`torch.min(surr1, surr2)` → `surr2`**：正 advantage 下数值相近，现有测试通过；负 advantage 时偏正 → 训练发散。
+  堵法：`test_regression_ppo_min_not_clipped_only` 用 A=-1, ratio=2 → 应得 2.0（而非 1.2）
+- **`KL ≈ 0.5·Δ²`（高斯近似）替换 k3**：KL ≥ 0 仍然成立。
+  堵法：`test_grpo_kl_k3_formula_closed_form_distinguishes_from_gaussian_approx` 用 Δ=0.5 → 应得 0.1487（高斯给 0.125）
+- **`group_std` 用 `unbiased=True`**：只在 |G|=2 的小组上差 √2。
+  堵法：`test_regression_grpo_population_vs_sample_std` 用 group=(0, 2) → 归一化值应为 (-1, +1)
+- **`ratio = log_new - log_old`（线性近似）**：ratio≈1 时无差。
+  堵法：`test_attack_ppo_ratio_must_be_exp_not_linear_log_ratio` 用 ratio=2 → exp(log 2)=2 vs linear=1.693
+- **`advantage_norm` 用全局均值而忽略 group**：无 mask 时一致。
+  堵法：`test_attack_grpo_advantage_norm_must_use_group_mean_not_global_mean` 用两个相差 100x 的组
+
+## Bug 注入验证
+
+临时把源码改成 buggy 版本，对应 regression test 都精确失败：
+
+| 注入 | 期望值 | buggy 值 | 抓住与否 |
+| --- | --- | --- | --- |
+| PPO/GRPO `min(surr1,surr2)` → `surr2` | 2.0 | 1.2 | ✓ |
+| GRPO k3 KL 方向 `log_ref - log_new` → 反向 | 0.7183 | 0.3679 | ✓ |
+| SimPO γ 在差中抵消 | loss(γ=0) ≠ loss(γ=2) | 相等 | ✓ |
+| GAE `reversed(range(T))` → `range(T)` | A₀=0.25 | A₀=0 | ✓ |
+
+## Summary
+
+- 新增 **157 个对抗性测试**（含 18 个回归 pin）
+- 测试执行时间：~3 秒（CPU、tiny tensors，无 `@pytest.mark.heavy`）
+- 全项目 **851 通过 + 6 skipped**，新增测试**未破坏任何现有测试**
+
+---
+
+## Tests — Adversarial Suite for engine / trainers / update_rules
+
+> 测试专项：覆盖 `lighttrain/engine/`、`lighttrain/trainers/`、`lighttrain/update_rules/` 三个模块。
+> **不修改任何源码**，只新增对抗性测试。
+
+### 动机
+
+与 losses/rl/objectives 组关注**数学正确性**不同，本组关注 **控制流正确性 + 回调链完整性**。
+现有 `tests/test_engine_standard.py`、`tests/test_update_rules_rl.py`、`tests/test_trainer_ppo.py`、`tests/test_trainer_grpo.py`、`tests/test_stop_training_signal.py` 同样陷入「形状/集合测试陷阱」：
+
+- 生命周期事件用 `event in fired`（集合成员）检查，**任意重排序都能通过**。
+- 三路 backward 分支（`grad_sync` / `accelerator` / 裸 `loss.backward()`，见 [`lighttrain/update_rules/standard.py:266-271`](../../lighttrain/update_rules/standard.py)）只测裸路径。
+- `SKIP_STEP` 只在 StandardUpdateRule 测过；SAM / MeZO 完全未覆盖。`RETRY_STEP` 只测耗尽，**成功路径**未覆盖。
+- PPO value head 懒初始化（[`lighttrain/trainers/ppo.py:374-382`](../../lighttrain/trainers/ppo.py)）从未被测。
+- 信号优先级（`STOP_TRAINING > RETRY_STEP > SKIP_STEP > CONTINUE`）从未被测。
+- `_register_new_params` 懒注入路径（`standard.py:243-245`）从未被测。
+- PretrainTrainer / PPOTrainer / GRPOTrainer 的 **`fit()` 生命周期**（`on_train_start` / `on_epoch_begin` / `on_rollout_begin` / `on_train_end` / `on_exception`）覆盖不全且不验证顺序。
+
+本组用 5 类手段把控制流契约钉到测试里：
+
+1. **严格顺序列表（`_OrderedRecorder`）**：用 `assert events == expected_list`，事件重排序立刻失败。
+2. **三路分支 mock 探针**：`_FakeGradSync` / `_FakeAccelerator` 记录每次调用，断言路由到正确分支。
+3. **危险载荷探测**：mock loss 的 `.backward` 抛异常 → 如果 SKIP 路径仍触发就崩。
+4. **懒初始化身份断言**：用 `id()` 比较 value head 跨 step 不被重建。
+5. **跨 step 状态断言**：accumulation 边界、`micro_step` 重置、`ctx.is_accumulating` 翻转。
+
+### 共享约定
+
+1. 数值断言一律用 `torch.testing.assert_close(actual, expected, atol=1e-5, rtol=1e-4)`
+2. 禁止用 `assert "key" in output` 或 `assert tensor.shape == (...)` 作为唯一断言
+3. 每个测试函数顶部 docstring 写明：**测试目标 / 输入构造 / 期望行为 / 抓的攻击路径**
+4. 回归 pin **严格限定**于显式记录过的真实 bug，**不**从 git log 推测
+5. 共用 fixtures 在 `tests/conftest.py` 追加：`tiny_model` / `tiny_optimizer` / `tiny_batch` / `fake_dist_env` / `fake_accelerator`
+6. `_OrderedRecorder` 等测试本地工具就近放在测试文件里，不污染 conftest
+7. 测试目录镜像源码：`lighttrain/update_rules/standard.py` → `tests/update_rules/test_standard.py`
+8. 新文件与现有扁平 `tests/test_engine_standard.py` 并存，旧文件不动
+
+### 新增文件
+
+```
+tests/
+├── conftest.py                        # +5 fixtures: tiny_model / tiny_optimizer / tiny_batch / fake_dist_env / fake_accelerator
+├── engine/
+│   ├── __init__.py
+│   ├── test_standard.py               # StandardEngine 委托契约（ctx.loss_fn 注入守卫等）
+│   └── test_context.py                # StepContext mutable-default 守卫
+├── update_rules/
+│   ├── __init__.py
+│   ├── test_standard.py               # C1–C6 全部分组（35 tests）
+│   ├── test_rl.py                     # RLUpdateRule 全契约（13 tests）
+│   ├── test_sam.py                    # 两步前向 / 扰动恢复 / 文档化 GAP（7 tests）
+│   └── test_mezo.py                   # 零阶/无 backward/seed 旋转（9 tests）
+└── trainers/
+    ├── __init__.py
+    ├── test_base.py                   # ABC 装配契约
+    ├── test_ppo.py                    # fit 生命周期 + value head 懒初始化 + 引擎绕过
+    ├── test_grpo.py                   # fit 生命周期 + 引擎绕过 + 无 value head 契约
+    ├── test_pretrain.py               # 引擎委托 + STOP_TRAINING 信号
+    └── test_preference_base.py        # PreferenceTrainer 共享基类
+```
+
+### 测试规模
+
+| 文件 | 测试数 | 覆盖的控制流错误类型 |
+| --- | ---: | --- |
+| `tests/engine/test_standard.py` | 8 | `if ctx.loss_fn is None` 守卫方向、`ctx.model` vs `self.model`、返回值原样透传 |
+| `tests/engine/test_context.py` | 3 | 单 GPU 默认安全、mutable-default-argument bug、kwargs 字段名 |
+| `tests/update_rules/test_standard.py` | 35 | 12-事件严格顺序、三路 backward 分支、SKIP/STOP/RETRY 信号、累积边界、scheduler 门、`_register_new_params` 懒注入 |
+| `tests/update_rules/test_rl.py` | 13 | 严格顺序、不调 model forward、`ctx.extras` log_probs 契约、三路分支、无 RETRY |
+| `tests/update_rules/test_sam.py` | 6 (+1 xfail) | 两步 forward-backward 顺序、扰动→恢复→step 时机、累积边界跳过扰动 |
+| `tests/update_rules/test_mezo.py` | 9 | 永不调 `.backward()` / `optimizer.step()`、扰动对称性、`seed_per_step` 旋转、lr 线性 |
+| `tests/trainers/test_base.py` | 10 | EventBus 装配、`ctx.bus is self.bus`、回调列表副本、`is_main` 单 GPU 默认 |
+| `tests/trainers/test_ppo.py` | 17 | fit 生命周期严格顺序、value head 懒初始化（5 测）、`target_kl` 早停、引擎绕过、异常路径 |
+| `tests/trainers/test_grpo.py` | 10 | fit 生命周期、引擎绕过、`_value_head` 不存在契约、stop_requested 早断 |
+| `tests/trainers/test_pretrain.py` | 8 | engine.step 每步一次、`loss_signal` 双路径（`ctx.extras` + `on_train_batch_end` 返回）、异常重抛 |
+| `tests/trainers/test_preference_base.py` | 4 | DPO 实例化的 fit 生命周期、双路径 STOP_TRAINING、`loss_signal` 清理 |
+| **合计** | **123 (+1 xfail)** | |
+
+### 回归 pin（仅 1 项，严格限定）
+
+| Bug ID | 描述 | Pin 测试 |
+| --- | --- | --- |
+| `signal_collapse_into_skipped` | 修复前 `StandardUpdateRule` 把 SKIP_STEP / RETRY_STEP / STOP_TRAINING 全部塌缩成 `metrics["skipped"]=1.0`，trainer 无法区分"跳过这批"和"停止训练"。修复后通过 `ctx.extras["loss_signal"]` 暴露原始 IntEnum 值。来源：[`tests/test_stop_training_signal.py`](../../tests/test_stop_training_signal.py) docstring 显式记录。 | `test_regression_signal_not_collapsed_to_skipped_flag` |
+
+> 规则：**回归测试必须对应 docstring/issue 里明确记录的真实 bug，不从 git log 推测**。未来若发现新历史 bug，由人类显式提供后再追加。
+
+### 文档化 GAP（xfail strict）
+
+| GAP | 状态 | 测试 |
+| --- | --- | --- |
+| SAM 不响应 `Signal.SKIP_STEP` | 已知缺陷，`@pytest.mark.xfail(strict=True)` | `test_sam_skip_signal_currently_ignored_xfail` |
+
+测试写的是**正确行为**（SKIP_STEP 返回时 backward 不应被调）。当 SAM 修复后，xfail 会变成 XPASS 让 CI 红，强制维护者移除标记。docstring 里明确写："When SAM is fixed to honor SKIP_STEP, this test will XPASS and force the xfail marker to be removed."
+
+### 「恶意 PR 审查员」攻击路径
+
+仿照 losses 组，对 trainers/update_rules/engine 设想了 9 条偷懒攻击路径，每条都用至少一个测试堵死：
+
+| 攻击 | 偷懒说辞 | 堵法 |
+| --- | --- | --- |
+| **事件重排序** | "我把 `on_backward_pre` 移到 backward 后面，post-event 语义更顺" | `test_full_step_emits_events_in_exact_order` / `test_rl_full_step_emits_events_in_exact_order`（严格顺序列表） |
+| **丢弃 no-sync ctx** | "`grad_sync.accumulate(model)` 改 `nullcontext`，DDP 单 rank 不影响" | `test_grad_sync_path_uses_no_sync_during_accumulation` + `test_grad_sync_path_does_not_use_no_sync_on_boundary`（mock grad_sync 记录 enter/exit） |
+| **信号优先级塌缩** | "RETRY 当 SKIP 处理就行" | `test_retry_step_success_re_runs_forward_and_loss` + `test_signal_precedence_stop_training_beats_retry_step` + `test_regression_signal_not_collapsed_to_skipped_flag`（pin IntEnum 区分） |
+| **去掉懒参数注册** | "`ctx.extras["_new_trainable_params"]` 这玩意儿没人用" | `test_new_trainable_params_drained_from_extras_into_optimizer` + `test_new_params_registered_before_backward_so_they_get_grads`（用 `on_optimizer_step_pre` 探针验证 grad 在 step 时非 None） |
+| **每微步都 optimizer.step** | "反正 loss 已经按 K 缩放过" | `test_accumulation_boundary_optimizer_fires_only_on_last_micro_step`（参数化 K=2,4 数 step 次数） |
+| **skip 路径不发 on_step_end** | "skip 就跳过结束事件呗" | `test_step_end_always_fires_even_on_skip` + `test_skip_path_emits_abbreviated_event_sequence`（短序列严格相等） |
+| **value head 每步重建** | "每次重新分配保持 fresh" | `test_ppo_value_head_not_re_initialized_on_second_step`（断言 `id()` 跨 step 不变） |
+| **缓存 RNG 恢复**（新增） | "第一次 retry 恢复 RNG 后就缓存，后续 retry 不用再恢复" | `test_retry_step_restores_rng_on_every_retry_not_just_first`（3 次 retry，4 次 randn 全等） |
+| **MeZO seed 装饰**（新增） | "`seed_per_step=True` 只装饰，实际用常数 seed" | `test_mezo_seed_per_step_true_rotates_seed_across_steps`（两连续步 Δθ 余弦相似度 < 0.999） |
+
+### 核心契约 pin（H 组重点）
+
+| 契约 | 测试 | 为什么重要 |
+| --- | --- | --- |
+| **PPO/GRPO 绕过 `engine.step`** | `test_ppo_step_bypasses_standard_engine_step` / `test_grpo_step_bypasses_standard_engine_step` | RL trainer 必须直接走 `_rl_rule.step`。若有人"统一接口"把 PPO 路由通过 engine，会沉默使用 `StandardUpdateRule`，再调一次 `model(**batch)`，污染 log-probs 算错梯度 |
+| **RL log-probs 走 `ctx.extras` 而非 batch** | `test_rl_step_reads_log_probs_from_ctx_extras` | 正/反向双子测试：缺 key 必须抛清晰错误，不是深栈 tensor 形状 mismatch |
+| **PPO value head `in_features` 取 `hidden.shape[-1]`** | `test_ppo_value_head_lazy_init_uses_hidden_dim_from_output` | hardcode 768 或写成 `hidden.shape[-2]`（T）都被精确捕获 |
+| **value head params 注册进 optimizer** | `test_ppo_value_head_lazy_init_registers_params_with_optimizer` | 不注册 → `optimizer.step()` 跳过 value head 参数 → value head 永不训练但 forward 仍跑 |
+| **MeZO 永不调 `.backward()`** | `test_mezo_never_calls_backward` | monkey-patch `torch.Tensor.backward`，违反就 fail。MeZO 的存在意义就是免 backward |
+
+### 执行结果
+
+- 本组新增 **123 通过 + 1 strict xfail**（共 124）
+- 全部新测试 + 全部既有 `tests/test_engine_standard.py` 等遗留测试（115 项）**同时通过**，无破坏
+- 全项目 **809 通过 + 1 skipped + 1 xfailed**（排除 `tests/test_update_rules_frontier.py` 一个跨群组遗留导入错误，不属本组范围）
+- 全部新测试执行时间：~3 秒（CPU、tiny tensors）
+
+## Aggregate Summary（v0.1.5 合计）
+
+| 组 | 测试数 | 回归 pin | 文档化 GAP | 主负责 |
+| --- | ---: | ---: | ---: | --- |
+| losses / rl / objectives | 157 | 18 | 0 | 数学正确性 |
+| engine / trainers / update_rules | 124 | 1 | 1 | 控制流正确性 |
+| **合计** | **281** | **19** | **1** | |
+
+两组联合覆盖了**算法数学**与**生命周期编排**两个独立失败维度，互不重叠：losses 组的测试无法抓事件重排序；本组的测试无法抓 KL 方向反。彼此都不修改对方源码与测试。

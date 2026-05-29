@@ -1,42 +1,49 @@
-Change Log
-Bug Fixes
-lighttrain/losses/preference.py
+# v0.1.1
 
-Fix [SimPO gamma 失效] SimPOLoss.__call__: logits 计算由 beta * (reward_chosen - reward_rejected) 改为 beta * (chosen - rejected) - self.gamma，修复 gamma 在差值中完全抵消的算法错误
-lighttrain/losses/rl.py
+## Bug Fixes
 
-Fix [PPO entropy 梯度断开] PPOSurrogateLoss.__call__: entropy_loss 移除 .detach()，使 ent_coef 参数实际影响训练
-Fix [prompt 位置参与 PG 计算] PPOSurrogateLoss.__call__ & GRPOLoss.__call__: mask 由 batch.get("attention_mask") 改为 (batch["labels"] != -100).bool()（有 labels 时），排除 prompt token 对梯度的影响
-Fix [死代码] GRPOLoss.__call__: 删除未被引用的 seq_logps_new = _masked_mean(...) 赋值
-lighttrain/rl/rollout.py
+### `lighttrain/losses/preference.py`
+- **[SimPO gamma 失效]** `SimPOLoss.__call__`：logits 计算由 `beta * (reward_chosen - reward_rejected)` 改为 `beta * (chosen - rejected) - self.gamma`，修复 gamma 在差值中完全抵消的算法错误
 
-Fix [rollout prompt token ID 错误] _compute_log_probs: labels[1:].clamp(min=0) → seq[1:]，prompt 位置不再用 token_0 的 log_prob
-lighttrain/trainers/grpo.py
+### `lighttrain/losses/rl.py`
+- **[PPO entropy 梯度断开]** `PPOSurrogateLoss.__call__`：`entropy_loss` 移除 `.detach()`，使 `ent_coef` 参数实际影响训练
+- **[prompt 位置参与 PG 计算]** `PPOSurrogateLoss.__call__` & `GRPOLoss.__call__`：mask 由 `batch.get("attention_mask")` 改为 `(batch["labels"] != -100).bool()`（有 labels 时），排除 prompt token 对梯度的影响
+- **[死代码]** `GRPOLoss.__call__`：删除未被引用的 `seq_logps_new = _masked_mean(...)` 赋值
 
-Fix [prompt token ID 错误] _grpo_step: labels[:, 1:].clamp(min=0) → input_ids[:, 1:]
-Fix [RL Trainer 回调缺失] _grpo_step: 补全完整回调链：on_step_begin、on_loss_computed + SKIP_STEP 检查、on_backward_pre/post、梯度裁剪 + on_clip_grad、on_optimizer_step_pre/post、on_zero_grad、scheduler + on_scheduler_step、on_step_end
-lighttrain/trainers/ppo.py
+### `lighttrain/rl/rollout.py`
+- **[rollout prompt token ID 错误]** `_compute_log_probs`：`labels[1:].clamp(min=0)` → `seq[1:]`，prompt 位置不再用 token_0 的 log_prob
 
-Fix [prompt token ID 错误] _ppo_step: labels[:, 1:].clamp(min=0) → input_ids[:, 1:]
-Fix [RL Trainer 回调缺失] _ppo_step: 补齐缺失项：on_step_begin、on_loss_computed + SKIP_STEP 检查、梯度裁剪 + on_clip_grad、on_zero_grad、scheduler + on_scheduler_step、on_step_end
-lighttrain/trainers/_preference_base.py
+### `lighttrain/trainers/grpo.py`
+- **[prompt token ID 错误]** `_grpo_step`：`labels[:, 1:].clamp(min=0)` → `input_ids[:, 1:]`
+- **[RL Trainer 回调缺失]** `_grpo_step`：补齐完整回调链：`on_step_begin`、`on_loss_computed` + `SKIP_STEP` 检查、`on_backward_pre/post`、梯度裁剪 + `on_clip_grad`、`on_optimizer_step_pre/post`、`on_zero_grad`、scheduler + `on_scheduler_step`、`on_step_end`
 
-Fix [RL Trainer 回调缺失] _preference_step: 补齐缺失项：on_step_begin、SKIP_STEP 检查、梯度裁剪 + on_clip_grad、on_step_end
-Fix [死代码] _maybe_save: 删除永远不会执行的重复 if self.ckpt_manager is None: return
-lighttrain/invariants/_dsl.py
+### `lighttrain/trainers/ppo.py`
+- **[prompt token ID 错误]** `_ppo_step`：`labels[:, 1:].clamp(min=0)` → `input_ids[:, 1:]`
+- **[RL Trainer 回调缺失]** `_ppo_step`：补齐缺失项：`on_step_begin`、`on_loss_computed` + `SKIP_STEP` 检查、梯度裁剪 + `on_clip_grad`、`on_zero_grad`、scheduler + `on_scheduler_step`、`on_step_end`
 
-Fix [DSL 沙箱 dunder 绕过] evaluate_check: 新增 import ast 及 AST 预检，拒绝任何访问 dunder 属性（__class__、__mro__ 等）的表达式
-frontier_plugins/layer_offload/_engine.py
+### `lighttrain/trainers/_preference_base.py`
+- **[RL Trainer 回调缺失]** `_preference_step`：补齐缺失项：`on_step_begin`、`SKIP_STEP` 检查、梯度裁剪 + `on_clip_grad`、`on_step_end`
+- **[死代码]** `_maybe_save`：删除永远不会执行的重复 `if self.ckpt_manager is None: return`
 
-Fix [backward 访问已驱逐权重 crash] _install_swap_hooks: 新增 _bwd_hook + register_full_backward_pre_hook，反向传播时正确 swap in 层
-Fix [驱逐方向性 bug] _evict_outside_window: 重写为 LRU 窗口逻辑（set(self._lru)），不再依赖单调递增的层索引假设，前向/反向/skip-connection 均正确；新增 self._lru: deque[str]（maxlen=resident_layers + prefetch）
-Fix [重复实现 _nullctx] 删除本地 _nullctx 类，改为 from contextlib import nullcontext as _nullctx
-Tests Added
-文件	新增测试
-tests/test_losses_preference.py	test_simpo_gamma_affects_loss、test_simpo_gamma_zero_equals_no_margin
-tests/test_losses_rl.py	test_ppo_entropy_gradient_flows、test_ppo_response_only_mask_excludes_prompt、test_grpo_response_only_mask_excludes_prompt
-tests/test_invariants_dsl.py	test_sandbox_blocks_dunder_mro_chain、test_sandbox_blocks_dunder_class、test_sandbox_blocks_dunder_dict、test_sandbox_allows_normal_expression
-tests/test_trainer_grpo.py	test_grpo_step_fires_full_callback_chain
-tests/test_trainer_ppo.py	test_ppo_step_fires_full_callback_chain
-tests/test_trainer_preference.py	test_preference_step_fires_full_callback_chain
+### `lighttrain/invariants/_dsl.py`
+- **[DSL 沙箱 dunder 绕过]** `evaluate_check`：新增 `import ast` 及 AST 预检，拒绝任何访问 dunder 属性（`__class__`、`__mro__` 等）的表达式
+
+### `frontier_plugins/layer_offload/_engine.py`
+- **[backward 访问已驱逐权重 crash]** `_install_swap_hooks`：新增 `_bwd_hook` + `register_full_backward_pre_hook`，反向传播时正确 swap in 层
+- **[驱逐方向性 bug]** `_evict_outside_window`：重写为 LRU 窗口逻辑（`set(self._lru)`），不再依赖单调递增的层索引假设，前向/反向/skip-connection 均正确；新增 `self._lru: deque[str]`（maxlen=`resident_layers + prefetch`）
+- **[重复实现 `_nullctx`]** 删除本地 `_nullctx` 类，改为 `from contextlib import nullcontext as _nullctx`
+
+## Tests Added
+
+| 文件 | 新增测试 |
+| --- | --- |
+| `tests/test_losses_preference.py` | `test_simpo_gamma_affects_loss`、`test_simpo_gamma_zero_equals_no_margin` |
+| `tests/test_losses_rl.py` | `test_ppo_entropy_gradient_flows`、`test_ppo_response_only_mask_excludes_prompt`、`test_grpo_response_only_mask_excludes_prompt` |
+| `tests/test_invariants_dsl.py` | `test_sandbox_blocks_dunder_mro_chain`、`test_sandbox_blocks_dunder_class`、`test_sandbox_blocks_dunder_dict`、`test_sandbox_allows_normal_expression` |
+| `tests/test_trainer_grpo.py` | `test_grpo_step_fires_full_callback_chain` |
+| `tests/test_trainer_ppo.py` | `test_ppo_step_fires_full_callback_chain` |
+| `tests/test_trainer_preference.py` | `test_preference_step_fires_full_callback_chain` |
+
+## Summary
+
 675 tests pass, 0 regressions.

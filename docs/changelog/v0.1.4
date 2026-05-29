@@ -1,0 +1,51 @@
+# v0.1.4
+
+## Bug Fixes
+
+### `lighttrain/losses/rl.py`
+- **[GRPOLoss 缺 `min(unclipped, clipped)`]** `policy_loss` 改为 `-mean(min(surr1, surr2))`。A<0 且 ratio>1+ε 时正确选择更严厉的 unclipped 分支（之前 clip 反而更宽容）
+- **[GRPOLoss KL 不是 KL]** `beta_kl` 分支改用 Schulman k3 无偏估计 `exp(Δ) - Δ - 1`，`Δ = log_ref - log_new`，保证 KL ≥ 0、梯度方向把 `log_new` 拉向 `log_ref`（之前是 `E[log_new - log_ref]`，方向无约束可为负）
+
+### `lighttrain/distributed/_context.py`
+- **[EP 组用局部 rank 调用 `dist.new_group`]** 改用 `dist.get_process_group_ranks(dp_group)` 拿真实全局 rank。`dp_degree>1` 且 `ep>1` 的真实拓扑下 EP 组成员不再错配
+
+### `lighttrain/trainers/ppo.py`
+- **[value head 注入未走 Accelerator 解包]** 改为复用 `update_rules/standard.py` 的 `_register_new_params`，自动 unwrap optimizer wrapper、避免污染 Accelerator 外层
+
+### `lighttrain/config/_loader.py`
+- **[override `~key` 删除路径异常]** 中间节点不存在时抛 `ConfigError`（带原因），不再裸 `KeyError`；叶子不存在时静默 noop（符合 `~` 语义"确保不存在"）
+- **[override 值解析脆弱]** 新增 `_parse_override_value`：先尝试 `int`/`float`，仅在以 `[` `{` `'` `"` 开头时调 `yaml.safe_load`，其余按字面字符串处理。避免：
+  - `path=/tmp/foo` 被解为 dict
+  - `mode=on` 被 YAML 1.1 解为 `True`
+  - `#xxx` 被解为 `None`
+- **[`_compose_defaults` seen 残留风险]** 改为 `try/finally` 维护 `seen` 集合，子递归抛出时不污染父调用
+
+### `lighttrain/checkpoint/manager.py`
+- **[`_prune` 不保护 `last` 指针]** 新增 `self._read_pointer("last")` 检查，`list_steps()` 因 manifest 缺失漏掉最新 step 时不再误删 `last` 指针目标，避免软链野指针
+
+## Robustness
+
+### `lighttrain/trainers/pretrain.py`、`grpo.py`、`ppo.py`、`_preference_base.py`
+- 新增 `_log = logging.getLogger(__name__)`，crash/finally 路径里所有 `except Exception: pass` 改为 `_log.warning(..., exc_info=True)`：保留 swallow 语义防止二次异常掩盖根因，但不再静默丢失
+- 涵盖 14 处：`on_exception` / `on_train_end` / `logger.flush` / `write_index_page` / `write_crash_bundle` / `write_oom_report` / `rng_state` / `data_module state_dict` / `restore_rng_state` 等
+
+## Comments
+
+### `lighttrain/trainers/ppo.py`、`grpo.py`
+- 新增注释说明 `if labels is not None` 仅作 None 哨兵，实际 next-token target 来自 `input_ids[:, 1:]`，prompt 位置由 loss fn 的 `(labels != -100)` 掩码处理
+
+## CI
+
+### `.github/workflows/test.yml`（新建）
+- Python 3.12 + `pip install -e ".[dev]"` + `pytest tests/`，push 到 `master` / PR 时触发
+
+## Tests Added
+
+| 文件 | 新增测试 |
+| --- | --- |
+| `tests/test_losses_rl.py` | `test_grpo_uses_min_clipping_when_advantage_negative`、`test_grpo_kl_is_nonneg`、`test_grpo_kl_zero_when_new_equals_ref` |
+| `tests/test_config.py` | `test_override_value_with_colon_path_is_string`、`test_override_value_magic_bool_stays_string`、`test_override_value_comment_char_stays_string`、`test_override_value_explicit_null`、`test_override_value_int_and_float`、`test_override_value_bool`、`test_override_delete_missing_intermediate_raises`、`test_override_delete_missing_leaf_is_noop` |
+| `tests/test_checkpoint_atomic.py` | `test_prune_preserves_last_pointer` |
+
+## Summary
+694 tests pass, 0 regressions.

@@ -15,6 +15,7 @@ Training loop::
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any, Callable, Mapping
 
@@ -33,6 +34,8 @@ from ..rl.rollout import HFGenerateBackend, RolloutEngine
 from ..update_rules.rl import RLUpdateRule
 from ._utils import _device_of, _move_batch, validate_batch
 from .base import Trainer
+
+_log = logging.getLogger(__name__)
 
 
 class LinearValueHead(nn.Module):
@@ -309,18 +312,18 @@ class PPOTrainer(Trainer):
                     "on_exception", trainer=self, exception=exc, step=self.ctx.step, batch=None
                 )
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed secondary exception in on_exception dispatch", exc_info=True)
             raise
         finally:
             try:
                 self.bus.dispatch("on_train_end", trainer=self, ctx=self.ctx, metrics=last_metrics)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed exception in on_train_end dispatch", exc_info=True)
             if self.logger is not None:
                 try:
                     self.logger.flush()
                 except Exception:  # noqa: BLE001
-                    pass
+                    _log.warning("Suppressed exception in logger.flush", exc_info=True)
 
         return last_metrics
 
@@ -354,6 +357,9 @@ class PPOTrainer(Trainer):
 
         # Per-token log-probs
         if labels is not None:
+            # NOTE: `labels` is used as a None-sentinel only; the actual next-token
+            # targets come from input_ids[:, 1:]. Prompt positions are masked by
+            # PPOSurrogateLoss via (labels != -100), not by skipping them here.
             shift_logits = logits[:, :-1, :].contiguous()
             shift_labels = input_ids[:, 1:].contiguous()
             lp = F.log_softmax(shift_logits, dim=-1)
@@ -370,9 +376,9 @@ class PPOTrainer(Trainer):
             if self._value_head is None:
                 # Lazy init: infer hidden size from tensor
                 self._value_head = LinearValueHead(hidden.shape[-1]).to(hidden.device)
-                # Register value head params with optimizer
-                if hasattr(self.optimizer, "add_param_group"):
-                    self.optimizer.add_param_group({"params": list(self._value_head.parameters())})
+                # Register value head params with the inner optimizer (unwraps Accelerator)
+                from ..update_rules.standard import _register_new_params
+                _register_new_params(self.optimizer, list(self._value_head.parameters()))
             values_new = self._value_head(hidden)   # (B, T)
 
         # Populate ctx for RLUpdateRule (backward/callbacks delegated below)

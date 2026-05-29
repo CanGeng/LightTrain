@@ -25,6 +25,7 @@ Reference log-probs (optional; skipped by SimPO/ORPO):
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any, Mapping
 
@@ -38,6 +39,8 @@ from ..update_rules.rl import RLUpdateRule
 from ..utils.seed import restore_rng_state, rng_state
 from ._utils import _device_of, _move_batch, validate_batch
 from .base import Trainer
+
+_log = logging.getLogger(__name__)
 
 
 def _seq_logps_and_nll(
@@ -208,7 +211,7 @@ class PreferenceTrainer(Trainer):
                     step=self.ctx.step, batch=last_batch,
                 )
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed secondary exception in on_exception dispatch", exc_info=True)
             raise
         finally:
             try:
@@ -216,12 +219,12 @@ class PreferenceTrainer(Trainer):
                     "on_train_end", trainer=self, ctx=self.ctx, metrics=last_metrics
                 )
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed exception in on_train_end dispatch", exc_info=True)
             if self.logger is not None:
                 try:
                     self.logger.flush()
                 except Exception:  # noqa: BLE001
-                    pass
+                    _log.warning("Suppressed exception in logger.flush", exc_info=True)
 
         return last_metrics
 

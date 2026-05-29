@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable
 
+import yaml
 from omegaconf import DictConfig, OmegaConf
 from pydantic import ValidationError
 
@@ -40,28 +41,65 @@ def _compose_defaults(path: Path, _seen: set[Path] | None = None) -> DictConfig:
         raise ConfigError(f"Circular defaults: {path}")
     seen.add(path)
 
-    cfg = _read_yaml_node(path)
-    defaults = cfg.pop("defaults", None)
-    if defaults is None:
-        return cfg
+    try:
+        cfg = _read_yaml_node(path)
+        defaults = cfg.pop("defaults", None)
+        if defaults is None:
+            return cfg
 
-    if not isinstance(defaults, (list, Iterable)) or isinstance(defaults, str):
-        raise ConfigError(f"`defaults:` in {path} must be a list of relative refs.")
+        if not isinstance(defaults, (list, Iterable)) or isinstance(defaults, str):
+            raise ConfigError(f"`defaults:` in {path} must be a list of relative refs.")
 
-    base = OmegaConf.create({})
-    for ref in defaults:
-        if not isinstance(ref, str):
-            raise ConfigError(f"`defaults:` entries must be strings, got {ref!r}")
-        sub_path = (path.parent / ref).with_suffix(".yaml")
-        if not sub_path.exists():
-            sub_path = path.parent / ref
-        if not sub_path.exists():
-            raise ConfigError(f"defaults entry {ref!r} not found relative to {path}")
-        sub = _compose_defaults(sub_path, seen)
-        base = OmegaConf.merge(base, sub)
+        base = OmegaConf.create({})
+        for ref in defaults:
+            if not isinstance(ref, str):
+                raise ConfigError(f"`defaults:` entries must be strings, got {ref!r}")
+            sub_path = (path.parent / ref).with_suffix(".yaml")
+            if not sub_path.exists():
+                sub_path = path.parent / ref
+            if not sub_path.exists():
+                raise ConfigError(f"defaults entry {ref!r} not found relative to {path}")
+            sub = _compose_defaults(sub_path, seen)
+            base = OmegaConf.merge(base, sub)
 
-    seen.discard(path)
-    return OmegaConf.merge(base, cfg)
+        return OmegaConf.merge(base, cfg)
+    finally:
+        seen.discard(path)
+
+
+def _parse_override_value(val: str) -> Any:
+    """Conservative scalar parser for CLI override values.
+
+    Avoids YAML 1.1 'magic bool' pitfalls (on/off/yes/no → bool, #x → None)
+    and mis-parsing paths like ``/tmp/foo`` as dicts.
+    """
+    if val == "":
+        return ""
+    s = val.strip()
+    # Explicit literals
+    if s in ("null", "None", "~"):
+        return None
+    if s in ("true", "True"):
+        return True
+    if s in ("false", "False"):
+        return False
+    # Numbers
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    # Containers / quoted strings — only here is YAML safe to invoke
+    if s[:1] in ("[", "{", "'", '"'):
+        try:
+            return yaml.safe_load(s)
+        except yaml.YAMLError:
+            return val
+    # Everything else: literal string (no magic boolean / comment interpretation)
+    return val
 
 
 def _apply_overrides(cfg: DictConfig, overrides: list[str]) -> DictConfig:
@@ -73,14 +111,18 @@ def _apply_overrides(cfg: DictConfig, overrides: list[str]) -> DictConfig:
             key = ov[1:].strip()
             if not key:
                 raise ConfigError(f"Empty key in override {ov!r}")
-            OmegaConf.update(cfg, key, None, merge=False)
-            # OmegaConf has no public delete; mask via update + pop
             keys = key.split(".")
             node: Any = cfg
-            for k in keys[:-1]:
-                node = node[k]
-            if keys[-1] in node:
-                del node[keys[-1]]
+            try:
+                for k in keys[:-1]:
+                    node = node[k]
+                if keys[-1] in node:
+                    del node[keys[-1]]
+                # If leaf doesn't exist, silently noop (~ means "ensure absent")
+            except (KeyError, AttributeError) as e:
+                raise ConfigError(
+                    f"Override {ov!r}: intermediate path does not exist ({e})"
+                ) from e
             continue
 
         force = ov.startswith("++")
@@ -91,8 +133,7 @@ def _apply_overrides(cfg: DictConfig, overrides: list[str]) -> DictConfig:
         key = key.strip()
         if not key:
             raise ConfigError(f"Empty key in override {ov!r}")
-        # Parse value as YAML scalar so 1, 1.0, true, [1,2], {a:1} all work.
-        parsed = OmegaConf.create(f"v: {val}").v if val != "" else ""
+        parsed = _parse_override_value(val)
         OmegaConf.update(cfg, key, parsed, merge=False, force_add=force)
     return cfg
 

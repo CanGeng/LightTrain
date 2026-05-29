@@ -22,6 +22,7 @@ save.
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any, Mapping
 
@@ -33,6 +34,8 @@ from ..registry import register
 from ..utils.seed import restore_rng_state, rng_state
 from ._utils import _device_of, _move_batch
 from .base import Trainer
+
+_log = logging.getLogger(__name__)
 
 
 @register("trainer", "pretrain")
@@ -185,7 +188,7 @@ class PretrainTrainer(Trainer):
                     batch=last_batch,
                 )
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed secondary exception in on_exception dispatch", exc_info=True)
             self._write_crash_bundle(exc, last_batch, last_metrics)
             raise
         finally:
@@ -194,12 +197,12 @@ class PretrainTrainer(Trainer):
                     "on_train_end", trainer=self, ctx=self.ctx, metrics=last_metrics
                 )
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed exception in on_train_end dispatch", exc_info=True)
             if self.logger is not None:
                 try:
                     self.logger.flush()
                 except Exception:  # noqa: BLE001
-                    pass
+                    _log.warning("Suppressed exception in logger.flush", exc_info=True)
             # Always emit the run failure-entry page. Soft —
             # never let index generation interfere with crash propagation.
             try:
@@ -209,7 +212,7 @@ class PretrainTrainer(Trainer):
                 if rd is not None:
                     write_index_page(rd, bus=self.bus)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Suppressed exception in write_index_page", exc_info=True)
 
         return last_metrics
 
@@ -255,7 +258,7 @@ class PretrainTrainer(Trainer):
                 tokenizer=tokenizer,
             )
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning("Suppressed exception in write_crash_bundle", exc_info=True)
         # OOM-specific report — non-fatal.
         try:
             from ..diagnostics.oom_report import is_oom_exception, write_oom_report
@@ -263,7 +266,7 @@ class PretrainTrainer(Trainer):
             if is_oom_exception(exc):
                 write_oom_report(rd, exception=exc)
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning("Suppressed exception in write_oom_report", exc_info=True)
 
     # ---- evaluation -------------------------------------------------------
 
@@ -434,6 +437,7 @@ class PretrainTrainer(Trainer):
             if mf.exists():
                 manifest = json.loads(mf.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
+            _log.warning("Failed to re-read manifest.json after save", exc_info=True)
             manifest = None
         self.bus.dispatch(
             "on_save_checkpoint_post",
@@ -490,12 +494,12 @@ class PretrainTrainer(Trainer):
         try:
             state["rng"] = rng_state()
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning("Failed to capture RNG state for checkpoint", exc_info=True)
         if self.data_module is not None and hasattr(self.data_module, "state_dict"):
             try:
                 state["data_module"] = self.data_module.state_dict()
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Failed to capture data_module state for checkpoint", exc_info=True)
         return state
 
     # ---- resume -----------------------------------------------------------
@@ -525,13 +529,13 @@ class PretrainTrainer(Trainer):
             try:
                 self.data_module.load_state_dict(ckpt["data_module"])
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Failed to restore data_module state from checkpoint", exc_info=True)
         rng = ckpt.get("rng")
         if rng:
             try:
                 restore_rng_state(rng)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("Failed to restore RNG state from checkpoint", exc_info=True)
         self.bus.dispatch("on_load_checkpoint_post", trainer=self, path=path)
 
 

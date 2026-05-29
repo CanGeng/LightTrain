@@ -246,13 +246,15 @@ def _create_ep_groups(dp_rank: int, ep: int, dp_group: Any) -> tuple[int, Any]:
     if dp_group is None:
         return 0, None
 
-    dp_ranks = list(range(dist.get_world_size(dp_group)))
+    # dist.new_group requires GLOBAL ranks, not DP-local indices.
+    dp_global_ranks = dist.get_process_group_ranks(dp_group)
+    my_global_rank = dist.get_rank()
     ep_rank = dp_rank % ep
     ep_group = None
-    for start in range(0, len(dp_ranks), ep):
-        members = dp_ranks[start:start + ep]
+    for start in range(0, len(dp_global_ranks), ep):
+        members = dp_global_ranks[start:start + ep]
         g = dist.new_group(members)
-        if dp_rank in members:
+        if my_global_rank in members:
             ep_group = g
     return ep_rank, ep_group
 

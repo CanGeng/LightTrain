@@ -1,15 +1,17 @@
 # lighttrain
 
 PyTorch language model training framework.
+
 Created by Claude Code.
 
+Still in the testing phase.
 ---
 
 ## Overview
 
-lighttrain is a compact, highly customizable training framework designed for research workflows: pretraining small language models, supervised fine-tuning, preference learning, reinforcement learning, and distillation. The core — Registry, Config, Engine, UpdateRule, Trainer, EventBus, PrepGraph — is small enough to read end-to-end, while research-grade extensions (PEFT, vLLM, alternative architectures, sweep tooling) are available as opt-in [frontier plugins](frontier_plugins/).
+lighttrain is a highly customizable training framework designed for research workflows: pretraining small language models, supervised fine-tuning, preference learning, reinforcement learning, and distillation. The core — Registry, Config, Engine, UpdateRule, Trainer, EventBus, PrepGraph — is small enough to read end-to-end, while research-grade extensions (PEFT, vLLM, alternative architectures, sweep tooling) are available as opt-in [frontier plugins](plugins/).
 
-Six design tenets govern the codebase:
+Design goals:
 **registry-first**, **failure-first**, **plugin-clean**, **single-GPU honest**, **lab-friendly**, and **audit-ready**.
 
 ---
@@ -287,16 +289,16 @@ The `parallel:` block scales lighttrain from a single GPU to DDP, FSDP, DeepSpee
 
 ```bash
 # Single-node DDP (4 GPUs)
-torchrun --nproc_per_node=4 -m lighttrain.cli train -c frontier_plugins/distributed/recipes/ddp.yaml
+torchrun --nproc_per_node=4 -m lighttrain.cli train -c plugins/distributed/recipes/ddp.yaml
 
 # TP=2 + DDP=4 (8 GPUs)
-torchrun --nproc_per_node=8 -m lighttrain.cli train -c frontier_plugins/distributed/recipes/tp_ddp.yaml
+torchrun --nproc_per_node=8 -m lighttrain.cli train -c plugins/distributed/recipes/tp_ddp.yaml
 
 # gloo + CPU — multi-process communication test (no GPU required)
-torchrun --nproc_per_node=4 -m lighttrain.cli train -c frontier_plugins/distributed/recipes/nano_model.yaml
+torchrun --nproc_per_node=4 -m lighttrain.cli train -c plugins/distributed/recipes/nano_model.yaml
 ```
 
-See [`frontier_plugins/distributed/recipes/`](frontier_plugins/distributed/recipes/) for full YAML examples (DDP, FSDP, ZeRO-2, TP+DDP, 3D parallel, gloo CPU test).
+See [`frontier_plugins/distributed/recipes/`](plugins/distributed/recipes/) for full YAML examples (DDP, FSDP, ZeRO-2, TP+DDP, 3D parallel, gloo CPU test).
 See [`docs/user_guide.md`](docs/user_guide.md) for the complete `parallel:` field reference.
 
 ---

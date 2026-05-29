@@ -1,22 +1,22 @@
-Change Log
+# v0.1.3
 
-Bug Fixes
-lighttrain/prepgraph/_fp.py
+## Bug Fixes
 
-Fix [canonical_config None 指纹碰撞] 删除 if v is None: continue，None 值不再被丢弃，{"lr": 0.001, "warmup": None} 与 {"lr": 0.001} 现在生成不同指纹，PrepGraph 缓存可正确因显式 null 覆盖而失效
+### `lighttrain/prepgraph/_fp.py`
+- **[canonical_config None 指纹碰撞]** 删除 `if v is None: continue`，None 值不再被丢弃。`{"lr": 0.001, "warmup": None}` 与 `{"lr": 0.001}` 现在生成不同指纹，PrepGraph 缓存可正确因显式 `null` 覆盖而失效
 
-lighttrain/trainers/ppo.py
+### `lighttrain/trainers/ppo.py`
+- **[value head 启用后第二轮 crash]** 新增 `_compute_buffer_values()`：rollout 结束后批量运行 value head，将 per-response 均值存入 `ep.values`，解决 `all_values()` 始终返回 `None` 导致的 `AttributeError`
+- **[GAE 形状错误]** `all_values()` 返回 `(N, T_max)` 但代码做 `.unsqueeze(1)` 得到错误形状；改为 `ep.values` 存 `(1,)` 标量，`all_values()` 返回 `(N, 1)` 与 `compute_gae` 对齐
+- **[value loss 广播错误]** `_ppo_step` 中 `returns (B,)` 与 `values (B, T)` 无法广播；改为 `returns.unsqueeze(1)` 使形状 `(B, 1)` 正确广播
+- **[value head 训练但不参与 GAE]** `_compute_buffer_values` 在每轮 rollout 后预填 `ep.values`，第二轮起 value head 真正影响 GAE；`output_hidden_states=True` 通过 forward 参数自动尝试开启，拿不到时 `warnings.warn` 并回退 zero baseline
 
-Fix [value head 启用后第二轮 crash] 新增 _compute_buffer_values()：rollout 结束后批量运行 value head，将 per-response 均值存入 ep.values，解决 all_values() 始终返回 None 导致的 AttributeError
-Fix [GAE 形状错误] all_values() 返回 (N, T_max) 但代码做 .unsqueeze(1) 得到错误形状；改为 ep.values 存 (1,) 标量，all_values() 返回 (N, 1) 与 compute_gae 对齐
-Fix [value loss 广播错误] _ppo_step 中 returns (B,) 与 values (B, T) 无法广播；改为 returns.unsqueeze(1) 使形状 (B, 1) 正确广播
-Fix [value head 训练但不参与 GAE] _compute_buffer_values 在每轮 rollout 后预填 ep.values，第二轮起 value head 真正影响 GAE；output_hidden_states=True 通过 forward 参数自动尝试开启，拿不到时 warnings.warn 并回退 zero baseline
+### `lighttrain/prepgraph/runner.py`
+- **[ProcessPool/ThreadPool 异常延迟暴露]** `for fut in futs` 改为 `for fut in as_completed(futs)`，已完成 future 的异常不再被挂起的 future 阻塞
 
-lighttrain/prepgraph/runner.py
+### `lighttrain/losses/preference.py`
+- **[SimPO reward 日志偏移]** `reward_chosen` / `reward_rejected` 返回值移除 gamma 偏移（gamma 是 logit margin，不是 reward offset），日志中显示的 reward 现在与模型实际 log-prob 一致
 
-Fix [ProcessPool/ThreadPool 异常延迟暴露] for fut in futs 改为 for fut in as_completed(futs)，已完成 future 的异常不再被挂起的 future 阻塞
+## Summary
 
-lighttrain/losses/preference.py
-
-Fix [SimPO reward 日志偏移] reward_chosen / reward_rejected 返回值移除 gamma 偏移（gamma 是 logit margin，不是 reward offset），日志中显示的 reward 现在与模型实际 log-prob 一致
 677 tests pass, 0 regressions.

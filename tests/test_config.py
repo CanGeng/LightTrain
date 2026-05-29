@@ -84,6 +84,67 @@ def test_overrides_invalid_format(tmp_yaml):
         load_config(p, overrides=["malformed_no_eq"])
 
 
+# ---- conservative scalar parser (bug fix verification) ----------------------
+
+def test_override_value_with_colon_path_is_string(tmp_yaml):
+    """path=/tmp/foo must parse as string, not dict {tmp: foo}."""
+    p = tmp_yaml("mode: lab\n")
+    cfg = load_config(p, overrides=["++path=/tmp/foo"], validate=False)
+    assert cfg.path == "/tmp/foo"
+
+
+def test_override_value_magic_bool_stays_string(tmp_yaml):
+    """mode=on must NOT become True (YAML 1.1 magic bool)."""
+    p = tmp_yaml("mode: lab\n")
+    cfg = load_config(p, overrides=["++debug_mode=on"], validate=False)
+    assert cfg.debug_mode == "on"
+
+
+def test_override_value_comment_char_stays_string(tmp_yaml):
+    """value starting with # must stay string, not become None."""
+    p = tmp_yaml("mode: lab\n")
+    cfg = load_config(p, overrides=["++tag=#alpha"], validate=False)
+    assert cfg.tag == "#alpha"
+
+
+def test_override_value_explicit_null(tmp_yaml):
+    """name=null must map to None."""
+    p = tmp_yaml("mode: lab\n")
+    cfg = load_config(p, overrides=["++optional_name=null"], validate=False)
+    assert cfg.optional_name is None
+
+
+def test_override_value_int_and_float(tmp_yaml):
+    """epochs=10 → int, lr=0.001 → float."""
+    p = tmp_yaml("mode: lab\n")
+    cfg = load_config(p, overrides=["++epochs=10", "++lr=0.001"], validate=False)
+    assert cfg.epochs == 10 and isinstance(cfg.epochs, int)
+    assert cfg.lr == 0.001 and isinstance(cfg.lr, float)
+
+
+def test_override_value_bool(tmp_yaml):
+    """debug=true must become True."""
+    p = tmp_yaml("mode: lab\n")
+    cfg = load_config(p, overrides=["++debug=true"], validate=False)
+    assert cfg.debug is True
+
+
+# ---- ~key deletion robustness (bug fix verification) -----------------------
+
+def test_override_delete_missing_intermediate_raises(tmp_yaml):
+    """~a.b.c on missing intermediate path must raise ConfigError, not bare KeyError."""
+    p = tmp_yaml("mode: lab\n")
+    with pytest.raises(ConfigError):
+        load_config(p, overrides=["~missing.nested.key"], validate=False)
+
+
+def test_override_delete_missing_leaf_is_noop(tmp_yaml):
+    """~key where key doesn't exist (but parent does) should be a silent noop."""
+    p = tmp_yaml("model:\n  name: a\n")
+    cfg = load_config(p, overrides=["~model.missing_leaf"], validate=False)
+    assert cfg.model.name == "a"
+
+
 def test_defaults_compose(tmp_config_dir):
     base = tmp_config_dir / "base.yaml"
     base.write_text("mode: prod\nseed: 99\n", encoding="utf-8")

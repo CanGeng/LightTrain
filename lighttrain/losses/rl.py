@@ -205,13 +205,17 @@ class GRPOLoss:
 
         log_ratio = log_probs_new - log_probs_old
         ratio = log_ratio.exp()
-        surr = ratio.clamp(1.0 - self.clip_eps, 1.0 + self.clip_eps) * advantages
-        policy_loss = -_masked_mean(surr, mask)
+        surr1 = ratio * advantages
+        surr2 = ratio.clamp(1.0 - self.clip_eps, 1.0 + self.clip_eps) * advantages
+        policy_loss = -_masked_mean(torch.min(surr1, surr2), mask)
 
         kl_loss = torch.tensor(0.0, device=policy_loss.device)
         if self.beta_kl > 0 and "log_probs_ref" in ctx.extras:
             log_probs_ref = ctx.extras["log_probs_ref"]
-            kl = _masked_mean(log_probs_new - log_probs_ref, mask)
+            # k3 estimator (Schulman): KL(π_θ || π_ref) ≈ E[exp(Δ) - Δ - 1], Δ = log_ref - log_new
+            log_diff = log_probs_ref - log_probs_new
+            kl_per_token = log_diff.exp() - log_diff - 1.0
+            kl = _masked_mean(kl_per_token, mask)
             kl_loss = self.beta_kl * kl
 
         total = policy_loss + kl_loss
