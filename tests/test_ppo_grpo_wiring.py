@@ -138,13 +138,15 @@ def test_dpo_runtime_no_grad_clip_leak(tmp_path):
         exp: test_dpo_minimal
         run_root: {tmp_path / "runs"}
 
-        model:
-          name: tiny_lm
-          vocab_size: 260
-          d_model: 32
-          n_layers: 1
-          n_heads: 2
-          max_seq_len: 32
+        model: default
+        model_profiles:
+          default:
+            name: tiny_lm
+            vocab_size: 260
+            d_model: 32
+            n_layers: 1
+            n_heads: 2
+            max_seq_len: 32
 
         data:
           name: simple
@@ -233,13 +235,15 @@ def test_pairwise_llm_judge_with_grpo_raises():
             exp: test_pairwise_grpo
             run_root: /tmp/test_pairwise_grpo_runs
 
-            model:
-              name: tiny_lm
-              vocab_size: 260
-              d_model: 32
-              n_layers: 1
-              n_heads: 2
-              max_seq_len: 32
+            model: default
+            model_profiles:
+              default:
+                name: tiny_lm
+                vocab_size: 260
+                d_model: 32
+                n_layers: 1
+                n_heads: 2
+                max_seq_len: 32
 
             data:
               name: simple

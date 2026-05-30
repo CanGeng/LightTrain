@@ -1,0 +1,96 @@
+# v0.1.8
+
+## 概览
+
+**v0.1.8 实现 Mamba-3 实验总结 §6.1 提出的 4 项结构性改动，验收标准是删除实验里的 `train.py` 启动脚本**——删除后该实验 README 的全部命令仅靠 `lighttrain` CLI + YAML 即可运行。
+
+- **核心 BREAKING 变更**：recipe 的 `model:` 由「内联 dict」改为「字符串选择器 + `model_profiles:` 配置组」，从结构上消除 Issue #1（CLI override 泄漏进 ambient `model:` 块）。
+- 新增 `lighttrain resume-verify`、`train --eval/--output-summary`、`compare --metric/--output`、`dry-run --build`、`migrate config --to-profiles`。
+- **22 个内置 recipe 全部迁移**到 profile 形式；新增 35+ 测试，原有测试无回归（1926 passed）。
+
+改动文件：
+
+- [lighttrain/config/_schema.py](../../lighttrain/config/_schema.py)（`model_profiles` 字段）
+- [lighttrain/config/_resolver.py](../../lighttrain/config/_resolver.py)（`select_model_spec`）
+- [lighttrain/cli/_runtime.py](../../lighttrain/cli/_runtime.py)（`_build_model` 选择器）
+- [lighttrain/cli/_app.py](../../lighttrain/cli/_app.py)（train/eval/compare/dry-run/migrate/resume-verify）
+- [lighttrain/lab/compare.py](../../lighttrain/lab/compare.py)（`render_markdown` / `to_records`）
+- [lighttrain/lab/resume_verify.py](../../lighttrain/lab/resume_verify.py)（新模块）
+- [lighttrain/lab/estimate.py](../../lighttrain/lab/estimate.py)（profile 感知）
+- [lighttrain/lineage/migration.py](../../lighttrain/lineage/migration.py)（`migrate_model_to_profiles_text`）
+
+---
+
+## 🐞 本次发现的 Bug（务必关注）
+
+### BUG-1 — resume 在数据流上**不是逐步精确的**（P1，静默正确性 Bug，本版未修，已用工具坐实）
+
+新的 `lighttrain resume-verify`（强校验：单趟训练 vs「存档-续训」逐步对比 loss）**第一次运行就抓到一个真实的保真度缺口**，而旧 `train.py --resume-test` 只检查「phase2 没崩」，看不到它：
+
+```
+resume-verify: phase1=3 phase2=3 tol=0.01
+  max |Δloss| = 2.86e-02  →  FAIL
+  step 3: single=5.258803 resume=5.258803 Δ=0.000e+00
+  step 4: single=5.159859 resume=5.131284 Δ=2.86e-02   ← resume 边界
+```
+
+- **现象**：checkpoint **保存点**（step 3）逐位一致，但**续训的第一步**（step 4）就发散。
+- **根因**：采样器只恢复到 **epoch 粒度**，不记录 **epoch 内已消费的位置**——见 [lighttrain/data/core/samplers.py](../../lighttrain/data/core/samplers.py)，`ShuffleSampler`/`SequentialSampler` 只存 `_epoch`，且 `__iter__` 在迭代器创建时就 `+= 1`。因此 **epoch 中途** resume 会从另一个 epoch 排列的开头重启数据流 → 抽到不同的 batch → loss 发散；**恰好落在 epoch 边界**的 resume 则逐位精确。
+- **证据**：fp32 下复现完全一致（2.861e-02），**不是 bf16 reduction 噪声**，是真实的数据管线 Bug。
+- **影响**：总结 §2 把 Level-3「bit-exact resume（含 data order）」标为「仅 smoke-tested」——本版把它**实测**了，结论是**当前不成立**。
+- **状态**：本版交付的是**发现该 Bug 的工具**，而非修复。修复需要「记录 epoch 内消费位置 + 可中途续读的 stateful sampler」，跨 sampler / data module / trainer，留待后续版本（建议作为下一实验的 Level-1 验证目标）。
+- **规避**：让 phase1 落在 epoch 边界即逐位精确；`resume-verify` 的默认 `--tol=1e-2` 是 bf16 现实值，bit-exact 校验请用 fp32 + 单 worker。
+
+> 这正是「论文复现作为用户反馈」闭环应当产出的东西：工具产生的**分歧**比「loss 下降了」更有价值——它指出了一个真实 Bug。
+
+---
+
+## BREAKING — `model:` 内联 dict 移除，改用 `model_profiles:` 配置组
+
+### 行为
+
+- recipe 用 `model: <profile_name>`（字符串）从 `model_profiles:` 中选择一个完整的模型配置。
+- **内联 dict 形式的 `model:` 直接报错**，并给出迁移命令：
+
+  ```
+  ConfigResolveError: bare `model:` dict blocks were removed in v0.1.8; declare
+  named configs under `model_profiles:` and select one with `model: <name>`.
+  Run `lighttrain migrate config <recipe> --to-profiles` to auto-rewrite.
+  ```
+
+- **字段 override 语法随之变化**（N6）：旧 `model.d_model=256` → 新 `model_profiles.<name>.d_model=256`。
+
+### 迁移
+
+```bash
+lighttrain migrate config <recipe>.yaml --to-profiles --in-place
+```
+
+`--to-profiles` 做的是**保留注释/空行/`${...}` 插值的文本级改写**（不是 schema 版本跳变），把 `model: {dict}` 重写为 `model_profiles: {default: {dict}}` + `model: default`。详见 [docs/v0.1.8_recipe_migration.md](../v0.1.8_recipe_migration.md)。仓库内 22 个 recipe 已全部迁移。
+
+### 为什么这样改（结构性关闭 Issue #1）
+
+不再有「ambient `model:` 块」可供 CLI override 合并泄漏——泄漏在结构上不可能发生。resolver 的 `_filter_kwargs`（v0.1.7）**保持不变**：它现在是兜底而非主防线，且对 profile 里的拼写错误（从别的 profile 复制漏改 key）仍会发出 `UserWarning`——这正是我们要保留它的原因。
+
+---
+
+## 新增 CLI
+
+| 命令 | 替代 `train.py` 的哪一块 |
+|------|--------------------------|
+| `resume-verify -c R --phase1-steps N --phase2-steps M [--tol]` | `--resume-test` 两阶段编排（且更强：与单趟基线逐步对比） |
+| `train --eval --eval-max-batches N --eval-json F` | 直接调用 `eval.metrics.perplexity` 的绕过 |
+| `train --output-summary F` | wall-time + `summary.json` 聚合（按 `exp` 一行一个，崩溃也写 `status=error` 行） |
+| `compare --metric M --output F` | 自定义 sweep 聚合（Markdown `.md` / 记录 `.json`） |
+| `dry-run --build` | 仅 `load_config` 不够：`--build` 真正构造模型以校验 `model_profiles` 解析 |
+| `migrate config --to-profiles` | recipe 迁移 |
+
+`lighttrain eval`（及 `train --eval`）现在在 recipe 没有 val split 时**回退到 train loader** 计算 perplexity——这正是当年迫使实验绕过 CLI 的场景，现已端到端可用（Issue #10 彻底闭环）。
+
+---
+
+## 测试
+
+- 新增 `tests/config/test_model_profiles.py`、`tests/config/test_all_recipes_loadable.py`、`tests/lineage/test_to_profiles.py`、`tests/cli/test_eval_command.py`、`tests/cli/test_train_summary.py`、`tests/cli/test_compare_metric.py`、`tests/cli/test_resume_verify.py`、`tests/experiments/test_mamba3_round_trip.py`（GPU 回归，与 v0.1.7 前的 dict-form 基线逐位一致）。
+- 迁移 `tests/test_ppo_grpo_wiring.py`、`tests/test_estimate.py`、`tests/test_cli_freeze_replay.py` 内嵌的 dict-form recipe 到 profile 形式。
+- 全量：**1926 passed，原有测试无回归**（`resume-verify` / round-trip 标 `heavy`/`gpu`，默认套件外）。

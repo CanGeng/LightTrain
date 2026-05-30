@@ -13,12 +13,14 @@ seed: 42
 exp: r10_pcn
 run_root: runs
 
-model:
-  name: mlp_toy
-  input_dim: 16
-  hidden_dim: 32
-  output_dim: 2
-  num_layers: 3
+model: default
+model_profiles:
+  default:
+    name: mlp_toy
+    input_dim: 16
+    hidden_dim: 32
+    output_dim: 2
+    num_layers: 3
 
 data:
   name: simple

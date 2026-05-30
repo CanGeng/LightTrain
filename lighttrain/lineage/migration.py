@@ -204,6 +204,108 @@ def migrate_file(
 # alongside, never bump CURRENT in SCHEMA_VERSION without registering a hop.
 
 
+# ---------------------------------------------------------------- model_profiles
+# v0.1.8 structural rewrite: a bare-dict ``model:`` block becomes a
+# ``model_profiles: {<name>: {...}}`` group plus a ``model: <name>`` selector.
+# This is NOT a schema_version hop — it is orthogonal to the version DAG above
+# (recipes carry no ``schema_version``), so it gets its own text-level transform
+# rather than going through ``migrate_payload``. The transform is surgical: it
+# preserves comments, blank lines, and OmegaConf ``${...}`` interpolations,
+# touching only the model block.
+
+import re as _re
+
+
+_MODEL_BLOCK_RE = _re.compile(r"^model:[ \t]*(#.*)?$")
+_MODEL_FLOW_RE = _re.compile(r"^model:[ \t]*(\{.*\})[ \t]*(#.*)?$")
+
+
+def migrate_model_to_profiles_text(
+    raw: str, *, profile_name: str = "default"
+) -> tuple[str, bool]:
+    """Rewrite a top-level bare-dict ``model:`` block to ``model_profiles:``.
+
+    Returns ``(new_text, changed)``. Idempotent: a recipe whose ``model:`` is
+    already a string selector (or which has no top-level ``model:``) is returned
+    unchanged with ``changed=False``. Handles both block form::
+
+        model:
+          name: tiny_lm
+          d_model: 128
+
+    and single-line flow form (``model: {name: tiny_lm, d_model: 128}``).
+    """
+    lines = raw.splitlines()
+    out: list[str] = []
+    i, n = 0, len(lines)
+    changed = False
+    while i < n:
+        line = lines[i]
+        if not changed:
+            flow = _MODEL_FLOW_RE.match(line)
+            if flow:
+                out.append(f"model: {profile_name}")
+                out.append("model_profiles:")
+                out.append(f"  {profile_name}: {flow.group(1)}")
+                changed = True
+                i += 1
+                continue
+            if _MODEL_BLOCK_RE.match(line):
+                # Collect the indented block body (blank lines included) until
+                # the next column-0 non-blank line.
+                body: list[str] = []
+                j = i + 1
+                while j < n:
+                    bl = lines[j]
+                    if bl.strip() == "" or bl[:1] in (" ", "\t"):
+                        body.append(bl)
+                        j += 1
+                        continue
+                    break
+                out.append(f"model: {profile_name}")
+                out.append("model_profiles:")
+                out.append(f"  {profile_name}:")
+                for bl in body:
+                    out.append(bl if bl.strip() == "" else "  " + bl)
+                changed = True
+                i = j
+                continue
+        out.append(line)
+        i += 1
+    result = "\n".join(out)
+    if raw.endswith("\n"):
+        result += "\n"
+    return result, changed
+
+
+def rewrite_model_to_profiles_file(
+    path: str | Path,
+    *,
+    profile_name: str = "default",
+    in_place: bool = True,
+    backup: bool = True,
+) -> bool:
+    """Apply :func:`migrate_model_to_profiles_text` to a YAML file.
+
+    Returns ``True`` if the file was changed. Writes a ``.pre-migration-bak``
+    backup before an in-place rewrite, and writes atomically via a tmp + rename.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(path)
+    raw = path.read_text(encoding="utf-8")
+    new_text, changed = migrate_model_to_profiles_text(raw, profile_name=profile_name)
+    if not changed or not in_place:
+        return changed
+    if backup:
+        bak = path.with_suffix(path.suffix + ".pre-migration-bak")
+        shutil.copy2(path, bak)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(new_text, encoding="utf-8")
+    os.replace(tmp, path)
+    return changed
+
+
 @migrate("config", from_="0.3", to_="0.4")
 def _migrate_config_03_to_04(old: dict[str, Any]) -> dict[str, Any]:
     new = dict(old)
@@ -235,6 +337,8 @@ __all__ = [
     "find_path",
     "migrate",
     "migrate_file",
+    "migrate_model_to_profiles_text",
     "migrate_payload",
     "registered_migrations",
+    "rewrite_model_to_profiles_file",
 ]

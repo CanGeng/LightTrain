@@ -13,12 +13,14 @@ seed: 42
 exp: r7_rwkv
 run_root: runs
 
-model:
-  name: tiny_rwkv
-  vocab_size: 256
-  embed_dim: 64
-  num_layers: 2
-  chunk_size: 64
+model: default
+model_profiles:
+  default:
+    name: tiny_rwkv
+    vocab_size: 256
+    embed_dim: 64
+    num_layers: 2
+    chunk_size: 64
 
 data:
   name: simple

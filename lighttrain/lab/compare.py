@@ -269,6 +269,55 @@ def render_ascii(report: CompareReport) -> str:
     return "\n".join(lines)
 
 
+def _fmt_metric(v: object) -> str:
+    return f"{v:.6g}" if isinstance(v, (int, float)) else "—"
+
+
+def render_markdown(report: CompareReport, metrics: list[str] | None = None) -> str:
+    """Render a sweep-style Markdown table: one row per run, columns are the
+    changed config fields followed by the selected metrics.
+
+    ``metrics=None`` includes every metric; otherwise only the named metrics
+    (in the given order). Unknown metric names become an all-``—`` column.
+    """
+    metric_keys = list(metrics) if metrics else sorted(report.metrics_table)
+    cfg_keys = sorted(report.config_diff)
+    headers = ["run", *cfg_keys, *metric_keys]
+
+    body: list[list[str]] = []
+    for i, r in enumerate(report.runs):
+        cells = [Path(r).name]
+        cells += [str(report.config_diff[k][i]) for k in cfg_keys]
+        for m in metric_keys:
+            col = report.metrics_table.get(m)
+            cells.append(_fmt_metric(col[i]) if col is not None else "—")
+        body.append(cells)
+
+    out = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join("---" for _ in headers) + " |",
+    ]
+    out += ["| " + " | ".join(row) + " |" for row in body]
+    return "\n".join(out)
+
+
+def to_records(report: CompareReport, metrics: list[str] | None = None) -> list[dict]:
+    """Flatten a report into one JSON record per run (run name + changed config
+    + selected metrics). Used by ``compare --output foo.json``."""
+    metric_keys = list(metrics) if metrics else sorted(report.metrics_table)
+    cfg_keys = sorted(report.config_diff)
+    records: list[dict] = []
+    for i, r in enumerate(report.runs):
+        rec: dict = {"run": Path(r).name, "run_dir": str(r)}
+        for k in cfg_keys:
+            rec[k] = report.config_diff[k][i]
+        for m in metric_keys:
+            col = report.metrics_table.get(m)
+            rec[m] = col[i] if col is not None else None
+        records.append(rec)
+    return records
+
+
 # ---------------------------------------------------------------------------
 # PNG renderer (matplotlib, soft dep)
 # ---------------------------------------------------------------------------

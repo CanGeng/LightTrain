@@ -112,13 +112,14 @@ class EstimateReport:
 
 def _build_model(cfg: Mapping[str, Any]) -> torch.nn.Module:
     from ..config._resolver import resolve as _resolve
+    from ..config._resolver import select_model_spec
 
-    model_spec = cfg.get("model") if isinstance(cfg, Mapping) else None
-    if not model_spec:
-        raise RuntimeError("estimate: recipe is missing `model:` section")
-    if hasattr(model_spec, "model_dump"):
-        model_spec = model_spec.model_dump()
-    return _resolve(dict(model_spec), category="model")
+    # v0.1.8: honour the `model:` selector + `model_profiles:` group, same as
+    # the CLI runtime. A bare-dict `model:` is rejected with a migration hint.
+    model = cfg.get("model") if isinstance(cfg, Mapping) else None
+    profiles = cfg.get("model_profiles") if isinstance(cfg, Mapping) else None
+    spec = select_model_spec(model, profiles)
+    return _resolve(spec, category="model")
 
 
 def _spec_name(spec: Any) -> str:
@@ -245,10 +246,16 @@ def estimate(cfg: Mapping[str, Any]) -> EstimateReport:
     else:
         raise TypeError(f"estimate: cfg must be a mapping, got {type(cfg).__name__}")
 
+    from ..config._resolver import select_model_spec
+
     model = _build_model(cfg_dict)
     optim_name = _spec_name(cfg_dict.get("optim"))
     engine_name = _spec_name(cfg_dict.get("engine"))
-    model_name = _spec_name(cfg_dict.get("model"))
+    # Resolve the v0.1.8 selector → profile so the name reflects the model
+    # actually built, not the literal `model: <selector>` string.
+    model_name = _spec_name(
+        select_model_spec(cfg_dict.get("model"), cfg_dict.get("model_profiles"))
+    )
 
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     n_all = sum(p.numel() for p in model.parameters())

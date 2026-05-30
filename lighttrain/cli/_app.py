@@ -107,6 +107,76 @@ def _root(
 # ---------------------------------------------------------------------------
 
 
+def _final_loss_from_run(run_dir: Path) -> Optional[float]:
+    """Return the last logged ``loss`` from ``<run_dir>/logs/metrics.jsonl``."""
+    import json
+
+    metrics = Path(run_dir) / "logs" / "metrics.jsonl"
+    if not metrics.exists():
+        return None
+    last: Optional[float] = None
+    for line in metrics.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if "loss" in row:
+            last = float(row["loss"])
+    return last
+
+
+def _eval_perplexity(trainer: object, max_batches: int) -> Optional[float]:
+    """Perplexity on the val loader, falling back to the train loader.
+
+    Mirrors ``eval_cmd``'s perplexity path so ``train --eval`` and
+    ``lighttrain eval`` agree. Returns ``None`` if no loader / eval fails.
+    """
+    from ..eval.metrics import perplexity
+
+    model = getattr(trainer, "model", None)
+    data_module = getattr(trainer, "data_module", None)
+    if model is None or data_module is None:
+        return None
+    loader = None
+    if hasattr(data_module, "val_loader"):
+        loader = data_module.val_loader()
+    if loader is None and hasattr(data_module, "train_loader"):
+        loader = data_module.train_loader()
+    if loader is None:
+        return None
+    mb = max_batches if max_batches > 0 else None
+    try:
+        return perplexity(model, loader, device=getattr(trainer, "device", None), max_batches=mb)
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[yellow]perplexity eval failed:[/] {exc}")
+        return None
+
+
+def _append_run_summary(path: Path, row: dict) -> None:
+    """Append ``row`` to a JSON-list summary at ``path``, replacing any existing
+    entry with the same ``exp`` so a multi-variant shell loop accumulates one
+    row per variant. Atomic (tmp + replace)."""
+    import json
+    import os
+
+    rows: list[dict] = []
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                rows = [r for r in loaded if not (isinstance(r, dict) and r.get("exp") == row.get("exp"))]
+        except (json.JSONDecodeError, OSError):
+            rows = []
+    rows.append(row)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
 @app.command("train")
 def train_cmd(
     config: Path = typer.Option(..., "-c", "--config", help="Recipe YAML path."),
@@ -119,6 +189,21 @@ def train_cmd(
     ),
     allow_stale_artifact: bool = typer.Option(
         False, "--allow-stale-artifact", help="Bypass artifact header check."
+    ),
+    eval: bool = typer.Option(
+        False, "--eval", help="Run perplexity eval after training."
+    ),
+    eval_max_batches: int = typer.Option(
+        0, "--eval-max-batches", help="Limit post-train eval to N batches (0 = no limit)."
+    ),
+    eval_json: Optional[Path] = typer.Option(
+        None, "--eval-json", help="Write post-train eval metrics to this JSON path."
+    ),
+    output_summary: Optional[Path] = typer.Option(
+        None,
+        "--output-summary",
+        help="Append a one-row run summary (exp, wall, final_loss, eval_ppl, "
+        "checkpoint, status) to this JSON list; keyed by exp.",
     ),
 ) -> None:
     """Train a model from a recipe YAML."""
@@ -169,12 +254,73 @@ def train_cmd(
 
     run_dir: Path = bundle["run_dir"]
     trainer = bundle["trainer"]
+    cfg = bundle.get("cfg")
+    exp = getattr(cfg, "exp", None) or "default"
     console.print(f"[green]run_dir[/] = {run_dir}")
+
+    import time as _time
+
+    def _last_checkpoint() -> Optional[str]:
+        mgr = getattr(trainer, "ckpt_manager", None)
+        if mgr is None:
+            return None
+        try:
+            latest = mgr.latest()
+            return str(latest) if latest is not None else None
+        except Exception:  # noqa: BLE001
+            return None
+
+    t0 = _time.perf_counter()
+    fit_error: Optional[BaseException] = None
     try:
-        trainer.fit()
+        try:
+            trainer.fit()
+        except BaseException as exc:  # noqa: BLE001 — capture to still emit a summary row
+            fit_error = exc
     finally:
         if bundle.get("logger") is not None:
             bundle["logger"].close()
+    wall_seconds = _time.perf_counter() - t0
+
+    # Post-fit eval (only on a clean run).
+    eval_ppl: Optional[float] = None
+    if eval and fit_error is None:
+        eval_ppl = _eval_perplexity(trainer, eval_max_batches)
+        if eval_ppl is not None:
+            console.print(f"[green]eval perplexity[/] = {eval_ppl:.6g}")
+        if eval_json is not None:
+            import json
+            import time
+
+            eval_json.parent.mkdir(parents=True, exist_ok=True)
+            eval_json.write_text(
+                json.dumps(
+                    {"task_name": "train_eval", "metrics": {"perplexity": eval_ppl},
+                     "step": 0, "timestamp": time.time()},
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+    if output_summary is not None:
+        _append_run_summary(
+            output_summary,
+            {
+                "exp": exp,
+                "run_dir": str(run_dir),
+                "status": "error" if fit_error is not None else "ok",
+                "wall_seconds": round(wall_seconds, 4),
+                "final_loss": _final_loss_from_run(run_dir),
+                "eval_ppl": eval_ppl,
+                "last_checkpoint": _last_checkpoint(),
+                "error": (f"{type(fit_error).__name__}: {fit_error}" if fit_error else None),
+            },
+        )
+        console.print(f"[green]summary →[/] {output_summary}")
+
+    if fit_error is not None:
+        console.print(f"[red]training failed:[/] {type(fit_error).__name__}: {fit_error}")
+        raise typer.Exit(code=1)
     console.print("[green]training complete[/]")
 
 
@@ -370,14 +516,24 @@ def sweep_cmd(
 def compare_cmd(
     runs: list[str] = typer.Argument(..., help="Run directories to compare."),
     png: Optional[Path] = typer.Option(None, "--png", help="Also write a PNG chart."),
+    metric: Optional[list[str]] = typer.Option(
+        None, "--metric", help="Restrict the table to these metric(s); repeatable."
+    ),
+    output: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        help="Write the comparison to a file: Markdown sweep table (.md) or "
+        "per-run records (.json), by extension.",
+    ),
 ) -> None:
     """Diff multiple runs — config changes + metric alignment.
 
     \\b
-    Example:
+    Examples:
       lighttrain compare runs/exp/run_001 runs/exp/run_002
+      lighttrain compare runs/exp/run_* --metric loss --output table.md
     """
-    from ..lab.compare import compare, render_ascii, render_png
+    from ..lab.compare import compare, render_ascii, render_markdown, render_png, to_records
 
     run_paths = [Path(r) for r in runs]
     missing = [p for p in run_paths if not p.exists()]
@@ -391,7 +547,28 @@ def compare_cmd(
         console.print(f"[red]compare failed:[/] {exc}")
         raise typer.Exit(code=1) from exc
 
-    console.print(render_ascii(report))
+    metrics = list(metric) if metric else None
+    if metrics:
+        unknown = [m for m in metrics if m not in report.metrics_table]
+        if unknown:
+            console.print(f"[yellow]no such metric in runs:[/] {unknown}")
+
+    # --metric / --output switch to the sweep-style Markdown table.
+    if metrics or output is not None:
+        console.print(render_markdown(report, metrics))
+    else:
+        console.print(render_ascii(report))
+
+    if output is not None:
+        if output.suffix.lower() == ".json":
+            import json
+
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(to_records(report, metrics), indent=2), encoding="utf-8")
+        else:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(render_markdown(report, metrics) + "\n", encoding="utf-8")
+        console.print(f"[green]written →[/] {output}")
 
     if png is not None:
         try:
@@ -628,7 +805,6 @@ def eval_cmd(
     to also write the full EvalReport to disk.
     """
     import json
-    from ..eval.metrics import perplexity
 
     load_dotenv_if_present()
 
@@ -650,19 +826,13 @@ def eval_cmd(
         console.print("[red]trainer has no model[/]")
         raise typer.Exit(code=1)
 
-    data_module = getattr(trainer, "data_module", None)
     device = getattr(trainer, "device", None)
 
-    # ---- perplexity via val_loader (if available) ----
-    ppl_value: float | None = None
-    if data_module is not None:
-        val_loader = data_module.val_loader() if hasattr(data_module, "val_loader") else None
-        if val_loader is not None:
-            mb = max_batches if max_batches > 0 else None
-            try:
-                ppl_value = perplexity(model, val_loader, device=device, max_batches=mb)
-            except Exception as exc:
-                console.print(f"[yellow]perplexity eval failed:[/] {exc}")
+    # ---- perplexity via val loader, falling back to the train loader ----
+    # The fallback is what lets `lighttrain eval` work on recipes without a
+    # dedicated val split (e.g. the mamba3 reproduction), so the experiment's
+    # direct-call bypass of this CLI is no longer needed (Issue #10).
+    ppl_value = _eval_perplexity(trainer, max_batches)
 
     metrics: dict[str, float] = {}
     if ppl_value is not None:
@@ -1190,8 +1360,47 @@ def lineage_graph_cmd(
 def migrate_config_cmd(
     path: Path = typer.Argument(...),
     in_place: bool = typer.Option(False, "--in-place"),
+    to_profiles: bool = typer.Option(
+        False,
+        "--to-profiles",
+        help="Rewrite a bare-dict `model:` block into `model_profiles:` + a "
+        "`model: <name>` selector (v0.1.8 structural migration).",
+    ),
+    profile_name: str = typer.Option(
+        "default", "--profile-name", help="Name for the migrated profile."
+    ),
 ) -> None:
     from ..lineage.migration import SchemaMigrationError, migrate_file
+
+    # --to-profiles is a structural (comment-preserving) text rewrite, not a
+    # schema_version hop, so it takes its own path through migration.py.
+    if to_profiles:
+        from ..lineage.migration import (
+            migrate_model_to_profiles_text,
+            rewrite_model_to_profiles_file,
+        )
+
+        if in_place:
+            changed = rewrite_model_to_profiles_file(
+                path, profile_name=profile_name, in_place=True
+            )
+            if changed:
+                console.print(
+                    f"[green]migrated[/] {path} → model_profiles "
+                    f"(backup at {path}.pre-migration-bak)"
+                )
+            else:
+                console.print(
+                    f"[yellow]no change[/] {path} (already profile form or no "
+                    "top-level `model:` block)"
+                )
+        else:
+            raw = path.read_text(encoding="utf-8")
+            new_text, changed = migrate_model_to_profiles_text(
+                raw, profile_name=profile_name
+            )
+            console.print(new_text)
+        return
 
     try:
         migrated = migrate_file(path, schema_kind="config", in_place=in_place)
@@ -1259,13 +1468,50 @@ def migrate_checkpoint_cmd(
 def dry_run_cmd(
     config: Path = typer.Option(..., "-c", "--config"),
     overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
+    build: bool = typer.Option(
+        False,
+        "--build",
+        help="Also import user_modules and construct the model — exercises the "
+        "`model:`/`model_profiles:` resolver. No run dir, no training.",
+    ),
 ) -> None:
-    """Resolve a recipe and print the resolved config — no training."""
+    """Resolve a recipe and print the resolved config — no training.
+
+    ``load_config`` alone does not build the model, so it cannot catch a recipe
+    whose ``model:`` selection is wrong (e.g. a bare-dict block left un-migrated,
+    or a selector naming a missing profile). ``--build`` constructs the model so
+    the resolver path runs, making it a real migration/build verifier.
+    """
     try:
         cfg = load_config(config, overrides=list(overrides or []))
     except (ConfigError, FileNotFoundError) as e:
         console.print(f"[red]config error:[/] {e}")
         raise typer.Exit(code=1) from e
+    if build:
+        from ._runtime import (
+            _build_model,
+            _eager_import_components,
+            _import_user_modules,
+        )
+
+        try:
+            # Mirror setup_run_from_config's registry population so --build sees
+            # the same adapter set as a real `train` run.
+            _eager_import_components()
+            _import_user_modules(list(getattr(cfg, "user_modules", None) or []))
+            model = _build_model(cfg)
+        except Exception as e:  # noqa: BLE001
+            console.print(f"[red]build error:[/] {e}")
+            raise typer.Exit(code=1) from e
+        n_params = (
+            sum(p.numel() for p in model.parameters())
+            if hasattr(model, "parameters")
+            else 0
+        )
+        console.print(
+            f"[green]model built[/] = {type(model).__name__} ({n_params:,} params)"
+        )
+        return
     console.print(dump_resolved(cfg))
 
 
@@ -1462,6 +1708,46 @@ def resume_cmd(
         if bundle.get("logger") is not None:
             bundle["logger"].close()
     console.print("[green]resume complete[/]")
+
+
+@app.command("resume-verify")
+def resume_verify_cmd(
+    config: Path = typer.Option(..., "-c", "--config", help="Recipe YAML path."),
+    overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
+    phase1_steps: int = typer.Option(..., "--phase1-steps", help="Steps before the checkpoint."),
+    phase2_steps: int = typer.Option(..., "--phase2-steps", help="Steps after resuming."),
+    tol: float = typer.Option(
+        None,
+        "--tol",
+        help="Max allowed |Δloss| per step. Default 1e-2 (bf16-realistic); use a "
+        "tighter value only for fp32 + single-worker bit-exact runs.",
+    ),
+) -> None:
+    """Verify resume == single pass: compare step-aligned losses for a run of
+    ``phase1+phase2`` steps against a checkpoint-and-continue at ``phase1``.
+
+    \\b
+    Example:
+      lighttrain resume-verify -c recipe.yaml model=transformer \\
+          --phase1-steps 5 --phase2-steps 5
+    """
+    from ..lab.resume_verify import DEFAULT_TOL, render_report, resume_verify
+
+    try:
+        report = resume_verify(
+            config,
+            phase1_steps,
+            phase2_steps,
+            tol=DEFAULT_TOL if tol is None else tol,
+            overrides=list(overrides or []),
+        )
+    except (ConfigError, FileNotFoundError) as e:
+        console.print(f"[red]config error:[/] {e}")
+        raise typer.Exit(code=1) from e
+
+    console.print(render_report(report))
+    if not report.passed:
+        raise typer.Exit(code=1)
 
 
 # ---------------------------------------------------------------------------

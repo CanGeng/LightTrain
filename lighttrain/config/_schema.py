@@ -117,7 +117,10 @@ class RootConfig(BaseModel):
     exp: str = "default"
 
     # Component sections — typed as Any so users can drop in arbitrary mappings.
+    # v0.1.8: ``model`` is a *string selector* into ``model_profiles``; a bare
+    # dict here is rejected at build time (run ``migrate config --to-profiles``).
     model: Any | None = None
+    model_profiles: dict[str, Any] | None = None
     data: Any | None = None
     optim: Any | None = None
     loss: Any | None = None

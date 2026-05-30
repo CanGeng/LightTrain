@@ -19,14 +19,16 @@ seed: 1337
 exp: r12_offload
 run_root: runs
 
-model:
-  name: tiny_lm
-  vocab_size: 260
-  d_model: 256
-  n_layers: 8
-  n_heads: 8
-  max_seq_len: 128
-  dropout: 0.0
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 260
+    d_model: 256
+    n_layers: 8
+    n_heads: 8
+    max_seq_len: 128
+    dropout: 0.0
 
 data:
   name: simple

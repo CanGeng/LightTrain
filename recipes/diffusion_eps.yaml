@@ -15,13 +15,15 @@ seed: 7
 exp: r8_diffusion
 run_root: runs
 
-model:
-  name: tiny_unet
-  in_channels: 1
-  base_channels: 16
-  channel_mults: [1, 2]
-  timesteps: 100
-  time_embed_dim: 32
+model: default
+model_profiles:
+  default:
+    name: tiny_unet
+    in_channels: 1
+    base_channels: 16
+    channel_mults: [1, 2]
+    timesteps: 100
+    time_embed_dim: 32
 
 data:
   name: simple

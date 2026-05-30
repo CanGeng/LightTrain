@@ -22,13 +22,16 @@ def _tiny_cfg(**overrides):
         "seed": 0,
         "exp": "estimate_smoke",
         "run_root": "runs",
-        "model": {
-            "name": "tiny_lm",
-            "vocab_size": 64,
-            "d_model": 16,
-            "n_layers": 2,
-            "n_heads": 4,
-            "max_seq_len": 32,
+        "model": "default",
+        "model_profiles": {
+            "default": {
+                "name": "tiny_lm",
+                "vocab_size": 64,
+                "d_model": 16,
+                "n_layers": 2,
+                "n_heads": 4,
+                "max_seq_len": 32,
+            }
         },
         "data": {
             "name": "simple",
@@ -73,19 +76,22 @@ def test_estimate_returns_filled_report_for_tiny_lm():
 def test_estimate_with_lora_reports_low_trainable_ratio():
     pytest.importorskip("peft")
     cfg = _tiny_cfg(
-        model={
-            "name": "lora",
-            "base": {
-                "name": "tiny_lm",
-                "vocab_size": 64,
-                "d_model": 16,
-                "n_layers": 2,
-                "n_heads": 4,
-                "max_seq_len": 32,
-            },
-            "r": 4,
-            "lora_alpha": 8,
-            "lora_dropout": 0.0,
+        model="default",
+        model_profiles={
+            "default": {
+                "name": "lora",
+                "base": {
+                    "name": "tiny_lm",
+                    "vocab_size": 64,
+                    "d_model": 16,
+                    "n_layers": 2,
+                    "n_heads": 4,
+                    "max_seq_len": 32,
+                },
+                "r": 4,
+                "lora_alpha": 8,
+                "lora_dropout": 0.0,
+            }
         },
     )
     rpt = estimate(cfg)

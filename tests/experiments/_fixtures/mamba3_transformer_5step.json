@@ -1,0 +1,31 @@
+{
+  "description": "Reference per-step training losses for the built-in tiny_lm (Transformer) model. Recorded BEFORE the v0.1.8 model_profiles schema change, using an equivalent dict-form `model:` recipe. The round-trip test (tests/experiments/test_mamba3_round_trip.py) runs the PROFILE-form recipe (mamba3_transformer_recipe.yaml) through the new model_profiles selector and asserts these losses reproduce. This guards against (a) numerical drift introduced by the model_profiles refactor and (b) a transcription error in the transformer profile params. The comparison is honest (post-rewrite vs pre-recorded), not circular.",
+  "provenance": {
+    "recorded_with": "lighttrain train -c <transient dict-form recipe>, before A1/A2 landed",
+    "recipe": "mamba3_transformer_recipe.yaml",
+    "corpus": "corpus.txt",
+    "hardware": "single NVIDIA RTX 3080 Ti, CUDA",
+    "determinism": "bit-identical across 2 consecutive runs on this hardware"
+  },
+  "seed": 1337,
+  "max_steps": 5,
+  "mixed_precision": "bf16",
+  "model_profile": "transformer",
+  "model_params": {
+    "name": "tiny_lm",
+    "vocab_size": 264,
+    "d_model": 128,
+    "n_layers": 4,
+    "n_heads": 4,
+    "max_seq_len": 256,
+    "dropout": 0.0
+  },
+  "losses": [
+    5.688473701477051,
+    5.305986404418945,
+    5.258802890777588,
+    5.1598591804504395,
+    5.013774871826172
+  ],
+  "tolerance_note": "On the recording hardware the reproduction is bit-identical; use a small atol (e.g. 1e-2) in the assertion to stay robust across GPU/driver differences, since bf16 reduction order is hardware-dependent."
+}

@@ -11,14 +11,16 @@ seed: 1337
 exp: sweep_lr
 run_root: runs
 
-model:
-  name: tiny_lm
-  vocab_size: 260
-  d_model: 128
-  n_layers: 2
-  n_heads: 4
-  max_seq_len: 64
-  dropout: 0.0
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 260
+    d_model: 128
+    n_layers: 2
+    n_heads: 4
+    max_seq_len: 64
+    dropout: 0.0
 
 data:
   name: simple

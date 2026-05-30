@@ -37,9 +37,13 @@
 **最小配置骨架：**
 
 ```yaml
-model:
-  name: tiny_lm          # 或 hf_causal 等
-  ...
+# v0.1.8+：模型用「配置组」声明，再用字符串选择器选中其一。
+# 内联 dict 形式的 `model:` 已移除（见下方迁移说明）。
+model: default            # 选择器：选中 model_profiles 中的某个 profile
+model_profiles:
+  default:
+    name: tiny_lm         # 或 hf_causal 等
+    ...
 
 data:
   name: simple
@@ -53,6 +57,13 @@ optim:
   name: adamw
   lr: 3e-4
 ```
+
+> **`model_profiles:` 配置组（v0.1.8 BREAKING）。** 一个 recipe 可声明多个完整模型配置（如
+> `transformer` / `mamba2` / ...），用 `model: <名字>` 选中，或在 CLI 上 `model=mamba2` 切换——
+> 切换不同架构无需改动 recipe 主体。**内联 dict 的 `model:` 会直接报错**并提示运行
+> `lighttrain migrate config <recipe> --to-profiles` 自动改写。单字段覆盖语法也随之变化：
+> 旧 `model.d_model=256` → 新 `model_profiles.<名字>.d_model=256`。详见
+> [v0.1.8_recipe_migration.md](v0.1.8_recipe_migration.md)。
 
 ---
 
@@ -155,6 +166,10 @@ lighttrain train -c pretrain_causal.yaml trainer.max_steps=5000
 # 覆盖多个字段
 lighttrain train -c pretrain_causal.yaml optim.lr=1e-3 trainer.grad_clip=0.5
 
+# 选择模型 profile（v0.1.8）；覆盖 profile 内字段走 model_profiles.<名字>.*
+lighttrain train -c recipe.yaml model=mamba2
+lighttrain train -c recipe.yaml model_profiles.default.d_model=256
+
 # 插值引用（字符串用引号）
 lighttrain train -c pretrain_causal.yaml "exp=my_exp_v2"
 
@@ -181,13 +196,29 @@ lighttrain resume --run runs/tiny_pretrain/20260527-... [-c new_config.yaml] [--
 
 ---
 
+#### `resume-verify` — 校验 resume 与单趟训练逐步一致（v0.1.8）
+
+```bash
+lighttrain resume-verify -c config.yaml [OVERRIDES...] \
+    --phase1-steps N --phase2-steps M [--tol 1e-2]
+```
+
+跑两条轨迹并逐步对比 loss：①单趟 `N+M` 步；②先 `N` 步存档、再恢复续训到 `N+M`。
+最大逐步 `|Δloss|` 超过 `--tol`（默认 `1e-2`，bf16 现实值）则判 FAIL 并返回非零退出码。
+bit-exact 校验请用 fp32 + 单 worker。注意：当前 sampler 仅恢复 epoch 粒度，**epoch 中途
+的 resume 会被判 FAIL**（真实数据管线缺口，见 v0.1.8 changelog）。
+
+---
+
 #### `dry-run` — 验证配置不训练
 
 ```bash
-lighttrain dry-run -c config.yaml [OVERRIDES...]
+lighttrain dry-run -c config.yaml [OVERRIDES...] [--build]
 ```
 
-验证配置文件能否正确解析并实例化所有组件，不执行任何训练步骤。
+验证配置文件能否正确解析并实例化所有组件，不执行任何训练步骤。加 `--build`
+会进一步导入 `user_modules` 并真正构造模型——用于校验 `model:`/`model_profiles:`
+选择器能解析、模型能构建（仅 `load_config` 不构造模型，无法发现选择器写错）。
 
 ---
 

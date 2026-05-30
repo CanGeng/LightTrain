@@ -1,6 +1,6 @@
 # lighttrain
 
-PyTorch language model training framework.
+PyTorch language model training framework for quick experiment.
 
 Created by Claude Code.
 
@@ -15,7 +15,7 @@ Designed for single-GPU researchers. Distributed training (DDP/FSDP/TP/PP) is av
 
 Distributed training (DDP/FSDP/TP/PP/EP) is implemented and unit-tested via CPU-based multiprocess spawn tests. It has NOT been validated at scale on multi-node GPU clusters. Use at your own risk for production distributed workloads.
 
-While Claude Code assisted with implementation, all architectural decisions, test design, and quality gates were human-directed. The test suite (33K lines, 1600+ tests) includes adversarial regression tests verified via mutation testing.
+While Claude Code assisted with implementation, all architectural decisions, test design, and quality gates were human-directed. The test suite (33K lines, 1900+ tests) includes adversarial regression tests verified via mutation testing.
 
 Design goals:
 **registry-first**, **failure-first**, **plugin-clean**, **lab-friendly**, and **audit-ready**.
@@ -73,7 +73,10 @@ The framework defines five clean seams; everything else remains straightforward.
 2. **Config** ([lighttrain/config/](lighttrain/config/)) —
    OmegaConf loading (`defaults:` composition, `${var}` interpolation, CLI
    overrides) combined with Pydantic v2 schema (`RootConfig` with optional
-   `prep_graph:` block).
+   `prep_graph:` block). The model is chosen by a **config group**: declare
+   one or more named configs under `model_profiles:` and select one with a
+   `model: <name>` string (override on the CLI with `model=<name>`). See
+   "Specifying the model" below.
 
 3. **Engine and UpdateRule** ([lighttrain/engine/](lighttrain/engine/),
    [lighttrain/update_rules/](lighttrain/update_rules/)) —
@@ -102,6 +105,27 @@ The framework defines five clean seams; everything else remains straightforward.
 | Models | `tiny_lm` (~3M–30M-param pre-norm GPT), `hf_causal` (HuggingFace `AutoModelForCausalLM`), `tiny_rwkv`, `tiny_mamba`, `tiny_unet`, `jepa` |
 | PEFT adapters | `lora`, `ia3`, `adalora` |
 | Tokenizers | `byte` (vocab 260; PAD / BOS / EOS / UNK + 256 raw bytes) |
+
+#### Specifying the model (`model_profiles`)
+
+A recipe declares one or more complete model configs under `model_profiles:`
+and picks one with a `model: <name>` selector:
+
+```yaml
+model: base                 # selector (override on the CLI: model=big)
+model_profiles:
+  base: { name: tiny_lm, d_model: 256, n_layers: 4, n_heads: 8 }
+  big:  { name: tiny_lm, d_model: 512, n_layers: 8, n_heads: 8 }
+```
+
+```bash
+lighttrain train -c recipe.yaml model=big                 # switch profile
+lighttrain train -c recipe.yaml model_profiles.base.d_model=384   # tweak a field
+```
+
+A single-profile recipe may omit the selector. **A bare-dict `model:` block is
+not accepted** — run `lighttrain migrate config <recipe> --to-profiles` to
+auto-convert an old recipe (see [docs/v0.1.8_recipe_migration.md](docs/v0.1.8_recipe_migration.md)).
 
 ### Data Pipeline
 
@@ -182,10 +206,11 @@ A directory missing `manifest.json` (checkpoint) or `MANIFEST_COMPLETE.json`
 | ------- | ----------- |
 | `lighttrain --version` / `--help` | Version and help |
 | `lighttrain init <path>` | Generate a minimal recipe skeleton |
-| `lighttrain dry-run -c <cfg>` | Resolve config and print; no training |
-| `lighttrain train -c <cfg>` | Full training loop; auto-runs PrepGraph if `cfg.prep_graph` is set |
+| `lighttrain dry-run -c <cfg> [--build]` | Resolve config and print; `--build` also constructs the model to verify the `model_profiles` selector |
+| `lighttrain train -c <cfg> [--eval] [--output-summary f.json]` | Full training loop; auto-runs PrepGraph if `cfg.prep_graph` is set; optional post-train perplexity and a per-`exp` summary row |
 | `lighttrain overfit -c <cfg> --n N` | Overfit on N batches |
 | `lighttrain resume --run <dir>` | Functional resume from a run directory |
+| `lighttrain resume-verify -c <cfg> --phase1-steps N --phase2-steps M` | Verify resume == single pass by comparing step-aligned losses |
 | `lighttrain prep -c <cfg>` | Run data preparation only |
 | `lighttrain prep-graph -c <cfg> --out g.dot` | Render the PrepGraph as a Graphviz dot file |
 | `lighttrain prep-clean -c <cfg>` | Remove cached prep artefacts |
@@ -193,7 +218,7 @@ A directory missing `manifest.json` (checkpoint) or `MANIFEST_COMPLETE.json`
 | `lighttrain inspect-data -c <cfg>` | Decoded batch preview, length histogram, label-mask coverage |
 | `lighttrain produce-artifact -c <cfg>` | Run an `ArtifactProducer` from the recipe's `artifacts:` block |
 | `lighttrain lineage tag / untag / pin / invalidate / gc / prune-orphans / graph` | SQLite lineage operations |
-| `lighttrain migrate config / artifact-header / checkpoint` | Schema migrations with `.pre-migration-bak` backup |
+| `lighttrain migrate config [--to-profiles] / artifact-header / checkpoint` | Schema migrations with `.pre-migration-bak` backup; `--to-profiles` rewrites a bare `model:` block to `model_profiles:` |
 | `lighttrain doctor --run <dir>` | Inspect checkpoints, lineage, frozen steps, NaN repros, crash bundles |
 | `lighttrain freeze-step --run <dir> --step N` | Capture a single-step replay bundle |
 | `lighttrain replay-step <bundle.zip>` | Replay a frozen step bundle |
@@ -203,7 +228,7 @@ A directory missing `manifest.json` (checkpoint) or `MANIFEST_COMPLETE.json`
 | `lighttrain eval -c <cfg>` | Evaluate perplexity and EvalSuite metrics |
 | `lighttrain regression-gate -c <cfg> --metric <name> --threshold <f>` | CI gate; exits 1 on failure |
 | `lighttrain sweep -c <cfg> -s <sweep.yaml>` | Hyperparameter sweep (grid / random / Optuna) |
-| `lighttrain compare <run_a> <run_b> …` | Config diff and metric comparison |
+| `lighttrain compare <run_a> <run_b> … [--metric M] [--output f.md\|f.json]` | Config diff and metric comparison; `--metric` emits a sweep-style Markdown/JSON table |
 | `lighttrain fork --from <ckpt> -c <cfg>` | Branch from a checkpoint with lineage |
 | `lighttrain convert-checkpoint --input <ckpt> --output <out> --to <fmt>` | Convert between `.pt`, `.safetensors`, and HuggingFace formats |
 | `lighttrain export --config <cfg> --out <dir> --to <fmt>` | Export model weights; `gguf` requires llama.cpp on PATH |
@@ -239,10 +264,13 @@ stop:
 
 ```bash
 lighttrain compare runs/exp_a/ runs/exp_b/ [--png out.png]
+lighttrain compare runs/sweep/*/ --metric loss --output table.md   # sweep table
 ```
 
 Produces a config diff (changed fields only), a metric table (last value per
-key), and fork ancestry when available.
+key), and fork ancestry when available. `--metric <name>` (repeatable) switches
+to a sweep-style table with one row per run; `--output` writes it as Markdown
+(`.md`) or per-run records (`.json`).
 
 ### Checkpoint Branching
 
@@ -304,7 +332,7 @@ torchrun --nproc_per_node=8 -m lighttrain.cli train -c plugins/distributed/recip
 torchrun --nproc_per_node=4 -m lighttrain.cli train -c plugins/distributed/recipes/nano_model.yaml
 ```
 
-See [`frontier_plugins/distributed/recipes/`](plugins/distributed/recipes/) for full YAML examples (DDP, FSDP, ZeRO-2, TP+DDP, 3D parallel, gloo CPU test).
+See [`plugins/distributed/recipes/`](plugins/distributed/recipes/) for full YAML examples (DDP, FSDP, ZeRO-2, TP+DDP, 3D parallel, gloo CPU test).
 See [`docs/user_guide.md`](docs/user_guide.md) for the complete `parallel:` field reference.
 
 ---
@@ -312,33 +340,32 @@ See [`docs/user_guide.md`](docs/user_guide.md) for the complete `parallel:` fiel
 ## PEFT and Memory Efficiency
 
 ```yaml
-# LoRA
-model:
-  name: lora
-  base:
-    name: hf_causal
-    pretrained: meta-llama/Llama-3.2-1B
-  r: 8
-  target_modules: [q_proj, v_proj]
-
-# AdaLoRA (importance-based rank pruning)
-model:
-  name: adalora
-  base:
-    name: hf_causal
-    pretrained: gpt2
-  r: 12
-  target_r: 8
-  update_interval: 200
-  total_step: 2000
-
-# QLoRA (Linux + CUDA; requires pip install -e ".[quant]")
-model:
-  name: qlora
-  base:
-    name: hf_causal
-    pretrained: meta-llama/Llama-3.2-1B
-  load_in_4bit: true
+# Each adapter is a model profile selected with `model: <name>`.
+model: lora                       # or: adalora | qlora
+model_profiles:
+  # LoRA
+  lora:
+    name: lora
+    base:
+      name: hf_causal
+      pretrained: meta-llama/Llama-3.2-1B
+    r: 8
+    target_modules: [q_proj, v_proj]
+  # AdaLoRA (importance-based rank pruning)
+  adalora:
+    name: adalora
+    base: { name: hf_causal, pretrained: gpt2 }
+    r: 12
+    target_r: 8
+    update_interval: 200
+    total_step: 2000
+  # QLoRA (Linux + CUDA; requires pip install -e ".[quant]")
+  qlora:
+    name: qlora
+    base:
+      name: hf_causal
+      pretrained: meta-llama/Llama-3.2-1B
+    load_in_4bit: true
 ```
 
 **LayerOffload** (large models on consumer hardware):
@@ -412,7 +439,7 @@ lighttrain regression-gate  -c <recipe> --metric mean_score --threshold 0.3
 
 ## Alternative Architectures
 
-Stateful (RWKV, Mamba) and non-Transformer objectives ship as frontier plugins:
+Stateful (RWKV, Mamba) and non-Transformer objectives ship as plugins:
 
 ```bash
 lighttrain train -c recipes/pretrain_rwkv.yaml     # RWKV stateful pretraining
@@ -453,10 +480,9 @@ write `def __init__(self, **kwargs)` on the class that carries
 `@register(...)`.**
 
 ```python
-# Good — explicit signature; v0.1.7's resolver filters recipe-side kwargs
-# (e.g. Transformer's n_layers / n_heads when the recipe carries a
-# transformer-shaped sibling block) and your inner builder only sees keys
-# it actually understands:
+# Good — explicit signature; the resolver filters recipe-side kwargs against
+# it (e.g. a stray Transformer-shaped key copy-pasted into a Mamba profile)
+# so your inner builder only sees keys it actually understands:
 @register("model", "mamba2_lm")
 class Mamba2LM(_MambaLMAdapter):
     def __init__(
@@ -484,9 +510,15 @@ This matters because lighttrain's resolver
 kwargs **based on the registered class's signature**. A `**kwargs`
 declaration on the registered class semantically claims "I want every key",
 so the resolver passes everything through and the filter is a no-op. With
-an explicit signature, sibling keys from a Transformer-shaped base recipe
-(or any stale kwargs left after a CLI `model.name=…` override) get dropped
-with a `UserWarning` before reaching your inner builder.
+an explicit signature, a stray key that doesn't belong to this architecture
+gets dropped with a `UserWarning` before reaching your inner builder.
+
+> Since v0.1.8, `model_profiles:` makes each architecture a **separate,
+> disjoint profile** — there is no longer an ambient `model:` block for a CLI
+> override to merge sibling keys into, so the original cross-architecture leak
+> (Issue #1) is prevented by construction. The explicit-signature rule remains
+> the recommended backstop: it still catches a mistyped or copy-pasted key
+> within a profile, which is exactly when you want the warning to fire.
 
 > **Escape hatch — adapters that genuinely need `**kwargs`.** If your
 > adapter has to forward an open-ended set of kwargs to a downstream
@@ -571,10 +603,12 @@ HF_ENDPOINT=https://hf-mirror.com
 ```
 
 ```yaml
-model:
-  name: hf_causal
-  pretrained: meta-llama/Llama-3.2-1B
-  dtype: bfloat16
+model: default
+model_profiles:
+  default:
+    name: hf_causal
+    pretrained: meta-llama/Llama-3.2-1B
+    dtype: bfloat16
 ```
 
 ---

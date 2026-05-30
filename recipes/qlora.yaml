@@ -15,19 +15,21 @@ seed: 42
 exp: r13_qlora
 run_root: runs
 
-model:
-  name: qlora
-  bits: 4
-  base:
-    name: hf_causal
-    pretrained: TinyLlama/TinyLlama-1.1B-Chat-v1.0
-    dtype: bfloat16
-  lora:
-    r: 16
-    lora_alpha: 32
-    target_modules: [q_proj, k_proj, v_proj, o_proj]
-    lora_dropout: 0.05
-    task_type: CAUSAL_LM
+model: default
+model_profiles:
+  default:
+    name: qlora
+    bits: 4
+    base:
+      name: hf_causal
+      pretrained: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+      dtype: bfloat16
+    lora:
+      r: 16
+      lora_alpha: 32
+      target_modules: [q_proj, k_proj, v_proj, o_proj]
+      lora_dropout: 0.05
+      task_type: CAUSAL_LM
 
 data:
   name: simple

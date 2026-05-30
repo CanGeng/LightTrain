@@ -74,6 +74,68 @@ def _filter_kwargs(factory: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     return filtered
 
 
+def _as_plain_dict(x: Any) -> Any:
+    """Coerce a pydantic model / Mapping to a plain dict; pass other types through."""
+    if x is None:
+        return None
+    if hasattr(x, "model_dump"):
+        return x.model_dump()
+    if isinstance(x, Mapping):
+        return dict(x)
+    return x
+
+
+def select_model_spec(model: Any, model_profiles: Any) -> dict[str, Any]:
+    """Resolve a v0.1.8 model selector + ``model_profiles`` group to a spec dict.
+
+    * ``model`` is a string  → look it up in ``model_profiles``.
+    * ``model`` is a mapping → **rejected** (bare ``model:`` blocks were removed
+      in v0.1.8; this is the Issue #1 leak class).
+    * ``model`` absent + exactly one profile → that profile.
+    * ``model`` absent + 0/>1 profiles → error.
+
+    Shared by the CLI runtime and ``lab.estimate`` so both honour the same
+    config-group semantics. Raises :class:`ConfigResolveError` on any bad
+    selection; raises ``RuntimeError`` only when nothing is declared at all.
+    """
+    profiles = _as_plain_dict(model_profiles)
+
+    def _profile_spec(name: str) -> dict[str, Any]:
+        spec = _as_plain_dict(profiles[name])
+        if not spec:
+            raise ConfigResolveError(f"model_profiles[{name!r}] is empty.")
+        return dict(spec)
+
+    if isinstance(model, str):
+        if not profiles:
+            raise ConfigResolveError(
+                f"model: {model!r} selects a profile, but the recipe defines no "
+                "`model_profiles:` block."
+            )
+        if model not in profiles:
+            raise ConfigResolveError(
+                f"model: {model!r} is not a defined profile "
+                f"(available: {sorted(profiles)})."
+            )
+        return _profile_spec(model)
+
+    if isinstance(model, Mapping):
+        raise ConfigResolveError(
+            "bare `model:` dict blocks were removed in v0.1.8; declare named "
+            "configs under `model_profiles:` and select one with `model: <name>`. "
+            "Run `lighttrain migrate config <recipe> --to-profiles` to auto-rewrite."
+        )
+
+    if profiles:
+        if len(profiles) == 1:
+            return _profile_spec(next(iter(profiles)))
+        raise ConfigResolveError(
+            "recipe defines multiple `model_profiles:` but no `model:` selector; "
+            f"add `model: <name>` (available: {sorted(profiles)})."
+        )
+    raise RuntimeError("recipe is missing `model:` / `model_profiles:` section")
+
+
 def _coerce(spec: ComponentSpec | Mapping[str, Any]) -> ComponentSpec:
     if isinstance(spec, ComponentSpec):
         return spec
@@ -204,4 +266,4 @@ def resolve(
         ) from e
 
 
-__all__ = ["resolve"]
+__all__ = ["resolve", "select_model_spec"]

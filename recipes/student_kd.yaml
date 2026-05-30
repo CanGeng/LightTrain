@@ -12,14 +12,16 @@ run_root: runs
 
 # Smaller student. Note: hidden_dim matches teacher (192) so hidden_mse can
 # operate without a projection layer (M3 limitation; see M3 docs §11).
-model:
-  name: tiny_lm
-  vocab_size: 260
-  d_model: 192
-  n_layers: 4
-  n_heads: 6
-  max_seq_len: 128
-  output_hidden_states: true
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 260
+    d_model: 192
+    n_layers: 4
+    n_heads: 6
+    max_seq_len: 128
+    output_hidden_states: true
 
 data:
   name: simple

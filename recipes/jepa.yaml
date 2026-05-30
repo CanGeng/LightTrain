@@ -12,14 +12,16 @@ seed: 13
 exp: r9_jepa
 run_root: runs
 
-model:
-  name: jepa
-  patch_dim: 16
-  embed_dim: 64
-  num_heads: 4
-  depth: 2
-  predictor_depth: 1
-  dropout: 0.0
+model: default
+model_profiles:
+  default:
+    name: jepa
+    patch_dim: 16
+    embed_dim: 64
+    num_heads: 4
+    depth: 2
+    predictor_depth: 1
+    dropout: 0.0
 
 data:
   name: simple

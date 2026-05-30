@@ -18,13 +18,15 @@ seed: 1
 exp: m4_freeze_replay
 run_root: __ROOT__
 
-model:
-  name: tiny_lm
-  vocab_size: 260
-  d_model: 16
-  n_layers: 1
-  n_heads: 2
-  max_seq_len: 32
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 260
+    d_model: 16
+    n_layers: 1
+    n_heads: 2
+    max_seq_len: 32
 
 data:
   name: simple

@@ -11,14 +11,16 @@ exp: r3_teacher
 run_root: runs
 
 # A larger TinyLM stands in for "teacher".
-model:
-  name: tiny_lm
-  vocab_size: 260
-  d_model: 192
-  n_layers: 6
-  n_heads: 6
-  max_seq_len: 128
-  output_hidden_states: true
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 260
+    d_model: 192
+    n_layers: 6
+    n_heads: 6
+    max_seq_len: 128
+    output_hidden_states: true
 
 data:
   name: simple

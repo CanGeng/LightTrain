@@ -19,6 +19,7 @@ from .. import __version__
 from ..checkpoint.manager import CheckpointManager
 from ..config import RootConfig, load_config
 from ..config._resolver import resolve as _resolve
+from ..config._resolver import select_model_spec
 from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
 from ..engine.standard import StandardEngine
@@ -176,9 +177,9 @@ def _to_dict(spec: Any) -> dict[str, Any] | None:
 
 
 def _build_model(cfg: RootConfig) -> Any:
-    spec = _to_dict(cfg.model)
-    if not spec:
-        raise RuntimeError("recipe is missing `model:` section")
+    # v0.1.8: ``model`` is a string selector into ``model_profiles``; a bare
+    # dict ``model:`` is rejected by select_model_spec with a migration hint.
+    spec = select_model_spec(getattr(cfg, "model", None), getattr(cfg, "model_profiles", None))
     return _resolve(spec, category="model")
 
 
