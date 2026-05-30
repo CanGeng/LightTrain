@@ -208,21 +208,44 @@ def test_apply_override_force_add_creates_intermediates_depth_five():
     assert isinstance(cfg.a.b.c.d, type(cfg.a.b.c))  # both DictConfig
 
 
-def test_pin_apply_override_regular_creates_intermediates_on_unstructured_cfg():
-    """Pin: on an unstructured (no Pydantic-struct) DictConfig, OmegaConf's
-    ``force_add=False`` still permits creating missing intermediates because
-    the cfg has no struct constraint. The ``++`` prefix becomes meaningful
-    only under a struct-flagged DictConfig.
+def test_regression_CFG_SET_01_plain_override_missing_key_raises():
+    """Regression (v0.1.10, breaking): a plain ``a.b=c`` override against a key
+    that does not exist is now rejected instead of silently creating it.
+
+    Pre-fix bug: on an unstructured DictConfig, OmegaConf's ``force_add=False``
+    still created missing intermediates, so a typo'd override (e.g.
+    ``train.max_steps=3`` against a recipe whose key is ``trainer.max_steps``)
+    was silently accepted and then dropped by ``extra='allow'`` Pydantic
+    validation — the training step cap never took effect, with no error.
 
     Input: empty cfg, override ``mode.nested=foo`` (no ``++`` prefix).
-    Closed form: cfg.mode.nested == "foo" — no exception, intermediate created.
+    Closed form: a ``ConfigError`` is raised AND its message both names the key
+    and suggests the ``++`` add form.
 
-    If this is intentionally changed (e.g., to set ``struct=True`` on freshly
-    composed configs so missing intermediates raise without ``++``), update
-    this test AND document the breaking change.
+    To deliberately add a new key, use the ``++`` prefix (see
+    ``test_apply_override_force_add_creates_intermediates_depth_five``).
     """
-    cfg = _apply_overrides(_empty_cfg(), ["mode.nested=foo"])
-    assert cfg.mode.nested == "foo"
+    with pytest.raises(ConfigError) as exc_info:
+        _apply_overrides(_empty_cfg(), ["mode.nested=foo"])
+    msg = str(exc_info.value)
+    assert "mode.nested" in msg
+    assert "++mode.nested=foo" in msg
+
+
+def test_invariant_plain_override_existing_key_still_sets():
+    """Invariant: the existence guard must not regress the common case — a plain
+    override that targets an *existing* leaf still sets it (no ``++`` needed)."""
+    cfg = OmegaConf.create({"trainer": {"max_steps": 2000}})
+    out = _apply_overrides(cfg, ["trainer.max_steps=3"])
+    assert out.trainer.max_steps == 3
+
+
+def test_invariant_plain_override_existing_none_leaf_still_sets():
+    """Invariant: a leaf that exists with value ``None`` counts as existing and
+    is settable without ``++`` (the guard walks structurally, not by value)."""
+    cfg = OmegaConf.create({"run_dir": None})
+    out = _apply_overrides(cfg, ["run_dir=runs/x"])
+    assert out.run_dir == "runs/x"
 
 
 def test_regression_CFG_TILDE_01_missing_intermediate_raises_configerror():

@@ -188,27 +188,33 @@ def test_no_args_shows_help_and_exits_zero(runner):
     assert "train" in res.stdout.lower() or "help" in res.stdout.lower()
 
 
-def test_pin_train_mode_cli_override_bypasses_schema_revalidation(runner, tmp_path):
-    """Pin: ``--mode bogus --print-config`` currently MUTATES the validated
-    RootConfig directly without re-validating against the ``Literal`` field.
-    The mutation succeeds (no exception) and the dump shows ``mode: bogus``.
+def test_regression_CLI_MODE_01_invalid_mode_override_rejected(runner, tmp_path):
+    """Regression (v0.1.10, breaking): ``--mode bogus`` is now rejected instead
+    of silently bypassing the ``Literal["lab", "prod"]`` schema.
 
-    Setup: valid recipe (mode=lab), CLI passes ``--mode bogus``.
-    Expected: exit 0, stdout shows ``mode: bogus`` (validation bypassed).
+    Pre-fix bug: ``cfg.mode = mode`` assigned the CLI value directly onto an
+    already-validated RootConfig, which Pydantic does NOT re-check
+    (``validate_assignment`` is off). ``--mode bogus`` was accepted with exit 0
+    and dumped ``mode: bogus`` — an invalid snapshot that fails its own schema
+    on reload/resume. The "non-canonical modes for research" rationale was
+    hollow: every consumer branches on ``mode == "lab"`` vs else, so a bogus
+    mode behaves identically to ``prod`` — no capability was preserved.
 
-    If this behavior is intentionally changed (e.g. add Pydantic
-    re-validation after CLI mutation), update this test AND document the
-    breaking change. The current bypass is a known sharp edge that allows
-    quick experimentation with non-canonical modes during research.
+    Setup: valid recipe (mode=lab), CLI passes ``--mode bogus --print-config``.
+    Closed form: exit 1, stdout names the bad mode and the allowed set; the
+    dump's ``mode: bogus`` never appears.
+
+    Valid modes (``--mode prod`` etc.) still apply — see
+    ``test_train_print_config_with_mode_override_uses_cli_mode``.
     """
     cfg = _write_minimal_recipe(tmp_path)
     res = runner.invoke(
         app, ["train", "-c", str(cfg), "--mode", "bogus", "--print-config"]
     )
-    # Pydantic v2 may treat post-init assignment leniently for Literal under
-    # model_config; the current code DOES assign without raising.
-    assert res.exit_code == 0, res.stdout
-    assert "mode: bogus" in res.stdout
+    assert res.exit_code == 1, res.stdout
+    assert "bogus" in res.stdout
+    assert "lab" in res.stdout and "prod" in res.stdout
+    assert "mode: bogus" not in res.stdout
 
 
 # ===========================================================================

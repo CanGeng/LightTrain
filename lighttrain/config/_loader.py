@@ -102,8 +102,38 @@ def _parse_override_value(val: str) -> Any:
     return val
 
 
+def _leaf_exists(cfg: DictConfig, keys: list[str]) -> bool:
+    """True if the full dotted key path resolves to an existing node in ``cfg``.
+
+    Walks structurally without resolving interpolations, so a present-but-
+    unresolved or ``None``-valued leaf still counts as existing. Returns False
+    as soon as any key along the path is absent (or an intermediate cannot be
+    descended into).
+    """
+    node: Any = cfg
+    last = len(keys) - 1
+    for i, k in enumerate(keys):
+        if not OmegaConf.is_dict(node) or k not in node:
+            return False
+        if i == last:
+            return True
+        try:
+            node = node[k]
+        except Exception:
+            # Intermediate present but unresolved/missing — cannot descend.
+            return False
+    return True
+
+
 def _apply_overrides(cfg: DictConfig, overrides: list[str]) -> DictConfig:
-    """Apply CLI-style overrides: ``a.b=c`` / ``++a.b=c`` (force-set) / ``~a.b`` (delete)."""
+    """Apply CLI-style overrides: ``a.b=c`` / ``++a.b=c`` (force-set) / ``~a.b`` (delete).
+
+    A plain ``a.b=c`` override requires ``a.b`` to already exist in the config;
+    a missing key is rejected (almost always a typo). Use the ``++`` prefix to
+    deliberately add a new key. This mirrors Hydra's set-vs-add distinction and
+    prevents silently-ignored overrides such as ``train.max_steps=3`` against a
+    recipe whose key is actually ``trainer.max_steps``.
+    """
     for ov in overrides:
         if not isinstance(ov, str) or not ov:
             raise ConfigError(f"Invalid override entry: {ov!r}")
@@ -133,6 +163,11 @@ def _apply_overrides(cfg: DictConfig, overrides: list[str]) -> DictConfig:
         key = key.strip()
         if not key:
             raise ConfigError(f"Empty key in override {ov!r}")
+        if not force and not _leaf_exists(cfg, key.split(".")):
+            raise ConfigError(
+                f"Override {ov!r}: key {key!r} does not exist in the config "
+                f"(likely a typo). Use '++{key}={val}' to add a new key."
+            )
         parsed = _parse_override_value(val)
         OmegaConf.update(cfg, key, parsed, merge=False, force_add=force)
     return cfg

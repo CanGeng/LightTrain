@@ -15,7 +15,11 @@ from rich.table import Table
 from .. import __version__
 from ..config import ConfigError, dump_resolved, load_config
 from ..utils.env import load_dotenv_if_present
-from ._runtime import build_prep_runner, setup_run_from_config
+from ._runtime import (
+    _validate_mode_override,
+    build_prep_runner,
+    setup_run_from_config,
+)
 
 console = Console()
 
@@ -233,11 +237,11 @@ def train_cmd(
     if print_config:
         try:
             cfg = load_config(config, overrides=overrides)
+            if mode is not None:
+                cfg.mode = _validate_mode_override(mode)  # type: ignore[union-attr]
         except (ConfigError, FileNotFoundError) as e:
             console.print(f"[red]config error:[/] {e}")
             raise typer.Exit(code=1) from e
-        if mode is not None:
-            cfg.mode = mode  # type: ignore[union-attr]
         console.print(dump_resolved(cfg))
         return
 

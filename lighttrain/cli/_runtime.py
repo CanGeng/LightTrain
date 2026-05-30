@@ -10,14 +10,14 @@ import importlib
 import importlib.util
 import inspect
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, get_args
 
 import torch
 from omegaconf import OmegaConf
 
 from .. import __version__
 from ..checkpoint.manager import CheckpointManager
-from ..config import RootConfig, load_config
+from ..config import ConfigError, RootConfig, load_config
 from ..config._resolver import resolve as _resolve
 from ..config._resolver import select_model_spec
 from ..distributed._context import ParallelContext
@@ -485,6 +485,25 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
             pass
 
 
+def _validate_mode_override(mode: str) -> str:
+    """Validate a CLI ``--mode`` override against ``RootConfig.mode``'s allowed
+    values, deriving them from the schema so the two never drift.
+
+    The ``--mode`` flag assigns ``cfg.mode`` directly on an already-validated
+    RootConfig, which Pydantic does NOT re-check (``validate_assignment`` is
+    off). Without this guard an invalid mode (e.g. ``--mode bogus``) is silently
+    accepted and written into the run's config snapshot, which then fails its
+    own ``Literal`` schema on reload/resume.
+    """
+    allowed = get_args(RootConfig.model_fields["mode"].annotation)
+    if mode not in allowed:
+        raise ConfigError(
+            f"--mode {mode!r} is not a valid mode; choose one of "
+            f"{list(allowed)}."
+        )
+    return mode
+
+
 def setup_run_from_config(
     config: "str | Path | RootConfig",
     *,
@@ -536,7 +555,7 @@ def setup_run_from_config(
         config_path = None
         snapshot_yaml = OmegaConf.to_yaml(OmegaConf.create(cfg.model_dump()))
     if mode is not None:
-        cfg.mode = mode  # type: ignore[union-attr]
+        cfg.mode = _validate_mode_override(mode)  # type: ignore[union-attr]
 
     # Import user_modules BEFORE any component resolution so that @register
     # decorators execute and populate the registry in time.

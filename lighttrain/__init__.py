@@ -47,7 +47,7 @@ from .trainers.base import Trainer
 try:
     __version__ = _pkg_version("lighttrain")
 except PackageNotFoundError:
-    __version__ = "0.1.9"
+    __version__ = "0.1.10"
 
 __all__ = [
     "CheckpointManager",

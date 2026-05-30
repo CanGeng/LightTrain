@@ -1,8 +1,8 @@
 """Invariant DSL.
 
-A safe expression evaluator for short ``check:`` strings declared in recipes.
-The expressions are evaluated against a controlled namespace that contains
-only:
+A *guarded* expression evaluator for short ``check:`` strings declared in
+recipes. The expressions are evaluated against a controlled namespace that
+contains only:
 
 * ``loss``, ``outputs``, ``batch``, ``model``, ``optimizer``, ``scheduler``,
   ``metrics``, ``step``, ``epoch`` — the per-step variables a check might
@@ -11,10 +11,20 @@ only:
 * ``len``, ``min``, ``max``, ``sum``, ``abs``, ``any``, ``all`` — a small
   bounded set of pure builtins.
 
-The implementation goes through :func:`eval` with ``{"__builtins__": {}}`` so
-attribute access works but no dunder import / open / exec is reachable from
-inside the expression. See ``tests/test_invariants_dsl.py`` for the
-sandbox tests (no ``__import__``, no ``open``, no ``eval``).
+The implementation goes through :func:`eval` with ``{"__builtins__": {}}`` and
+rejects dunder attribute access at the AST level, so the classic
+``().__class__.__subclasses__()`` breakout and ``__import__`` / ``open`` /
+``exec`` are unreachable from inside the expression (see
+``tests/invariants/test_dsl_sandbox.py``).
+
+**This is NOT a security boundary for untrusted input.** The *entire* ``torch``
+module is bound, so primitives such as ``torch.load`` (pickle → arbitrary code
+execution) and ``torch.save`` (arbitrary file write) are reachable with plain,
+dunder-free expressions. The guard exists to stop accidental footguns and the
+generic Python escapes — it assumes the ``check:`` strings come from a
+**trusted recipe author**, the same trust already required by ``user_modules``
+/ registered components. Do NOT evaluate ``check:`` strings submitted by
+untrusted parties (e.g. a multi-tenant service) on the strength of this guard.
 """
 
 from __future__ import annotations
@@ -91,7 +101,7 @@ def evaluate_check(
         ):
             raise InvariantError(f"invariant check: dunder attribute access not allowed: {_node.attr!r}")
     try:
-        result = eval(  # noqa: S307 — sandbox: builtins stripped below
+        result = eval(  # noqa: S307 — guarded: builtins stripped, dunders AST-rejected; trusted authors only
             expr,
             {"__builtins__": {}},
             ns,
