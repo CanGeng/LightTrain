@@ -5,9 +5,6 @@
 #
 # Model size: ~115K params (embed 16K + 2 × Transformer layers ~50K each)
 
-user_modules:
-  - acceptance/extensions.py
-
 parallel:
   backend: gloo
   dp: 4
@@ -19,7 +16,7 @@ parallel:
 model: default
 model_profiles:
   default:
-    name: tiny_causal_lm
+    name: tiny_lm
     vocab_size: 256
     d_model: 64
     n_layers: 2
@@ -30,7 +27,7 @@ data:
   name: simple
   dataset:
     name: line_file_text
-    path: acceptance/data/qwen35_pretrain.txt
+    path: tests/fixtures/tiny_corpus.txt
     max_len: 32
   tokenizer:
     name: byte

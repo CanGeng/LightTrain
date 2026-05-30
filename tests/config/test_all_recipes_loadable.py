@@ -45,7 +45,10 @@ def test_recipe_has_no_bare_model_block(recipe: Path):
         "run `lighttrain migrate config <recipe> --to-profiles`"
     )
 
-    cfg = load_config(recipe)
+    # Static migration check: parse + validate only. `import_user_modules=False`
+    # keeps this CI-safe (a recipe's user_modules may be optional/absent in CI);
+    # select_model_spec needs the parsed model/model_profiles, not the imports.
+    cfg = load_config(recipe, import_user_modules=False)
     spec = select_model_spec(cfg.model, cfg.model_profiles)
     assert isinstance(spec, dict) and spec
     assert spec.get("name") or spec.get("_target_"), spec
