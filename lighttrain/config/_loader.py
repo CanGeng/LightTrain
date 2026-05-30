@@ -178,11 +178,18 @@ def load_config(
     *,
     overrides: list[str] | None = None,
     validate: bool = True,
+    import_user_modules: bool = True,
 ) -> RootConfig | DictConfig:
     """Load a YAML config, apply overrides, and (by default) validate to RootConfig.
 
     Pass ``validate=False`` to get the raw resolved DictConfig (useful for tests
     and for ``--print-config``).
+
+    This is the single chokepoint where a recipe's ``user_modules:`` are
+    imported, so every recipe-eating command populates the registry with custom
+    components without each command having to remember to do it. Pass
+    ``import_user_modules=False`` for pure config-dump paths (``--print-config``)
+    that must not trigger plugin side effects.
     """
     path = Path(path)
     cfg = _compose_defaults(path)
@@ -196,9 +203,14 @@ def load_config(
         raise ConfigError(f"Resolved config is not a mapping: {type(plain).__name__}")
 
     try:
-        return RootConfig.model_validate(plain)
+        root = RootConfig.model_validate(plain)
     except ValidationError as e:
         raise ConfigSchemaError(str(e)) from e
+
+    if import_user_modules:
+        from ._user_modules import import_user_modules as _import
+        _import(list(root.user_modules or []))
+    return root
 
 
 def dump_resolved(cfg: RootConfig | DictConfig) -> str:

@@ -307,14 +307,15 @@ def estimate(cfg: Mapping[str, Any]) -> EstimateReport:
 
     from ..config._resolver import select_model_spec
 
-    # Register the recipe's user_modules so user-defined models/optimizers (and
-    # their optional optim_state_bytes hook) resolve. Idempotent; lazy import
-    # keeps lab decoupled from cli at module load.
+    # estimate() is public API (lab/__init__) and can be called directly with a
+    # raw dict that never went through load_config's chokepoint — so import the
+    # recipe's user_modules here too (idempotent; free when load_config already
+    # ran via estimate_cmd). Lazy import keeps lab decoupled at module load.
     user_mods = cfg_dict.get("user_modules") or []
     if user_mods:
-        from ..cli._runtime import _import_user_modules
+        from ..config._user_modules import import_user_modules
 
-        _import_user_modules(list(user_mods))
+        import_user_modules(list(user_mods))
 
     model = _build_model(cfg_dict)
     optim_name = _spec_name(cfg_dict.get("optim"))

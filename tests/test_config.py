@@ -264,8 +264,10 @@ def test_resolve_construction_failure(clean_registry):
 
 
 def test_user_modules_field(tmp_yaml):
+    # load_config imports user_modules at its chokepoint; this test only checks
+    # the field parses, so use the escape hatch to skip importing fake paths.
     p = tmp_yaml("mode: lab\nuser_modules: [./a.py, ./b.py]\n")
-    cfg = load_config(p)
+    cfg = load_config(p, import_user_modules=False)
     assert list(cfg.user_modules) == ["./a.py", "./b.py"]
 
 

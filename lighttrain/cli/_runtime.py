@@ -6,8 +6,6 @@ Keeps ``cli/_app.py`` thin: every train-style command boils down to
 
 from __future__ import annotations
 
-import importlib
-import importlib.util
 import inspect
 from pathlib import Path
 from typing import Any, Mapping, get_args
@@ -31,51 +29,13 @@ from ..utils.run_dir import make_run_dir, slugify
 from ..utils.seed import seed_everything
 
 
-_IMPORTED_USER_MODULES: set[str] = set()
-
-
-def _import_user_modules(modules: list[str]) -> None:
-    """Import every entry in ``user_modules`` so @register decorators execute.
-
-    Accepts dotted module names (``mypkg.mymod``) and file paths
-    (``./plugins/my_optim.py``, ``/abs/path/module.py``).
-    Must be called after config loading but before any component resolution.
-
-    Idempotent within a process (Issue #9): the second and later calls for a
-    given module are no-ops. Without this guard, a second call would re-run
-    every ``@register(...)`` decorator and raise ``RegistryConflictError``,
-    which blocks resuming or multi-stage scripts that build several runs in
-    the same Python process.
-
-    Raises ImportError with context on the first failure.
-    """
-    for mod in modules:
-        _is_path = mod.endswith(".py") or "/" in mod or "\\" in mod
-        if _is_path:
-            try:
-                key = str(Path(mod).expanduser().resolve())
-            except (OSError, RuntimeError):
-                key = mod  # fall back to raw string if resolve() blows up
-        else:
-            key = mod
-        if key in _IMPORTED_USER_MODULES:
-            continue
-        try:
-            if _is_path:
-                p = Path(mod).expanduser().resolve()
-                spec = importlib.util.spec_from_file_location(p.stem, p)
-                if spec is None or spec.loader is None:
-                    raise ImportError(f"Cannot load spec from {p}")
-                m = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(m)  # type: ignore[union-attr]
-            else:
-                importlib.import_module(mod)
-        except (ImportError, FileNotFoundError) as exc:
-            raise ImportError(
-                f"user_modules: failed to import {mod!r}. "
-                "Check that the path exists or the dotted name is on sys.path."
-            ) from exc
-        _IMPORTED_USER_MODULES.add(key)
+# ``user_modules`` import now lives in ``config/`` and is invoked at the
+# ``load_config`` chokepoint (so every recipe-eating command gets it for free).
+# Re-exported here under the old private name for backward compatibility with
+# callers/tests that import it from ``cli._runtime``; both names share the one
+# process-wide dedup set.
+from ..config._user_modules import _IMPORTED_USER_MODULES  # noqa: F401
+from ..config._user_modules import import_user_modules as _import_user_modules
 
 
 def _eager_import_components() -> None:
@@ -538,6 +498,7 @@ def setup_run_from_config(
     if isinstance(config, (str, Path)):
         config_path: Path | None = Path(config)
         snapshot_yaml = config_path.read_text(encoding="utf-8")
+        # load_config is the chokepoint — it already imports cfg.user_modules.
         cfg = load_config(config_path, overrides=overrides or [])
     else:
         if not isinstance(config, RootConfig):
@@ -554,12 +515,12 @@ def setup_run_from_config(
         cfg = config
         config_path = None
         snapshot_yaml = OmegaConf.to_yaml(OmegaConf.create(cfg.model_dump()))
+        # This branch bypasses load_config: a RootConfig may have been hand-built
+        # without going through the chokepoint, so import its user_modules here
+        # (idempotent — free if load_config already ran).
+        _import_user_modules(list(getattr(cfg, "user_modules", None) or []))
     if mode is not None:
         cfg.mode = _validate_mode_override(mode)  # type: ignore[union-attr]
-
-    # Import user_modules BEFORE any component resolution so that @register
-    # decorators execute and populate the registry in time.
-    _import_user_modules(list(getattr(cfg, "user_modules", None) or []))
 
     seed_everything(int(cfg.seed))
 

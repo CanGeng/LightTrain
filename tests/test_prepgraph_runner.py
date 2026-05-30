@@ -127,6 +127,19 @@ def test_config_change_invalidates_cache(chat_jsonl: Path, tmp_path: Path) -> No
     assert by_name["out"].reason in ("upstream_changed", "first_run")
 
 
+def test_cleanup_orphans_multi_node_no_keyerror(chat_jsonl: Path, tmp_path: Path) -> None:
+    # Regression: cleanup_orphans on a graph whose nodes have inputs used to
+    # raise KeyError because it never populated _fp_cache before _resolve.
+    g = PrepGraph.from_config(_spec(chat_jsonl))
+    store = tmp_path / "store"
+    PrepRunner(g, store_root=store).run()
+    removed = PrepRunner(
+        PrepGraph.from_config(_spec(chat_jsonl)), store_root=store
+    ).cleanup_orphans(dry_run=True)
+    # All current fingerprints are live → nothing flagged orphan.
+    assert removed == []
+
+
 def test_validate_node_emits_report(chat_jsonl: Path, tmp_path: Path) -> None:
     spec = _spec(chat_jsonl)
     spec["nodes"].insert(2, {

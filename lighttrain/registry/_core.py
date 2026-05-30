@@ -12,6 +12,7 @@ keeps the registry strict-by-default while still extensible.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Callable, Iterable
 
 from ._exceptions import (
@@ -64,6 +65,57 @@ KNOWN_CATEGORIES: tuple[str, ...] = (
 )
 
 
+def _code_objects(obj: Any) -> list[Any]:
+    """Code objects defining ``obj``: its own (for a function) or its methods'
+    (for a class). Independent of ``sys.modules``, unlike ``inspect.getfile``."""
+    code = getattr(obj, "__code__", None)
+    if code is not None:
+        return [code]
+    out: list[Any] = []
+    for v in vars(obj).values() if hasattr(obj, "__dict__") else ():
+        fn = getattr(v, "__func__", v)  # unwrap classmethod/staticmethod
+        c = getattr(fn, "__code__", None)
+        if c is not None:
+            out.append(c)
+    return out
+
+
+def _identity(obj: Any) -> tuple | None:
+    """A source-location fingerprint for a class/function, or ``None`` if it
+    can't be determined. Built from the ``(filename, name, first line)`` of the
+    object's code objects, so two import spellings of one *file* (same physical
+    path, same definition lines) compare equal, while two genuinely distinct
+    definitions (different file, name, or line) do not."""
+    codes = _code_objects(obj)
+    if not codes:
+        return None
+    files = frozenset(c.co_filename for c in codes)
+    sites = frozenset(
+        (getattr(c, "co_qualname", c.co_name), c.co_firstlineno) for c in codes
+    )
+    return (files, getattr(obj, "__qualname__", None), sites)
+
+
+def _same_source(a: Any, b: Any) -> bool:
+    """True if ``a`` and ``b`` are the same logical component.
+
+    Same object identity always qualifies. Otherwise two objects match when
+    their source-location fingerprints (:func:`_identity`) are equal — exactly
+    the case when one file is imported under two module identities
+    (``user_modules`` path-stem import vs. ``_target_`` dotted import), which
+    would otherwise re-run ``@register`` on a *different* object with the same
+    name. Distinct definitions (different file/name/line) never match, and if a
+    fingerprint can't be computed we fall back to ``is`` (report the conflict,
+    never a false merge).
+    """
+    if a is b:
+        return True
+    ia, ib = _identity(a), _identity(b)
+    if ia is None or ib is None:
+        return False
+    return ia == ib
+
+
 class Registry:
     """Multi-category registry. Use the module-level singleton via the public API."""
 
@@ -107,6 +159,14 @@ class Registry:
             bucket = self._store[category]
             if name in bucket and not force:
                 existing = bucket[name]
+                # Idempotent by *content identity*: a user_modules path import and
+                # a `_target_` dotted import of the same file produce two distinct
+                # module objects, so the same class is re-registered under two
+                # object identities. Treat those as the same logical component
+                # (no-op) instead of a conflict. Only a genuinely different source
+                # (different file or qualname) still raises.
+                if _same_source(existing, target):
+                    return target
                 raise RegistryConflictError(
                     f"({category!r}, {name!r}) already registered to {existing!r}. "
                     f"Pass force=True to override (intended for plugin overrides)."

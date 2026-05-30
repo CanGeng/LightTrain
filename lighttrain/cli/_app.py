@@ -236,7 +236,8 @@ def train_cmd(
 
     if print_config:
         try:
-            cfg = load_config(config, overrides=overrides)
+            # Pure config dump — don't trigger user_modules plugin imports.
+            cfg = load_config(config, overrides=overrides, import_user_modules=False)
             if mode is not None:
                 cfg.mode = _validate_mode_override(mode)  # type: ignore[union-attr]
         except (ConfigError, FileNotFoundError) as e:
@@ -418,7 +419,12 @@ def prep_clean_cmd(
 
 
 @app.command("prep-status")
-def prep_status_cmd(config: Path = typer.Option(..., "-c", "--config")) -> None:
+def prep_status_cmd(
+    config: Path = typer.Option(..., "-c", "--config"),
+    extras: bool = typer.Option(
+        False, "--extras", help="Also print each node's persisted extras metrics."
+    ),
+) -> None:
     """Show PrepGraph cache status without executing anything."""
     try:
         bundle = build_prep_runner(config, console=console)
@@ -427,6 +433,28 @@ def prep_status_cmd(config: Path = typer.Option(..., "-c", "--config")) -> None:
         raise typer.Exit(code=1) from e
     runner = bundle["runner"]
     runner.print_banner()
+    if extras:
+        node_extras = runner.node_extras()
+        if not node_extras:
+            console.print(
+                "[yellow]no extras on disk — run `prep` first to materialize manifests[/]"
+            )
+            return
+        console.print("[bold]extras[/]")
+        for name, metrics in node_extras.items():
+            if not metrics:
+                continue
+            rendered = "  ".join(
+                f"{k}={_fmt_metric(v)}" for k, v in sorted(metrics.items())
+            )
+            console.print(f"  [cyan]{name}[/]: {rendered}")
+
+
+def _fmt_metric(v: Any) -> str:
+    """Compact metric value rendering: round floats, pass through the rest."""
+    if isinstance(v, float):
+        return f"{v:.4g}"
+    return str(v)
 
 
 @app.command("produce-artifact")
@@ -1513,17 +1541,13 @@ def dry_run_cmd(
         console.print(f"[red]config error:[/] {e}")
         raise typer.Exit(code=1) from e
     if build:
-        from ._runtime import (
-            _build_model,
-            _eager_import_components,
-            _import_user_modules,
-        )
+        from ._runtime import _build_model, _eager_import_components
 
         try:
             # Mirror setup_run_from_config's registry population so --build sees
-            # the same adapter set as a real `train` run.
+            # the same adapter set as a real `train` run. cfg came from
+            # load_config above, which already imported cfg.user_modules.
             _eager_import_components()
-            _import_user_modules(list(getattr(cfg, "user_modules", None) or []))
             model = _build_model(cfg)
         except Exception as e:  # noqa: BLE001
             console.print(f"[red]build error:[/] {e}")

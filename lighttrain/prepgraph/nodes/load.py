@@ -25,6 +25,16 @@ def _iter_jsonl(path: Path) -> Iterator[dict[str, Any]]:
             yield json.loads(line)
 
 
+def _iter_lines(path: Path) -> Iterator[dict[str, Any]]:
+    """One document per non-empty line of a plain ``.txt`` file → ``{"text": line}``."""
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            yield {"text": line}
+
+
 def _iter_parquet(path: Path) -> Iterator[dict[str, Any]]:
     import pyarrow.parquet as pq  # type: ignore
 
@@ -57,6 +67,7 @@ class LoadNode(PrepNode):
     Config keys:
 
     * ``source``: required. ``"jsonl:<path>"``, ``"parquet:<path>"``,
+      ``"lines:<path.txt>"`` (one document per non-empty line → ``{"text": line}``),
       ``"dir:<path>"`` (auto-detect by extension), or ``"hf:<name>[:subset]"``.
     * ``split``: HF split name (default ``"train"``).
     * ``raw_data_version``: arbitrary string baked into the fingerprint so
@@ -80,6 +91,8 @@ class LoadNode(PrepNode):
             payload, scheme = scheme, "auto"
         if scheme in ("jsonl",):
             return _iter_jsonl(Path(payload))
+        if scheme in ("lines",):
+            return _iter_lines(Path(payload))
         if scheme in ("parquet",):
             return _iter_parquet(Path(payload))
         if scheme in ("dir",):

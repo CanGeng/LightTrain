@@ -191,3 +191,79 @@ def test_snapshot_restore_round_trip(clean_registry):
     assert not reg.contains("model", "snap")
     reg.restore(snap)
     assert reg.contains("model", "snap")
+
+
+# ---------------------------------------------------------------------------
+# Content-identity idempotency (ISSUE-2 / root cause B): registering the same
+# logical component twice — e.g. one file imported under two module identities,
+# or the exact same object — is a no-op, not a conflict. Genuinely different
+# definitions with the same name still raise.
+# ---------------------------------------------------------------------------
+
+def _load_twice(tmp_path, body: str, name: str):
+    """Load one .py file under two distinct module identities (as the
+    user_modules path-import and a _target_ dotted-import would)."""
+    import importlib.util
+
+    f = tmp_path / "lt_idem_src.py"
+    f.write_text(body)
+    mods = []
+    for modname in ("lt_idem_A", "lt_idem_B"):
+        spec = importlib.util.spec_from_file_location(modname, f)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        mods.append(m)
+    return mods
+
+
+def test_same_file_two_module_identities_is_noop(clean_registry, tmp_path):
+    body = (
+        "from lighttrain.registry import register\n"
+        "@register('prep_node', '_idem_node')\n"
+        "class IdemNode:\n"
+        "    def run(self):\n"
+        "        return 1\n"
+    )
+    # No RegistryConflictError despite two @register executions on two distinct
+    # class objects produced from the same physical file.
+    _load_twice(tmp_path, body, "_idem_node")
+    assert contains("prep_node", "_idem_node")
+
+
+def test_same_object_reregistered_is_noop(clean_registry):
+    class Foo:
+        def run(self):  # gives the class a code object to fingerprint
+            return 1
+
+    register("model", "_idem_obj", Foo)
+    # Re-registering the identical object must not raise.
+    register("model", "_idem_obj", Foo)
+    assert get("model", "_idem_obj") is Foo
+
+
+def test_different_class_same_name_still_raises(clean_registry):
+    class A:
+        def run(self):
+            return 1
+
+    class B:  # different qualname + line → genuine conflict
+        def run(self):
+            return 2
+
+    register("model", "_idem_conflict", A)
+    with pytest.raises(RegistryConflictError):
+        register("model", "_idem_conflict", B)
+
+
+def test_force_still_overrides_after_idempotency(clean_registry):
+    class A:
+        def run(self):
+            return 1
+
+    class B:
+        def run(self):
+            return 2
+
+    register("model", "_idem_force", A)
+    register("model", "_idem_force", B, force=True)
+    assert get("model", "_idem_force") is B

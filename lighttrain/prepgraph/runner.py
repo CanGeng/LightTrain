@@ -30,6 +30,24 @@ from ._fp import SCHEMA_VERSION, short
 from .dag import PrepGraph
 from .node import NodeResult, PrepNode, RunContext, materialize_manifest
 
+# Manifest keys written by the framework itself (materialize_manifest + the
+# runner's ``elapsed_s``). Everything else in a manifest came from a node's
+# ``NodeResult.extras`` — the author's domain metrics.
+_FRAMEWORK_MANIFEST_KEYS = frozenset(
+    {
+        "kind",
+        "name",
+        "schema_kind",
+        "schema_version",
+        "fingerprint",
+        "code_version",
+        "config",
+        "lineage_pending",
+        "derived_from",
+        "elapsed_s",
+    }
+)
+
 
 @dataclass
 class _ResolvedFingerprint:
@@ -94,6 +112,31 @@ class PrepRunner:
     def print_banner(self, plan: list[PlanEntry] | None = None) -> None:
         plan = plan or self.plan()
         print_plan(self.console, plan)
+
+    def node_extras(self) -> dict[str, dict[str, Any]]:
+        """Per-node domain metrics persisted on disk, keyed by node name.
+
+        Reads each node's committed ``MANIFEST_COMPLETE.json`` and returns the
+        author-supplied ``extras`` (manifest keys minus the framework keys). Nodes
+        with no committed manifest yet (never run / cache miss) are omitted.
+        Call after :meth:`plan` (or :meth:`run`) so ``_fp_cache`` is populated;
+        this runs ``plan()`` itself if needed.
+        """
+        if not self._fp_cache:
+            self.plan()
+        out: dict[str, dict[str, Any]] = {}
+        for name in self.graph.topo_order():
+            rfp = self._fp_cache.get(name)
+            if rfp is None:
+                continue
+            manifest = _io.read_manifest(rfp.final_dir)
+            if not manifest:
+                continue
+            extras = {
+                k: v for k, v in manifest.items() if k not in _FRAMEWORK_MANIFEST_KEYS
+            }
+            out[name] = extras
+        return out
 
     # ----- execution -------------------------------------------------------
 
@@ -360,8 +403,10 @@ class PrepRunner:
     def cleanup_orphans(self, *, dry_run: bool = False) -> list[Path]:
         """Remove cache directories that no live node references."""
         live: set[Path] = set()
-        for name in self.graph.topo_order():
-            self._resolve(name)
+        # plan() resolves every node in topo order AND populates _fp_cache, which
+        # _resolve() reads for upstream fingerprints. (A bare _resolve loop left
+        # the cache empty → KeyError on the first node with inputs.)
+        self.plan()
         for entry in self._fp_cache.values():
             live.add(entry.final_dir.resolve())
         removed: list[Path] = []

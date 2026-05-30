@@ -1009,7 +1009,7 @@ class PrepNode:
 | `load` | 从磁盘加载原始文本/JSON 行 | [prepgraph/nodes/load.py](lighttrain/prepgraph/nodes/load.py) |
 | `tokenize` | 对行数据分词 | [prepgraph/nodes/tokenize.py](lighttrain/prepgraph/nodes/tokenize.py) |
 | `chunk` | 固定长度分块（含 stride） | [prepgraph/nodes/chunk.py](lighttrain/prepgraph/nodes/chunk.py) |
-| `pack` | 多条序列打包至固定上下文窗口 | [prepgraph/nodes/pack.py](lighttrain/prepgraph/nodes/pack.py) |
+| `pack` | 多文档打包至固定上下文窗口，`strategy: concat_chunk`（默认，padding-free 基线）/ `next_fit`（greedy-pad-flush）/ `best_fit`（BFD，opt-in），各自吐 `truncation_rate`/`token_utilization` 等指标 | [prepgraph/nodes/pack.py](lighttrain/prepgraph/nodes/pack.py) |
 | `mix` | 多 upstream 流按比例混合 | [prepgraph/nodes/mix.py](lighttrain/prepgraph/nodes/mix.py) |
 | `join` | 拼接多个 upstream 数据集 | [prepgraph/nodes/join.py](lighttrain/prepgraph/nodes/join.py) |
 | `index` | 为随机访问建索引 | [prepgraph/nodes/index.py](lighttrain/prepgraph/nodes/index.py) |
