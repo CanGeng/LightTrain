@@ -114,11 +114,17 @@ class PretrainTrainer(Trainer):
                 except StopIteration:
                     self.bus.dispatch("on_epoch_end", epoch=self.ctx.epoch, ctx=self.ctx)
                     self.ctx.epoch += 1
+                    self.ctx.batch_in_epoch = 0  # new epoch → reset data position
                     iterator = iter(loader)
                     self.bus.dispatch(
                         "on_epoch_begin", epoch=self.ctx.epoch, ctx=self.ctx
                     )
                     raw_batch = next(iterator)
+
+                # One batch consumed from the loader this epoch (authoritative,
+                # prefetch-independent — counts loop `next()`s, not sampler
+                # yields). Drives step-exact mid-epoch resume (BUG-1).
+                self.ctx.batch_in_epoch += 1
 
                 batch = _move_batch(raw_batch, self.device)
                 last_batch = batch
@@ -530,6 +536,15 @@ class PretrainTrainer(Trainer):
                 self.data_module.load_state_dict(ckpt["data_module"])
             except Exception:  # noqa: BLE001
                 _log.warning("Failed to restore data_module state from checkpoint", exc_info=True)
+        # Authoritative mid-epoch seek (BUG-1): position the sampler from the
+        # trainer's consumed-batch count, overriding any prefetch-skewed
+        # yield-time position the sampler may have serialized. Runs AFTER
+        # load_state_dict so it wins; before the train loop builds its iterator.
+        if self.data_module is not None and hasattr(self.data_module, "seek"):
+            try:
+                self.data_module.seek(self.ctx.epoch, self.ctx.batch_in_epoch)
+            except Exception:  # noqa: BLE001
+                _log.warning("Failed to seek data position on resume", exc_info=True)
         rng = ckpt.get("rng")
         if rng:
             try:

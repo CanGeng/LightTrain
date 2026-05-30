@@ -195,7 +195,7 @@ class StepOutput:
 
 ### 4.1 `model`
 
-**Protocol**：`ModelProtocol`（[lighttrain/protocols.py:79](lighttrain/protocols.py#L79)）
+**Protocol**：`ModelProtocol`（[lighttrain/protocols.py:86](lighttrain/protocols.py#L86)）
 
 ```python
 def forward(self, **batch: Any) -> ModelOutput: ...
@@ -243,7 +243,7 @@ class TinyCausalLM(nn.Module):
 
 ### 4.2 `loss`
 
-**Protocol**：`LossFnProtocol`（[lighttrain/protocols.py:95](lighttrain/protocols.py#L95)）
+**Protocol**：`LossFnProtocol`（[lighttrain/protocols.py:102](lighttrain/protocols.py#L102)）
 
 ```python
 def __call__(
@@ -298,21 +298,65 @@ class CrossEntropyLoss:
 
 ### 4.3 `optimizer`
 
-**Protocol**：`OptimizerWrapperProtocol`（[lighttrain/protocols.py:105](lighttrain/protocols.py#L105)）
+**Protocol**：`OptimizerWrapperProtocol`（[lighttrain/protocols.py:112](lighttrain/protocols.py#L112)）
+
+**完整契约**（更新规则与 checkpoint 管理器都调用在 **wrapper** 上，而非内部
+optimizer——务必全部实现，或继承 `_BaseWrapper`）：
 
 ```python
-optimizer: torch.optim.Optimizer   # build() 后必须设置
-
+optimizer: torch.optim.Optimizer          # build() 后必须设置；须暴露 .param_groups
+                                          # （LR 日志读 optimizer.optimizer.param_groups[0]["lr"]）
 def build(self, model: Any) -> torch.optim.Optimizer: ...
+def step(self, *a, **k) -> Any: ...        # 每步调用
+def zero_grad(self, set_to_none=True): ...
+def state_dict(self) -> dict: ...          # checkpoint 管理器调用
+def load_state_dict(self, sd) -> None: ...
+
+# 可选：estimate() 在场时调用，否则回退 2×params
+def optim_state_bytes(self, model) -> int: ...
 ```
 
-**基类**：`_BaseWrapper`（[lighttrain/optim/wrappers.py:67](lighttrain/optim/wrappers.py#L67)）
+**调用时序**（[update_rules/standard.py:280-307](lighttrain/update_rules/standard.py#L280-L307)）：每步
+`clip_grad_norm_(...)` → `optimizer.step()` → `zero_grad()`。**`step()` 时梯度为全秩、未被框架
+改动**（无 closure、无预先 grad mutation）——梯度操纵型优化器（如 GaLore）可在 `.step()` 内
+安全读取并投影 `.grad`。
 
-提供 `step / zero_grad / state_dict / load_state_dict`，子类只需实现 `build()`。
+**自定义状态 checkpoint**：optimizer state 经
+`torch.save(..., weights_only=False)`（[checkpoint/manager.py:136](lighttrain/checkpoint/manager.py#L136)、
+[:177](lighttrain/checkpoint/manager.py#L177)）整体 round-trip。放进 `optimizer.state[p]` 的任意
+对象（如 GaLore 的 `GaLoreProjector`）能存活，前提是 **(a) 可 pickle、(b) 加载时其类可
+import**。若按引用 pickle 自定义类，checkpoint 即**不自包含**（加载进程缺该包会
+`ModuleNotFoundError`）。要可移植，请在 `state_dict()` 里把自定义状态序列化为**纯张量**
+（无类引用），`load_state_dict()` 再重建对象。
 
-**`__init__` 约定**：所有超参数通过 `**kwargs` 传入（由 config resolver 注入），支持 `param_groups` 列表进行分组配置。
+> ⚠️ **Aliasing 陷阱**：`torch.optim.Optimizer.state_dict()` 返回的内层
+> `state[param]` dict 与活动优化器**同引用**。若在 `state_dict()` 覆写里**原地**改写
+> 自定义状态（例如把 projector 对象换成纯张量），会**污染正在运行的优化器**——下一个
+> `.step()` 会拿到你序列化后的形式而非活动对象，直接崩。**务必先 copy 再改写**。
+> `_BaseWrapper._safe_state_dict(convert)` 已替你做好这件事（内层 dict 先 copy，再对每个
+> 条目应用 `convert(key, value) -> value`）：
+>
+> ```python
+> def state_dict(self):
+>     def conv(k, v):
+>         return v.as_plain_tensors() if k == "projector" else v
+>     return self._safe_state_dict(conv)   # 安全：不会 alias 活动状态
+> ```
 
-**极简范例**：[lighttrain/optim/wrappers.py:105](lighttrain/optim/wrappers.py#L105)
+**`optim_state_bytes(model)`（可选）**：返回优化器真实的每步状态字节数。`lighttrain estimate`
+在场时调用它，否则回退 `2 × trainable_param_bytes`（全秩 Adam 假设）。内存高效优化器
+（GaLore / 8-bit Adam / Adam-mini）覆写它，`estimate` 才能**看见**其节省（issue #4）。
+
+**基类**：`_BaseWrapper`（[lighttrain/optim/wrappers.py](lighttrain/optim/wrappers.py)）
+
+提供 `step / zero_grad / state_dict / load_state_dict` 与默认 `optim_state_bytes`（Adam 类
+`2×`、Lion `1×`），子类只需实现 `build()`。
+
+**`__init__` 约定**：所有超参数通过 `**kwargs` 传入（由 config resolver 注入），支持
+`param_groups` 列表进行分组配置；每条支持名字正则 `pattern` + 可选谓词 `min_ndim` /
+`module_type`（详见下方 YAML）。
+
+**极简范例**：[lighttrain/optim/wrappers.py:210](lighttrain/optim/wrappers.py#L210)
 
 ```python
 @register("optimizer", "adamw")
@@ -335,7 +379,15 @@ optimizer:
   param_groups:
     - pattern: ".*bias|.*norm.*"
       weight_decay: 0.0
+    # 可选谓词（名字正则之后追加过滤；默认不设=旧行为）：
+    - pattern: "attn|mlp"
+      min_ndim: 2          # 仅 ndim>=2 的权重矩阵（排除 1-D bias/norm）
+      module_type: Linear  # 仅 nn.Linear 拥有的参数（按 type(module).__name__ 匹配）
+      weight_decay: 0.1
 ```
+
+> `min_ndim` / `module_type` 让**内置** param-group DSL 直接表达
+> 「Linear 权重、ndim≥2」这类选层（如 GaLore），无需自定义 `build()`（issue #3）。
 
 **内置注册项**
 
@@ -348,7 +400,7 @@ optimizer:
 
 ### 4.4 `scheduler`
 
-**Protocol**：`SchedulerProtocol`（[lighttrain/protocols.py:112](lighttrain/protocols.py#L112)）
+**Protocol**：`SchedulerProtocol`（[lighttrain/protocols.py:158](lighttrain/protocols.py#L158)）
 
 ```python
 step_per_batch: bool   # 总为 True：每个 optimizer step 调用一次
@@ -417,7 +469,7 @@ class LineFileTextDataset:
 
 ### 4.6 `processor`
 
-**Protocol**：`ProcessorProtocol`（[lighttrain/protocols.py:149](lighttrain/protocols.py#L149)）
+**Protocol**：`ProcessorProtocol`（[lighttrain/protocols.py:195](lighttrain/protocols.py#L195)）
 
 ```python
 modality: str   # "image" / "audio" / "text" / "video"
@@ -458,7 +510,7 @@ class SimpleImageProcessor:
 
 ### 4.7 `collator`
 
-**Protocol**：`CollatorProtocol`（[lighttrain/protocols.py:136](lighttrain/protocols.py#L136)）
+**Protocol**：`CollatorProtocol`（[lighttrain/protocols.py:182](lighttrain/protocols.py#L182)）
 
 ```python
 def __call__(self, samples: list[Mapping[str, Any]]) -> dict[str, Any]: ...
@@ -491,7 +543,7 @@ class CausalLMCollator:
 
 ### 4.8 `sampler`
 
-**Protocol**：`SamplerProtocol`（[lighttrain/protocols.py:141](lighttrain/protocols.py#L141)）
+**Protocol**：`SamplerProtocol`（[lighttrain/protocols.py:187](lighttrain/protocols.py#L187)）
 
 ```python
 def __iter__(self) -> Iterable[int]: ...
@@ -523,7 +575,7 @@ class ShuffleSampler:
 
 ### 4.9 `tokenizer`
 
-**Protocol**：`TokenizerProtocol`（[lighttrain/protocols.py:130](lighttrain/protocols.py#L130)）
+**Protocol**：`TokenizerProtocol`（[lighttrain/protocols.py:176](lighttrain/protocols.py#L176)）
 
 ```python
 def encode(self, text: str, **kwargs: Any) -> list[int]: ...
@@ -551,7 +603,7 @@ class ByteTokenizer:
 
 ### 4.10 `data_module`
 
-**Protocol**：`DataModuleProtocol`（[lighttrain/protocols.py:121](lighttrain/protocols.py#L121)）
+**Protocol**：`DataModuleProtocol`（[lighttrain/protocols.py:167](lighttrain/protocols.py#L167)）
 
 ```python
 def train_loader(self) -> Iterable[Any]: ...
@@ -572,7 +624,7 @@ def load_state_dict(self, sd: Mapping[str, Any]) -> None: ...
 
 ### 4.11 `trainer`
 
-**Protocol**：`TrainerProtocol`（[lighttrain/protocols.py:263](lighttrain/protocols.py#L263)）
+**Protocol**：`TrainerProtocol`（[lighttrain/protocols.py:319](lighttrain/protocols.py#L319)）
 
 **ABC 基类**：`Trainer`（[lighttrain/trainers/base.py:20](lighttrain/trainers/base.py#L20)）— **推荐继承**
 
@@ -630,7 +682,7 @@ class PretrainTrainer(Trainer):
 
 ### 4.12 `engine`
 
-**Protocol**：`EngineProtocol`（[lighttrain/protocols.py:194](lighttrain/protocols.py#L194)）
+**Protocol**：`EngineProtocol`（[lighttrain/protocols.py:240](lighttrain/protocols.py#L240)）
 
 ```python
 def step(self, batch: Mapping[str, Any], ctx: Any) -> dict[str, Any]: ...
@@ -646,7 +698,7 @@ def step(self, batch: Mapping[str, Any], ctx: Any) -> dict[str, Any]: ...
 
 ### 4.13 `update_rule`
 
-**Protocol**：`UpdateRuleProtocol`（[lighttrain/protocols.py:199](lighttrain/protocols.py#L199)）
+**Protocol**：`UpdateRuleProtocol`（[lighttrain/protocols.py:245](lighttrain/protocols.py#L245)）
 
 ```python
 def setup(self, model: Any, sample: Any) -> None: ...
@@ -683,7 +735,7 @@ class StandardUpdateRule:
 
 ### 4.14 `callback`
 
-**Protocol**：`CallbackProtocol`（[lighttrain/protocols.py:255](lighttrain/protocols.py#L255)）
+**Protocol**：`CallbackProtocol`（[lighttrain/protocols.py:311](lighttrain/protocols.py#L311)）
 
 **所有事件方法均为可选**（`EventBus` 通过 `getattr` 检查）。完整事件列表见 `CALLBACK_EVENTS`（39 个）。
 
@@ -743,7 +795,7 @@ class EMACallback:
 
 ### 4.15 `logger`
 
-**Protocol**：`LoggerProtocol`（[lighttrain/protocols.py:165](lighttrain/protocols.py#L165)）
+**Protocol**：`LoggerProtocol`（[lighttrain/protocols.py:211](lighttrain/protocols.py#L211)）
 
 ```python
 def log_scalars(self, scalars: Mapping[str, float], step: int) -> None: ...
@@ -806,7 +858,7 @@ class NextTokenObjective:
 
 ### 4.17 `judge`
 
-**Protocol**：`JudgeProtocol`（[lighttrain/protocols.py:288](lighttrain/protocols.py#L288)）
+**Protocol**：`JudgeProtocol`（[lighttrain/protocols.py:343](lighttrain/protocols.py#L343)）
 
 ```python
 def score(self, items: Iterable[Any], ctx: Any | None = None) -> list[Any]: ...
@@ -823,7 +875,7 @@ def score(self, items: Iterable[Any], ctx: Any | None = None) -> list[Any]: ...
 
 ### 4.18 `generation_strategy`
 
-**Protocol**：`GenerationStrategyProtocol`（[lighttrain/protocols.py:275](lighttrain/protocols.py#L275)）
+**Protocol**：`GenerationStrategyProtocol`（[lighttrain/protocols.py:331](lighttrain/protocols.py#L331)）
 
 ```python
 def generate(self, model: Any, prompts: Any,
@@ -838,7 +890,7 @@ def generate(self, model: Any, prompts: Any,
 
 ### 4.19 `environment`
 
-**Protocol**：`EnvironmentProtocol`（[lighttrain/protocols.py:292](lighttrain/protocols.py#L292)）
+**Protocol**：`EnvironmentProtocol`（[lighttrain/protocols.py:348](lighttrain/protocols.py#L348)）
 
 ```python
 def reset(self, ctx: Any | None = None) -> Any: ...
@@ -851,7 +903,7 @@ def step(self, action: Any) -> Any: ...
 
 ### 4.20 `retriever`
 
-**Protocol**：`RetrieverProtocol`（[lighttrain/protocols.py:297](lighttrain/protocols.py#L297)）
+**Protocol**：`RetrieverProtocol`（[lighttrain/protocols.py:354](lighttrain/protocols.py#L354)）
 
 ```python
 def index(self, corpus: Any, ctx: Any | None = None) -> Any: ...
@@ -864,7 +916,7 @@ def query(self, queries: Any, k: int, ctx: Any | None = None) -> Any: ...
 
 ### 4.21 `chunker`
 
-**Protocol**：`ChunkerProtocol`（[lighttrain/protocols.py:304](lighttrain/protocols.py#L304)）
+**Protocol**：`ChunkerProtocol`（[lighttrain/protocols.py:360](lighttrain/protocols.py#L360)）
 
 ```python
 def chunk(self, rows: Iterable[Any], ctx: Any | None = None) -> Iterable[Any]: ...
@@ -876,7 +928,7 @@ def chunk(self, rows: Iterable[Any], ctx: Any | None = None) -> Iterable[Any]: .
 
 ### 4.22 `probe`
 
-**Protocol**：`ProbeProtocol`（[lighttrain/protocols.py:309](lighttrain/protocols.py#L309)）
+**Protocol**：`ProbeProtocol`（[lighttrain/protocols.py:365](lighttrain/protocols.py#L365)）
 
 ```python
 def attach(self, model: Any, layers: Iterable[str], ctx: Any | None = None) -> Any: ...
@@ -889,7 +941,7 @@ def compute(self, activations: Any) -> Any: ...
 
 ### 4.23 `artifact_producer`
 
-**Protocol**：`ArtifactProducerProtocol`（[lighttrain/protocols.py:345](lighttrain/protocols.py#L345)）
+**Protocol**：`ArtifactProducerProtocol`（[lighttrain/protocols.py:401](lighttrain/protocols.py#L401)）
 
 ```python
 def prepare(self, cfg: Mapping[str, Any] | None = None) -> None: ...
@@ -907,7 +959,7 @@ def finalize(self) -> Path: ...
 
 ### 4.24 `artifact_store`
 
-**Protocol**：`ArtifactStoreProtocol`（[lighttrain/protocols.py:352](lighttrain/protocols.py#L352)）
+**Protocol**：`ArtifactStoreProtocol`（[lighttrain/protocols.py:408](lighttrain/protocols.py#L408)）
 
 ```python
 def put(self, sample_id: str, tensors_dict: Mapping[str, torch.Tensor]) -> None: ...
@@ -928,7 +980,7 @@ def iter_keys(self) -> Iterable[str]: ...
 
 ### 4.25 `prep_node`
 
-**Protocol**：`PrepNodeProtocol`（[lighttrain/protocols.py:360](lighttrain/protocols.py#L360)）
+**Protocol**：`PrepNodeProtocol`（[lighttrain/protocols.py:416](lighttrain/protocols.py#L416)）
 
 **基类**：`PrepNode`（[lighttrain/prepgraph/node.py:67](lighttrain/prepgraph/node.py#L67)）— **推荐继承**
 

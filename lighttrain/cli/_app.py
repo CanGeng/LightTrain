@@ -805,70 +805,91 @@ def eval_cmd(
     to also write the full EvalReport to disk.
     """
     import json
+    import tempfile
 
     load_dotenv_if_present()
 
-    bundle = setup_run_from_config(config)
-    trainer = bundle["trainer"]
-    cfg = bundle["cfg"]
+    # `eval` is read-only — don't litter run_root with an empty run dir per
+    # invocation (Issue #6). Mint into a temp dir that we clean up afterwards.
+    _tmp_run = tempfile.TemporaryDirectory(prefix="lighttrain-eval-")
+    try:
+        bundle = setup_run_from_config(config, existing_run_dir=Path(_tmp_run.name))
+        trainer = bundle["trainer"]
+        cfg = bundle["cfg"]
 
-    if checkpoint is not None:
-        ckpt_manager = getattr(trainer, "ckpt_manager", None)
-        if ckpt_manager is not None:
+        loaded_ckpt = False
+        if checkpoint is not None:
+            ckpt_manager = getattr(trainer, "ckpt_manager", None)
+            if ckpt_manager is not None:
+                try:
+                    trainer.load_checkpoint(checkpoint)
+                    console.print(f"[green]loaded checkpoint[/] {checkpoint}")
+                    loaded_ckpt = True
+                except Exception as exc:
+                    console.print(f"[yellow]checkpoint load failed:[/] {exc}")
+
+        # Loud guard: scoring init weights produces a meaningless (random)
+        # perplexity. Make it impossible to mistake for a trained result.
+        if not loaded_ckpt:
+            console.print(
+                "[bold yellow]⚠ evaluating UNTRAINED weights[/] — no checkpoint "
+                "loaded (pass --checkpoint <dir>); metrics below reflect random "
+                "initialization, not a trained model."
+            )
+
+        model = getattr(trainer, "model", None)
+        if model is None:
+            console.print("[red]trainer has no model[/]")
+            raise typer.Exit(code=1)
+
+        device = getattr(trainer, "device", None)
+
+        # ---- perplexity via val loader, falling back to the train loader ----
+        # The fallback is what lets `lighttrain eval` work on recipes without a
+        # dedicated val split (e.g. the mamba3 reproduction), so the experiment's
+        # direct-call bypass of this CLI is no longer needed (Issue #10).
+        ppl_value = _eval_perplexity(trainer, max_batches)
+
+        metrics: dict[str, float] = {}
+        if ppl_value is not None:
+            metrics["perplexity"] = ppl_value
+
+        # ---- run configured evaluator if present ----
+        evaluator = getattr(trainer, "evaluator", None) or getattr(cfg, "evaluator", None)
+        if evaluator is not None:
             try:
-                trainer.load_checkpoint(checkpoint)
-                console.print(f"[green]loaded checkpoint[/] {checkpoint}")
+                from ..eval.suite import Evaluator
+                if isinstance(evaluator, Evaluator):
+                    report = evaluator.run(model, step=0, device=device, force=True)
+                    if report is not None:
+                        metrics.update(report.metrics)
             except Exception as exc:
-                console.print(f"[yellow]checkpoint load failed:[/] {exc}")
+                console.print(f"[yellow]evaluator failed:[/] {exc}")
 
-    model = getattr(trainer, "model", None)
-    if model is None:
-        console.print("[red]trainer has no model[/]")
-        raise typer.Exit(code=1)
+        # ---- display ----
+        table = Table(title="lighttrain eval", show_header=True)
+        table.add_column("Metric")
+        table.add_column("Value")
+        for k, v in metrics.items():
+            table.add_row(k, f"{v:.6g}")
+        console.print(table)
 
-    device = getattr(trainer, "device", None)
-
-    # ---- perplexity via val loader, falling back to the train loader ----
-    # The fallback is what lets `lighttrain eval` work on recipes without a
-    # dedicated val split (e.g. the mamba3 reproduction), so the experiment's
-    # direct-call bypass of this CLI is no longer needed (Issue #10).
-    ppl_value = _eval_perplexity(trainer, max_batches)
-
-    metrics: dict[str, float] = {}
-    if ppl_value is not None:
-        metrics["perplexity"] = ppl_value
-
-    # ---- run configured evaluator if present ----
-    evaluator = getattr(trainer, "evaluator", None) or getattr(cfg, "evaluator", None)
-    if evaluator is not None:
+        if json_out is not None:
+            import time
+            report_dict = {
+                "task_name": "eval",
+                "metrics": metrics,
+                "step": 0,
+                "timestamp": time.time(),
+            }
+            json_out.parent.mkdir(parents=True, exist_ok=True)
+            json_out.write_text(json.dumps(report_dict, indent=2), encoding="utf-8")
+            console.print(f"[green]wrote[/] {json_out}")
+    finally:
         try:
-            from ..eval.suite import Evaluator
-            if isinstance(evaluator, Evaluator):
-                report = evaluator.run(model, step=0, device=device, force=True)
-                if report is not None:
-                    metrics.update(report.metrics)
-        except Exception as exc:
-            console.print(f"[yellow]evaluator failed:[/] {exc}")
-
-    # ---- display ----
-    table = Table(title="lighttrain eval", show_header=True)
-    table.add_column("Metric")
-    table.add_column("Value")
-    for k, v in metrics.items():
-        table.add_row(k, f"{v:.6g}")
-    console.print(table)
-
-    if json_out is not None:
-        import dataclasses, time
-        report_dict = {
-            "task_name": "eval",
-            "metrics": metrics,
-            "step": 0,
-            "timestamp": time.time(),
-        }
-        json_out.parent.mkdir(parents=True, exist_ok=True)
-        json_out.write_text(json.dumps(report_dict, indent=2), encoding="utf-8")
-        console.print(f"[green]wrote[/] {json_out}")
+            _tmp_run.cleanup()
+        except Exception:  # noqa: BLE001 — open handles (e.g. sqlite) on some OSes
+            pass
 
 
 @app.command("regression-gate")

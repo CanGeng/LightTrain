@@ -200,12 +200,14 @@ def test_scheduler_protocol_requires_step_per_batch_attr_and_step_method():
 # OptimizerWrapperProtocol — attribute + method
 # ---------------------------------------------------------------------------
 
-def test_optimizer_wrapper_protocol_requires_optimizer_attr_and_build_method():
-    """OptimizerWrapperProtocol requires the ``optimizer`` attribute AND
-    a ``build`` method.
+def test_optimizer_wrapper_protocol_requires_full_contract():
+    """OptimizerWrapperProtocol requires the ``optimizer`` attribute plus the
+    full method contract the framework actually calls on the wrapper:
+    ``build / step / zero_grad / state_dict / load_state_dict`` (issue #5 —
+    the checkpoint manager calls state_dict/load_state_dict on the wrapper).
 
-    Setup: three classes — complete; missing build; missing optimizer.
-    Expected: only the complete instance passes.
+    The optional ``optim_state_bytes`` hook is NOT part of the runtime-checkable
+    surface, so a wrapper without it still satisfies the protocol.
     """
     p = torch.nn.Parameter(torch.tensor([1.0]))
 
@@ -213,17 +215,41 @@ def test_optimizer_wrapper_protocol_requires_optimizer_attr_and_build_method():
         def __init__(self):
             self.optimizer = torch.optim.SGD([p], lr=0.01)
         def build(self, model): return self.optimizer
+        def step(self, *a, **k): ...
+        def zero_grad(self, set_to_none=True): ...
+        def state_dict(self): return {}
+        def load_state_dict(self, sd): ...
 
     class NoBuild:
         def __init__(self):
             self.optimizer = torch.optim.SGD([p], lr=0.01)
+        def step(self, *a, **k): ...
+        def zero_grad(self, set_to_none=True): ...
+        def state_dict(self): return {}
+        def load_state_dict(self, sd): ...
+
+    class NoCheckpointMethods:
+        """Has optimizer + build + step + zero_grad but omits state_dict /
+        load_state_dict — the exact README footgun (issue #5)."""
+        def __init__(self):
+            self.optimizer = torch.optim.SGD([p], lr=0.01)
+        def build(self, model): return self.optimizer
+        def step(self, *a, **k): ...
+        def zero_grad(self, set_to_none=True): ...
 
     class NoOptimizer:
         def build(self, model): return None
+        def step(self, *a, **k): ...
+        def zero_grad(self, set_to_none=True): ...
+        def state_dict(self): return {}
+        def load_state_dict(self, sd): ...
 
     assert isinstance(Complete(), OptimizerWrapperProtocol)
     assert not isinstance(NoBuild(), OptimizerWrapperProtocol)
+    assert not isinstance(NoCheckpointMethods(), OptimizerWrapperProtocol)
     assert not isinstance(NoOptimizer(), OptimizerWrapperProtocol)
+    # The optional hook is absent from Complete, yet it still conforms.
+    assert not hasattr(Complete(), "optim_state_bytes")
 
 
 # ---------------------------------------------------------------------------

@@ -178,15 +178,23 @@ def test_state_dict_load_state_dict_roundtrip():
     trainer.ctx.step = 5
     trainer.ctx.epoch = 2
     trainer.ctx.global_step = 7
+    trainer.ctx.batch_in_epoch = 3  # v0.1.9: data position for mid-epoch resume
 
     sd = trainer.state_dict()
-    assert sd == {"step": 5, "epoch": 2, "global_step": 7, "max_steps": 10}
+    assert sd == {
+        "step": 5,
+        "epoch": 2,
+        "global_step": 7,
+        "batch_in_epoch": 3,
+        "max_steps": 10,
+    }
 
     trainer2 = _DictStepTrainer(**_base_kwargs(max_steps=10))
     trainer2.load_state_dict(sd)
     assert trainer2.ctx.step == 5
     assert trainer2.ctx.epoch == 2
     assert trainer2.ctx.global_step == 7
+    assert trainer2.ctx.batch_in_epoch == 3
     assert trainer2.max_steps == 10
 
 

@@ -540,19 +540,36 @@ gets dropped with a `UserWarning` before reaching your inner builder.
 >         ...
 > ```
 
-> **Tip — third-party SSM packages.** Some SSM packages (e.g. `mamba_ssm`)
-> eagerly import CUDA C extensions in their `__init__.py`. If your model
-> never calls that path but the import still fails on a CPU-only / mismatched
-> CUDA install, stub the missing extension before importing the package
-> from your `user_modules` file:
+> **Tip — wrapping research packages with eager imports.** Many research repos
+> drag unrelated dependencies into their top-level `__init__.py` — a CUDA C
+> extension (`mamba_ssm` → `selective_scan_cuda`), a pure-Python optional dep
+> (`galore_torch` → `tensorly`, `bitsandbytes`), etc. If your model/optimizer
+> never calls that path but the package import still fails, **pre-seed a stub
+> module** before importing, from your `user_modules` file:
 >
 > ```python
 > import sys, types
+>
+> # (a) Stub a missing CUDA C-extension a submodule expects:
 > sys.modules.setdefault(
 >     "selective_scan_cuda", types.ModuleType("selective_scan_cuda")
 > )
 > import mamba_ssm  # safe now
+>
+> # (b) Stub a pure-Python optional dep an __init__ eagerly imports:
+> sys.modules.setdefault("tensorly", types.ModuleType("tensorly"))
+>
+> # (c) Skip a package __init__ that drags in unrelated siblings by importing
+> #     the submodule you actually need directly (pre-seed the parent package
+> #     as an empty module so Python doesn't run its __init__):
+> pkg = types.ModuleType("galore_torch"); pkg.__path__ = [".../galore_torch"]
+> sys.modules.setdefault("galore_torch", pkg)
+> from galore_torch.adamw import GaLoreAdamW  # only the dim<=2 path, no tensorly
 > ```
+>
+> Pattern (b)/(c) recurs whenever wrapping a research repo whose `__init__`
+> couples the part you want to unrelated heavy siblings (hit by both `mamba_ssm`
+> and `galore_torch`).
 
 ### Known third-party limitations
 
@@ -621,16 +638,40 @@ without modifying core code.
 
 ### Custom optimizer
 
+The wrapper must supply `build`, `step`, `zero_grad`, **and `state_dict` /
+`load_state_dict`** — the checkpoint manager calls the last two on the *wrapper*,
+so omitting them throws `AttributeError` at the first `ckpt_every`. Subclass
+`_BaseWrapper` to get
+all four (plus a default `optim_state_bytes`) for free; you only write `build()`:
+
 ```python
+import torch
 from lighttrain import register
+from lighttrain.optim.wrappers import _BaseWrapper, _split_param_groups
 
 @register("optimizer", "my_adamw")
-class MyAdamW:
-    def __init__(self, lr=1e-3, **kw): ...
-    def build(self, model): ...
-    def step(self): ...
-    def zero_grad(self, set_to_none=True): ...
+class MyAdamW(_BaseWrapper):           # _BaseWrapper supplies step/zero_grad/state_dict/load_state_dict
+    def build(self, model: torch.nn.Module) -> torch.optim.Optimizer:
+        self._check_unbuilt()
+        groups = _split_param_groups(model, self.param_groups, self._kwargs)
+        self.optimizer = torch.optim.AdamW(groups)
+        self._built = True
+        return self.optimizer
+
+    # Optional: let `lighttrain estimate` see a non-Adam state footprint.
+    # def optim_state_bytes(self, model): ...
 ```
+
+If you implement the wrapper from scratch instead of subclassing, you **must**
+provide all five methods plus an `.optimizer` attribute exposing `param_groups`
+(used for LR logging). See the full contract in
+[docs/registry_and_protocols.md §4.3](docs/registry_and_protocols.md).
+
+> **Serializing custom optimizer state?** `torch`'s `state_dict()` aliases the
+> live `optimizer.state`, so rewriting it in place (e.g. turning a projector
+> object into plain tensors for a portable checkpoint) corrupts the running
+> optimizer. Use `self._safe_state_dict(convert)` (from `_BaseWrapper`), which
+> copies first — see §4.3.
 
 ### Custom callback
 

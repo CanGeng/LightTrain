@@ -89,6 +89,19 @@ class SimpleDataModule:
     def predict_loader(self) -> DataLoader | None:
         return None
 
+    def seek(self, epoch: int, consumed_batches: int) -> None:
+        """Position the train sampler for mid-epoch resume (BUG-1).
+
+        Translates the trainer's authoritative consumed-*batch* count into a
+        consumed-*index* count (``× batch_size``) and delegates to the
+        sampler's ``seek``. Prefetch-independent: the count comes from the
+        training loop, not the sampler's yield position.
+        """
+        sampler = self._train_sampler
+        if sampler is None or not hasattr(sampler, "seek"):
+            return
+        sampler.seek(int(epoch), int(consumed_batches) * self.batch_size)
+
     def state_dict(self) -> dict[str, Any]:
         sd: dict[str, Any] = {}
         if self._train_sampler is not None and hasattr(

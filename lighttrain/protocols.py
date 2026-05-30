@@ -110,9 +110,48 @@ class LossFnProtocol(Protocol):
 
 @runtime_checkable
 class OptimizerWrapperProtocol(Protocol):
+    """Wrapper around a ``torch.optim.Optimizer``.
+
+    **Full contract** (the update rule + checkpoint manager call all of these
+    on the *wrapper*, not the inner optimizer — implement them or subclass
+    ``lighttrain.optim.wrappers._BaseWrapper`` which supplies them):
+
+    * ``optimizer`` — the inner ``torch.optim.Optimizer``, set by ``build()``.
+      Must expose ``.param_groups``: the LR logger reads
+      ``optimizer.optimizer.param_groups[0]["lr"]``
+      (``update_rules/standard.py``).
+    * ``build(model)`` — construct and return the inner optimizer (once).
+    * ``step()`` / ``zero_grad()`` — called each step. Canonical loop ordering
+      is ``clip_grad_norm_`` → ``optimizer.step()`` → ``zero_grad()``; grads
+      are **full-rank and intact** at ``step()`` time (no closure / pre-step
+      grad mutation by the framework).
+    * ``state_dict()`` / ``load_state_dict()`` — called by the checkpoint
+      manager via ``torch.save(..., weights_only=False)``. Custom (non-tensor)
+      optimizer state round-trips as long as it is picklable **and** importable
+      at load time. For a *portable* checkpoint, serialize custom state as
+      plain tensors so it loads without the optimizer's own package on path.
+
+    **Optional** methods (called when present, else a sane default is used):
+
+    * ``optim_state_bytes(model)`` — return the optimizer's real per-step state
+      footprint in bytes. ``lab.estimate`` calls this when present, else falls
+      back to ``2 × trainable_param_bytes`` (the full-rank Adam assumption).
+      Memory-efficient optimizers (GaLore, 8-bit Adam, Adam-mini) override it
+      so ``estimate`` can *see* their saving.
+    """
+
     optimizer: torch.optim.Optimizer
 
     def build(self, model: Any) -> torch.optim.Optimizer: ...
+    def step(self, *args: Any, **kwargs: Any) -> Any: ...
+    def zero_grad(self, set_to_none: bool = True) -> None: ...
+    def state_dict(self) -> dict[str, Any]: ...
+    def load_state_dict(self, sd: Mapping[str, Any]) -> None: ...
+
+    # NOTE: ``optim_state_bytes(model) -> int`` is an *optional* hook (see the
+    # class docstring). It is deliberately NOT declared here so it stays out
+    # of the ``runtime_checkable`` required surface; ``estimate`` discovers it
+    # via ``getattr`` and falls back to ``2 × params`` when absent.
 
 
 @runtime_checkable

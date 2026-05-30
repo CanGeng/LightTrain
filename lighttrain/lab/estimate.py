@@ -18,6 +18,7 @@ fast and pure-Python.
 from __future__ import annotations
 
 import time
+import warnings
 from dataclasses import asdict, dataclass, field
 from typing import Any, Mapping
 
@@ -76,6 +77,64 @@ def _optim_state_bytes(model: torch.nn.Module, optim_name: str) -> int:
         return 0
     # Conservative: assume Adam-like
     return 2 * n_trainable_params
+
+
+def _resolve_optim_state_bytes(
+    optim_spec: Any, model: torch.nn.Module, optim_name: str
+) -> int:
+    """Optimizer-state footprint, preferring the wrapper's ``optim_state_bytes``
+    hook when available (issue #4).
+
+    Instantiates the optimizer wrapper from the recipe's ``optim`` spec (cheap —
+    ``__init__`` only; no ``build()``) and calls ``optim_state_bytes(model)`` if
+    present, falling back to the name-based ``2 × params`` estimate otherwise —
+    so estimate never hard-fails on a custom optimizer.
+
+    Failure-first distinction (so a silently-wrong number can't masquerade as a
+    real one):
+
+    * **Can't resolve / hook errors** → a *problem* (name typo, ``user_modules``
+      not imported, buggy hook). Warn loudly, then fall back.
+    * **Resolved but no hook** → legitimate (most optimizers don't need one).
+      Fall back silently.
+    """
+    fallback = _optim_state_bytes(model, optim_name or "adamw")
+    if not isinstance(optim_spec, Mapping):
+        return fallback
+    spec = dict(optim_spec)
+    if "name" not in spec and "_target_" not in spec:
+        return fallback
+
+    name = optim_name or spec.get("name") or spec.get("_target_") or "<optimizer>"
+    try:
+        from ..config._resolver import resolve as _resolve
+
+        wrapper = _resolve(spec, category="optimizer")
+    except Exception as exc:  # noqa: BLE001
+        warnings.warn(
+            f"estimate: optimizer {name!r} could not be resolved ({exc}); "
+            f"optim_state_bytes falls back to the generic 2×params estimate "
+            f"and may not reflect a memory-efficient optimizer. Check the name "
+            f"and that the recipe's `user_modules` are importable.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return fallback
+
+    hook = getattr(wrapper, "optim_state_bytes", None)
+    if hook is None:
+        # Legitimate: this optimizer just uses the generic estimate.
+        return fallback
+    try:
+        return int(hook(model))
+    except Exception as exc:  # noqa: BLE001
+        warnings.warn(
+            f"estimate: {name!r}.optim_state_bytes() raised ({exc}); "
+            f"falling back to the generic 2×params estimate.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return fallback
 
 
 # ---------------------------------------------------------------- core API
@@ -248,6 +307,15 @@ def estimate(cfg: Mapping[str, Any]) -> EstimateReport:
 
     from ..config._resolver import select_model_spec
 
+    # Register the recipe's user_modules so user-defined models/optimizers (and
+    # their optional optim_state_bytes hook) resolve. Idempotent; lazy import
+    # keeps lab decoupled from cli at module load.
+    user_mods = cfg_dict.get("user_modules") or []
+    if user_mods:
+        from ..cli._runtime import _import_user_modules
+
+        _import_user_modules(list(user_mods))
+
     model = _build_model(cfg_dict)
     optim_name = _spec_name(cfg_dict.get("optim"))
     engine_name = _spec_name(cfg_dict.get("engine"))
@@ -261,7 +329,7 @@ def estimate(cfg: Mapping[str, Any]) -> EstimateReport:
     n_all = sum(p.numel() for p in model.parameters())
     p_bytes = _param_bytes(model)
     g_bytes = _grad_bytes(model)
-    o_bytes = _optim_state_bytes(model, optim_name or "adamw")
+    o_bytes = _resolve_optim_state_bytes(cfg_dict.get("optim"), model, optim_name)
     _tok, a_bytes = _activation_estimate(cfg_dict, model)
     tps = _tokens_per_sec(model, max(8, _tok))
     notes: list[str] = []

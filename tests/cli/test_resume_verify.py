@@ -1,12 +1,13 @@
 """`resume-verify` — strong single-pass-vs-resume parity (v0.1.8 C1).
 
-These also *characterise* a real finding the tool surfaced: lighttrain's resume
-restores sampler state at epoch granularity only (see
-`lighttrain/data/core/samplers.py`), so resume is step-exact when the
-checkpoint lands on an epoch boundary but diverges for a mid-epoch resume
-(the data stream restarts from a different position). The tool correctly
-reports PASS in the first case and FAIL in the second — that detection is the
-point of building it.
+v0.1.8 used this tool to *find* BUG-1: resume restored sampler state at epoch
+granularity only, so a mid-epoch resume replayed a different batch order and
+diverged one step after the boundary. **v0.1.9 fixes it** — the samplers now
+resume from the trainer's authoritative consumed-batch count
+(`ctx.batch_in_epoch` → `data_module.seek`), so mid-epoch resume is step-exact
+and prefetch-independent. These tests now assert PASS in *both* the
+epoch-aligned and mid-epoch cases (the fix), where v0.1.8 asserted FAIL for the
+latter.
 
 Marked ``heavy`` (each call runs three short training loops). fp32 + sequential
 sampler keeps the comparison deterministic on CPU or GPU.
@@ -99,15 +100,17 @@ def test_epoch_aligned_resume_is_faithful(tmp_path):
 
 
 @pytest.mark.heavy
-def test_midepoch_resume_gap_is_flagged(tmp_path):
-    # phase1 = 3 batches (mid-epoch) → known data-position gap: the tool must
-    # report FAIL with a non-zero post-boundary delta. This codifies the finding.
+def test_midepoch_resume_is_now_step_exact(tmp_path):
+    # phase1 = 3 batches (mid-epoch). v0.1.8 flagged this as FAIL (the data
+    # stream restarted from a different position). v0.1.9 fixes BUG-1: the
+    # sampler resumes from the authoritative consumed-batch count, so the
+    # mid-epoch resume is now step-exact and the tool reports PASS.
     report = resume_verify(_recipe(tmp_path), phase1_steps=3, phase2_steps=3, tol=1e-2)
-    # Pre-boundary steps still match (state up to the checkpoint is faithful).
+    # Pre-boundary steps match (state up to the checkpoint is faithful).
     assert report.per_step_delta[2] == pytest.approx(0.0, abs=1e-6)
-    # Post-boundary diverges because the sampler restarts the data stream.
-    assert not report.passed
-    assert report.max_abs_delta > 1e-2
+    # Post-boundary now ALSO matches — the data position is restored exactly.
+    assert report.per_step_delta[3] == pytest.approx(0.0, abs=1e-6)
+    assert report.passed, f"mid-epoch resume should be exact now: max Δ={report.max_abs_delta}"
 
 
 @pytest.mark.heavy
@@ -118,14 +121,35 @@ def test_cli_exit_code_reflects_pass(tmp_path):
 
     recipe = _recipe(tmp_path)
     runner = CliRunner()
+    # Epoch-aligned resume: PASS.
     ok = runner.invoke(
         app, ["resume-verify", "-c", str(recipe), "--phase1-steps", "4", "--phase2-steps", "2"]
     )
     assert ok.exit_code == 0, ok.output
     assert "PASS" in ok.output
 
-    bad = runner.invoke(
+    # Mid-epoch resume: now also PASS (BUG-1 fixed in v0.1.9).
+    mid = runner.invoke(
         app, ["resume-verify", "-c", str(recipe), "--phase1-steps", "3", "--phase2-steps", "3"]
     )
-    assert bad.exit_code == 1
-    assert "FAIL" in bad.output
+    assert mid.exit_code == 0, mid.output
+    assert "PASS" in mid.output
+
+
+@pytest.mark.heavy
+@pytest.mark.parametrize("num_workers", [0, 2])
+def test_midepoch_resume_exact_under_prefetch(tmp_path, num_workers):
+    """BUG-1 fix must hold with DataLoader prefetch (num_workers>0), not just
+    at num_workers=0 — otherwise the 'fix' would only work single-process."""
+    recipe = _recipe(tmp_path)
+    report = resume_verify(
+        recipe,
+        phase1_steps=3,
+        phase2_steps=3,
+        tol=1e-2,
+        overrides=[f"data.num_workers={num_workers}"],
+    )
+    assert report.passed, (
+        f"mid-epoch resume must be exact at num_workers={num_workers}: "
+        f"max Δ={report.max_abs_delta}"
+    )

@@ -65,6 +65,21 @@ class StatefulResumableSampler:
         self._chunk_idx = 0
         self._consumed_in_chunk = 0
 
+    def seek(self, epoch: int, consumed_indices: int) -> None:
+        """Position for mid-epoch resume from an authoritative consumed-index
+        count (BUG-1). Translates the flat index into ``(chunk_idx,
+        consumed_in_chunk)`` so the chunked walk resumes at the exact index.
+
+        Driven by the trainer's consumed-batch count rather than this sampler's
+        own yield-time counters, so it stays correct under DataLoader prefetch
+        (``num_workers > 0``). Under ``num_workers == 0`` the two agree, so the
+        existing bit-exact path is preserved.
+        """
+        consumed = max(0, int(consumed_indices))
+        self._epoch = int(epoch)
+        self._chunk_idx = consumed // self.chunk_size
+        self._consumed_in_chunk = consumed % self.chunk_size
+
     def state_dict(self) -> dict[str, Any]:
         return {
             "epoch": self._epoch,

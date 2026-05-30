@@ -1,0 +1,113 @@
+# v0.1.9
+
+## 概览
+
+**v0.1.9 实现 GaLore 实验（第二个「论文复现即用户反馈」实验，压测优化器协议 + 梯度面接缝）总结 §5 提出的 P0/P1/P2 全部改动，并修复 v0.1.8 用 `resume-verify` 发现但未修的 BUG-1。**
+
+GaLore 实验的结论是：lighttrain 的优化器接缝**健全**（梯度投影优化器 + 跨步 SVD 状态、零核心改动、逐位精确 parity 与 resume），唯一 MAJOR 是 `estimate` 看不见 GaLore 的优化器状态节省（issue #4）。本版闭合该 MAJOR 及其余 6 个 MINOR，并把 BUG-1 从「发现」升级为「修复」。
+
+- **修复 BUG-1（最高严重度开放正确性问题）**：默认采样器 mid-epoch resume 现在**逐步精确且 prefetch 无关**（`num_workers>0` 下也成立）。
+- **新增 `optim_state_bytes` 优化器协议钩子**：`estimate` 现在能反映优化器的**真实**状态占用（内存高效优化器如 GaLore / Lion / 8-bit Adam 不再被当作全秩 Adam）。
+- **param-group DSL 新增 `min_ndim` / `module_type` 谓词**：内置分组路径可直接表达「Linear 权重、ndim≥2」这类选层（如 GaLore），无需自定义 `build()`。
+- **优化器-wrapper 契约文档化** + 修正 README「Custom optimizer」范例（旧范例照抄即在首个 `ckpt_every` 崩）。
+- **`eval` 守卫** + 自定义状态 checkpoint **可移植化** + 第三方导入提示泛化。
+- **无 BREAKING**：协议/DSL 改动均为向后兼容的加法；旧 checkpoint 仍可加载（缺 `batch_in_epoch` 时退化为 epoch 粒度 resume，不劣于旧版）。
+
+改动文件：
+
+- [lighttrain/protocols.py](../../lighttrain/protocols.py)（`OptimizerWrapperProtocol` 完整契约 + 可选 `optim_state_bytes`）
+- [lighttrain/optim/wrappers.py](../../lighttrain/optim/wrappers.py)（`ParamGroupSpec` 谓词 + `_BaseWrapper.optim_state_bytes` 默认）
+- [lighttrain/lab/estimate.py](../../lighttrain/lab/estimate.py)（钩子接入 + 回退）
+- [lighttrain/engine/_context.py](../../lighttrain/engine/_context.py)（`StepContext.batch_in_epoch`）
+- [lighttrain/trainers/base.py](../../lighttrain/trainers/base.py) / [trainers/pretrain.py](../../lighttrain/trainers/pretrain.py)（计数 + 持久化 + resume seek）
+- [lighttrain/data/core/samplers.py](../../lighttrain/data/core/samplers.py) / [data/samplers/stateful_resumable.py](../../lighttrain/data/samplers/stateful_resumable.py) / [data/core/_module.py](../../lighttrain/data/core/_module.py)（`seek` + skip-in-order resume）
+- [lighttrain/cli/_app.py](../../lighttrain/cli/_app.py)（`eval` 守卫）
+- [docs/registry_and_protocols.md](../registry_and_protocols.md) §4.3、[README.md](../../README.md)（契约 + 范例 + 导入提示）
+- [experiments/galore/registrations.py](../../experiments/galore/registrations.py)（adapter `optim_state_bytes` + 纯张量 `state_dict`）
+
+---
+
+## 🐞 BUG-1 修复 —— mid-epoch resume 逐步精确（prefetch 无关）
+
+v0.1.8 用 `resume-verify` **发现**了 BUG-1（采样器只恢复到 epoch 粒度，mid-epoch resume 在边界后一步发散），但交付的是「发现该 Bug 的工具」而非修复。**v0.1.9 修复它。**
+
+**根因**：`SequentialSampler` / `ShuffleSampler` 只存 `_epoch`，不记录 epoch 内已消费位置。
+
+**修复设计（机制要点：消费计数源自 trainer，而非 sampler yield）**：
+
+- 新增 `StepContext.batch_in_epoch`（[engine/_context.py](../../lighttrain/engine/_context.py)）——训练循环每次 `next(iterator)` 自增一次、epoch 滚动归零。它数的是 **trainer 实际消费的批**，**不是** sampler/prefetch 已吐出的批。
+- **为什么这很关键**：`DataLoader` 在 `num_workers>0` 下预取，sampler 会比 trainer 多 yield `prefetch_factor × num_workers` 批。若用 sampler 的 yield 计数（旧 `stateful_resumable` 的潜在隐患），mid-epoch resume 在多 worker 下会**跳过过多**——只在 `num_workers=0` 的玩具配置下「碰巧」正确。源自 trainer 的计数则与 prefetch 深度无关。
+- checkpoint 持久化 `batch_in_epoch`（[trainers/base.py](../../lighttrain/trainers/base.py)）；resume 时 `load_checkpoint` 调用 `data_module.seek(epoch, batch_in_epoch)`（[trainers/pretrain.py](../../lighttrain/trainers/pretrain.py)），把权威位置换算为索引偏移（`× batch_size`）写进采样器，**覆盖**任何 prefetch 偏斜的 yield-time 位置。
+- 三个采样器都实现 `seek(epoch, consumed_indices)`：在按 `seed+epoch` **确定性重建**的本-epoch 顺序上跳过 `consumed_indices` 后继续。`stateful_resumable` 的消费账也对齐到权威计数（修其 yield-time 潜在隐患）；`num_workers=0` 下与旧值一致，故**不回退**其现有 bit-exact 路径（R7）。
+
+**验收**（`resume-verify` 此前 mid-epoch FAIL，现 PASS）：
+
+```
+resume-verify: phase1=3 phase2=3 tol=0.01
+  step 3: single=… resume=… Δ=0.000e+00   ← 保存点
+  step 4: single=… resume=… Δ=0.000e+00   ← resume 边界（旧版此处 2.86e-02 FAIL）
+  max |Δloss| = 0.000e+00  →  PASS
+```
+
+`tests/cli/test_resume_verify.py` 的 mid-epoch 用例已从「断言 FAIL」翻转为「断言 PASS」，并新增 **`num_workers∈{0,2}` 矩阵**（证明修复在多 worker 下也成立，而非只在单进程）。
+
+> 闭环再走一步：v0.1.8 的工具产生分歧 → 定位 BUG-1 → v0.1.9 修复并用同一工具回归验证。
+
+---
+
+## 新增 / API
+
+### `optim_state_bytes` 优化器协议钩子（issue #4，MAJOR）
+
+`estimate` 此前按 `2 × trainable_param_bytes` 估算优化器状态，对 `galore_adamw` 与 `adamw` 报同一数字——GaLore 的全部卖点（内存）在框架自带估算器里隐形。
+
+- `OptimizerWrapperProtocol` 新增**可选** `optim_state_bytes(model) -> int`（[protocols.py](../../lighttrain/protocols.py)）。
+- `_BaseWrapper` 提供默认实现（Adam 类 `2×`、Lion `1×`），不需 `build()`（[optim/wrappers.py](../../lighttrain/optim/wrappers.py)）。
+- `estimate` 经 registry 实例化 wrapper 并 `getattr` 调用钩子，缺失时回退旧 `2×params`（[lab/estimate.py](../../lighttrain/lab/estimate.py)）。**行为变化**：estimate 现会（a）导入 recipe 的 `user_modules`（使用户注册的优化器/模型可解析），（b）实例化优化器 wrapper（此前只读名字）；对内置优化器无副作用，钩子设计为不需 build。实测 GaLore：`optim_state_bytes` 由回退的 6.56 MB 变为 **2.31 MB**（−65%，与实测 checkpoint 逻辑状态 2.42 MB 相差 ~5%），adamw 基线仍 6.56 MB。
+- GaLore adapter 覆写钩子：低秩 Adam 矩 + SVD 投影器字节数（[experiments/galore/registrations.py](../../experiments/galore/registrations.py)），选层逻辑与 `build()` 共用一个 `_select_galore_params`。
+
+### Param-group DSL 谓词 `min_ndim` / `module_type`（issue #3）
+
+`ParamGroupSpec` 在名字正则之后追加可选过滤：`min_ndim`（仅 ndim≥N，排除 1-D bias/norm）、`module_type`（按 `type(module).__name__` 匹配，如 `Linear`）。语义保持首匹配胜出。
+
+```yaml
+param_groups:
+  - pattern: "attn|mlp"
+    min_ndim: 2
+    module_type: Linear
+    rank: 32
+```
+
+---
+
+## 文档 / 易用性
+
+- **优化器-wrapper 契约文档化**（issue #5/#1/#2a）：[docs/registry_and_protocols.md §4.3](../registry_and_protocols.md) 列全 `step/zero_grad/state_dict/load_state_dict` + `.optimizer.param_groups` 期望、`clip→step→zero_grad` 调用时序（step() 时梯度全秩未改动）、自定义状态 `weights_only=False` checkpoint 约定。**修正 README「Custom optimizer」范例**——旧范例不实现 `state_dict`/`load_state_dict`，照抄即在首个 `ckpt_every` 抛 `AttributeError`；新范例继承 `_BaseWrapper`。
+- **`eval` 守卫**（issue #6）：无 checkpoint 时打印醒目「evaluating UNTRAINED weights」告警；只读 eval 改在临时目录运行，不再向 `run_root` 堆积空 run 目录（[cli/_app.py](../../lighttrain/cli/_app.py)）。
+- **自定义状态 checkpoint 可移植化**（issue #2b，方案 A）：GaLore adapter 的 `state_dict()` 把 `GaLoreProjector` 序列化为**纯张量 + 标量**，checkpoint 自描述、无 `galore_torch` 也能加载/inspect（`doctor`/`convert-checkpoint` 不再踩雷）；`load_state_dict()` 反向重建。
+- **第三方导入提示泛化**（issue #7）：README「Tip」从 CUDA C-扩展拓宽到纯 Python 可选依赖（`tensorly`）与「预置 stub 包跳过会拖入无关兄弟的 `__init__`」。
+
+---
+
+## 硬化（failure-first，真实 GaLore 链路测试中暴露）
+
+补齐 `galore_torch` 后跑通真实链路，暴露两个早先「框架级等价证明」无法发现的问题，已修复：
+
+- **`estimate` 不再把「优化器无法 resolve」和「优化器没钩子」混为一谈**（[lab/estimate.py](../../lighttrain/lab/estimate.py)）。此前两者都**静默**回退 `2×params`——名字打错或 `user_modules` 导入失败时，estimate 会给出一个看似真实的错数字。现在：**resolve 失败 / 钩子抛错 → 显式 `UserWarning`**（提示检查名字与 `user_modules`），**仅缺钩子 → 静默回退**（合法，多数优化器本就如此）。
+- **`_BaseWrapper._safe_state_dict(convert)` helper —— 把作者从手写 `state_dict` 的 aliasing 坑里捞出来**（[optim/wrappers.py](../../lighttrain/optim/wrappers.py)）。`torch` 的 `state_dict()` 返回的内层 `state[param]` dict 与活动优化器**同引用**；原地改写自定义状态（把 projector 换成纯张量）会**污染正在运行的优化器**，下一个 `.step()` 直接崩（实测 `AttributeError: 'dict' object has no attribute 'project'`）。helper 先 copy 内层 dict、再对每条目应用 `convert(key, value)`，安全。GaLore adapter 的 P2a `state_dict()` 已改用它（dogfood）；契约文档与 README 均加了 aliasing 警告。
+
+---
+
+## 版本
+
+`pyproject.toml` 由停滞的 `0.1.5-alpha` 对齐到 **`0.1.9`**（与 changelog 历史同步）；`lighttrain/__init__.py` fallback 同步。
+
+---
+
+## 测试
+
+- 新增 `tests/data/test_sampler_resume.py`（BUG-1：seek/skip 不变量 + `num_workers∈{0,2}` prefetch 无关 + R7 stateful 护栏）、`tests/checkpoint/test_portable_custom_state.py`（P2a 纯张量可移植性）。
+- 扩展 `tests/optim/test_param_groups.py`（`min_ndim`/`module_type` 谓词 + `_safe_state_dict` aliasing 护栏）、`tests/test_estimate.py`（钩子端到端：Lion `1×`、低秩 sentinel；failure-first：unresolvable 优化器 warn、有解析无钩子静默）、`tests/test_protocols.py`（完整契约 + 可选钩子不入 runtime-checkable）、`tests/cli/test_eval_command.py`（untrained 告警 + 不 mint run 目录）。
+- **翻转** `tests/cli/test_resume_verify.py` 的 mid-epoch 用例：v0.1.8 断言 FAIL（发现 Bug），v0.1.9 断言 PASS（修复）+ 新增多-worker 矩阵。
+- 全量：**1967 passed, 7 skipped**（默认套件，排除 `heavy`/`gpu`），原有测试无回归；`heavy` 标记的 `resume-verify` 5 项（含 `num_workers=2` mid-epoch）单独跑亦全绿。
+- GaLore 真实链路（已补 `galore_torch`）端到端验证：estimate `2.31 MB`（−65%）、Level-1 parity `MAX|Δ|=0.000e+00`/15 步、resume-verify 默认采样器 `num_workers∈{0,2}` PASS、stateful 原路径 PASS、eval 守卫、无 `galore_torch` 加载 checkpoint。

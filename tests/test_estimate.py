@@ -73,6 +73,72 @@ def test_estimate_returns_filled_report_for_tiny_lm():
     assert rpt.optimizer_name == "adamw"
 
 
+def test_estimate_uses_optim_state_bytes_hook_lion_half_of_adamw():
+    """Issue #4: estimate calls the wrapper's ``optim_state_bytes`` hook.
+
+    Lion keeps one momentum buffer (1× params) vs AdamW's two (2× params), so
+    for the same model Lion's reported optimizer-state bytes is half AdamW's.
+    This exercises the hook path end-to-end (registry → wrapper → estimate).
+    """
+    adamw = estimate(_tiny_cfg(optim={"name": "adamw", "lr": 1e-3}))
+    lion = estimate(_tiny_cfg(optim={"name": "lion", "lr": 1e-4}))
+    assert lion.optim_state_bytes == pytest.approx(adamw.optim_state_bytes / 2)
+    assert lion.optim_state_bytes < adamw.optim_state_bytes
+
+
+def test_estimate_hook_overrides_name_default_for_memory_efficient_optimizer():
+    """A registered optimizer exposing ``optim_state_bytes`` makes its real
+    (smaller) footprint visible through ``estimate`` — the generalization of
+    GaLore's saving to any memory-efficient optimizer.
+    """
+    from lighttrain.optim.wrappers import AdamWWrapper
+    from lighttrain.registry import contains as _has
+    from lighttrain.registry import register
+
+    if not _has("optimizer", "_tiny_lowrank_test"):
+        @register("optimizer", "_tiny_lowrank_test")
+        class _TinyLowRank(AdamWWrapper):
+            # Pretend only a quarter of Adam's full-rank state is needed.
+            def optim_state_bytes(self, model):
+                return super().optim_state_bytes(model) // 4
+
+    baseline = estimate(_tiny_cfg(optim={"name": "adamw", "lr": 1e-3}))
+    lowrank = estimate(_tiny_cfg(optim={"name": "_tiny_lowrank_test", "lr": 1e-3}))
+    assert lowrank.optim_state_bytes == baseline.optim_state_bytes // 4
+    assert lowrank.optim_state_bytes < baseline.optim_state_bytes
+
+
+def test_estimate_warns_when_optimizer_cannot_be_resolved():
+    """Failure-first: an unresolvable optimizer (name typo / user_modules not
+    imported) must WARN before falling back to the generic 2×params estimate —
+    so a silently-wrong number can't masquerade as a real one."""
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        rpt = estimate(_tiny_cfg(optim={"name": "_no_such_optimizer_xyz", "lr": 1e-3}))
+    msgs = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+    assert any("_no_such_optimizer_xyz" in m and "fall" in m.lower() for m in msgs), msgs
+    # Fell back to the generic estimate (2× trainable bytes) rather than crashing.
+    assert rpt.optim_state_bytes >= 2 * rpt.grad_bytes
+
+
+def test_estimate_does_not_warn_for_resolvable_optimizer_without_hook():
+    """A resolvable optimizer that simply doesn't implement optim_state_bytes is
+    legitimate — no warning, silent fallback. (Here adamw DOES have the
+    _BaseWrapper default, so this also guards against spurious warnings.)"""
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        estimate(_tiny_cfg(optim={"name": "adamw", "lr": 1e-3}))
+    optim_warnings = [
+        w for w in caught
+        if issubclass(w.category, UserWarning) and "optim_state_bytes" in str(w.message)
+    ]
+    assert not optim_warnings, [str(w.message) for w in optim_warnings]
+
+
 def test_estimate_with_lora_reports_low_trainable_ratio():
     pytest.importorskip("peft")
     cfg = _tiny_cfg(

@@ -125,6 +125,7 @@ class Trainer(ABC):
             "step": int(self.ctx.step),
             "epoch": int(self.ctx.epoch),
             "global_step": int(self.ctx.global_step),
+            "batch_in_epoch": int(self.ctx.batch_in_epoch),
             "max_steps": int(self.max_steps),
         }
 
@@ -145,6 +146,9 @@ class Trainer(ABC):
         self.ctx.step = int(sd.get("step", 0))
         self.ctx.epoch = int(sd.get("epoch", 0))
         self.ctx.global_step = int(sd.get("global_step", self.ctx.step))
+        # Absent in pre-v0.1.9 checkpoints → 0 = resume at epoch start (the old
+        # epoch-granularity behavior), never worse.
+        self.ctx.batch_in_epoch = int(sd.get("batch_in_epoch", 0))
 
 
 __all__ = ["StepOutput", "Trainer"]

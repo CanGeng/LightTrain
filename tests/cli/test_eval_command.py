@@ -110,3 +110,25 @@ def test_eval_with_checkpoint_loads(tmp_path):
     res = runner.invoke(app, ["eval", "-c", str(recipe), "--checkpoint", str(ckpt)])
     assert res.exit_code == 0, res.output
     assert "loaded checkpoint" in res.output.lower() or "perplexity" in res.output.lower()
+    # A loaded checkpoint must NOT trigger the untrained-weights warning.
+    assert "untrained" not in res.output.lower()
+
+
+def test_eval_without_checkpoint_warns_untrained(tmp_path):
+    """Issue #6: eval with no checkpoint scores random init weights — it must
+    say so loudly so the perplexity isn't mistaken for a trained result."""
+    recipe = _recipe(tmp_path)
+    res = runner.invoke(app, ["eval", "-c", str(recipe), "--max-batches", "1"])
+    assert res.exit_code == 0, res.output
+    assert "untrained" in res.output.lower()
+
+
+def test_eval_does_not_mint_run_dir_under_run_root(tmp_path):
+    """Issue #6: read-only eval should not accumulate empty run dirs under
+    run_root. It runs in a temp dir that is cleaned up afterwards."""
+    recipe = _recipe(tmp_path)
+    res = runner.invoke(app, ["eval", "-c", str(recipe), "--max-batches", "1"])
+    assert res.exit_code == 0, res.output
+    run_root = tmp_path / "runs" / "eval_test"
+    # No run directory minted by the eval invocation.
+    assert not run_root.exists() or not any(run_root.iterdir())

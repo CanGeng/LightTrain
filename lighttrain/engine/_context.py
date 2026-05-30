@@ -19,6 +19,13 @@ class StepContext:
     step: int = 0
     epoch: int = 0
     global_step: int = 0
+    # Authoritative count of batches consumed in the *current* epoch. The
+    # training loop bumps it once per ``next(iterator)`` (so it tracks what the
+    # trainer actually consumed, NOT what the sampler/prefetch has yielded) and
+    # resets it to 0 on epoch rollover. Persisted in the checkpoint and used to
+    # resume the data sampler step-exactly mid-epoch (BUG-1), independent of
+    # DataLoader prefetch depth.
+    batch_in_epoch: int = 0
     is_accumulating: bool = False
     metrics: dict[str, float] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
