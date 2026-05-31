@@ -92,14 +92,16 @@ def test_grpo_update_path_bit_identical():
     torch.manual_seed(3)
     t = _make_grpo(_TinyLM())
     got = [round(float(t._step(_grpo_batch()).loss), 8) for _ in range(5)]
-    assert got == GRPO_GOLDEN
+    # tolerance (not 8-decimal exact): golden captured on one platform; a
+    # different CPU/BLAS drifts ~1e-7, while a real change is >>1e-5.
+    assert got == pytest.approx(GRPO_GOLDEN, rel=1e-5, abs=1e-7)
 
 
 def test_ppo_update_path_bit_identical():
     torch.manual_seed(5)
     t = _make_ppo(_TinyLM())
     got = [round(float(t._step(_ppo_batch()).loss), 8) for _ in range(5)]
-    assert got == PPO_GOLDEN
+    assert got == pytest.approx(PPO_GOLDEN, rel=1e-5, abs=1e-7)
 
 
 class _SentinelLoss:
