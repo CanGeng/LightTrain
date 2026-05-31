@@ -1,4 +1,4 @@
-# frontier_plugins
+# plugins
 
 Opt-in plugins. Each plugin lives in its own subdirectory
 (`layer_offload/`, `agent/`, `rag/`, `generation_strategies/`, `judge/`,
