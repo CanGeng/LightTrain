@@ -16,17 +16,14 @@ import pytest
 import torch
 import torch.nn as nn
 
+from lighttrain.losses.preference import DPOLoss
 from lighttrain.protocols import ModelOutput, StepOutput
+from lighttrain.trainers._preference_base import PreferenceTrainer
 from lighttrain.trainers.base import Trainer
-from lighttrain.trainers.dpo import DPOTrainer
 from lighttrain.trainers.grpo import GRPOTrainer
-from lighttrain.trainers.ipo import IPOTrainer
-from lighttrain.trainers.kto import KTOTrainer
-from lighttrain.trainers.orpo import ORPOTrainer
 from lighttrain.trainers.ppo import PPOTrainer
 from lighttrain.trainers.pretrain import PretrainTrainer
 from lighttrain.trainers.rm import RewardModelTrainer
-from lighttrain.trainers.simpo import SimPOTrainer
 
 
 # ---------------------------------------------------------------------------
@@ -118,26 +115,31 @@ def test_invalid_return_type_raises_typeerror():
         trainer.train_step({})
 
 
-def test_trainer_base_is_abstract():
-    """Trainer cannot be instantiated directly — both fit() and _step() are abstract."""
-    with pytest.raises(TypeError, match="abstract"):
-        Trainer(**_base_kwargs())  # type: ignore[abstract]
+def test_trainer_base_is_concrete():
+    """After the keystone refactor Trainer is the flat trainer: concrete fit()
+    and a default _step() (routes through the engine). It instantiates directly."""
+    trainer = Trainer(**_base_kwargs())
+    assert hasattr(trainer, "fit")
+    # default _step defers to _run_step → forward_loss (None) → engine.step
+    assert trainer.forward_loss({}) is None
 
 
-def test_subclass_without_step_cannot_instantiate():
-    """Forgetting to implement _step() raises TypeError at instantiation time."""
+def test_subclass_without_step_instantiates_and_uses_default():
+    """A subclass that omits _step inherits the flat trainer behaviour."""
     class _MissingStep(Trainer):
-        def fit(self, *, steps=None): ...
-    with pytest.raises(TypeError, match="abstract"):
-        _MissingStep(**_base_kwargs())
+        pass
+    trainer = _MissingStep(**_base_kwargs())
+    assert trainer is not None
+    assert _MissingStep._step is Trainer._step  # uses the inherited default
 
 
-def test_subclass_without_fit_cannot_instantiate():
-    """Forgetting to implement fit() raises TypeError at instantiation time."""
+def test_subclass_without_fit_instantiates_and_uses_default():
+    """fit() is concrete on the base now; subclasses inherit it for free."""
     class _MissingFit(Trainer):
         def _step(self, batch): return {"loss": 0.0}
-    with pytest.raises(TypeError, match="abstract"):
-        _MissingFit(**_base_kwargs())
+    trainer = _MissingFit(**_base_kwargs())
+    assert trainer is not None
+    assert _MissingFit.fit is Trainer.fit  # inherited concrete fit
 
 
 # ---------------------------------------------------------------------------
@@ -146,11 +148,7 @@ def test_subclass_without_fit_cannot_instantiate():
 
 CONCRETE_TRAINERS = [
     PretrainTrainer,
-    DPOTrainer,
-    IPOTrainer,
-    KTOTrainer,
-    ORPOTrainer,
-    SimPOTrainer,
+    PreferenceTrainer,
     RewardModelTrainer,
     PPOTrainer,
     GRPOTrainer,
@@ -167,15 +165,40 @@ def test_has_train_step_method(trainer_cls):
     assert hasattr(trainer_cls, "train_step"), f"{trainer_cls.__name__} missing train_step"
 
 
-@pytest.mark.parametrize("trainer_cls", CONCRETE_TRAINERS, ids=lambda c: c.__name__)
-def test_step_is_not_base_stub(trainer_cls):
+def test_base_step_is_concrete_not_a_stub():
+    """The base _step is now a working default (flat trainer), not a stub that
+    raises NotImplementedError. PretrainTrainer relies on it directly."""
+    assert PretrainTrainer._step is Trainer._step  # pretrain uses the flat default
+    # Smoke: the default _step must be callable without raising NotImplementedError.
+    mock_engine = MagicMock()
+    mock_engine.step.return_value = {"loss": 0.0}
+    model = _TinyLM()
+    trainer = PretrainTrainer(
+        engine=mock_engine,
+        data_module=_FakeDM(),
+        optimizer=torch.optim.SGD(model.parameters(), lr=1e-3),
+        model=model,
+    )
+    out = trainer._step({"input_ids": torch.zeros(2, 4, dtype=torch.long)})
+    assert isinstance(out, (dict, StepOutput))
+
+
+# Legacy paradigm trainers (RL / preference / reward) still override _step until
+# steps 2–3 of the keystone migration move them onto forward_loss.
+_LEGACY_STEP_TRAINERS = [
+    PreferenceTrainer, RewardModelTrainer, PPOTrainer, GRPOTrainer,
+]
+
+
+@pytest.mark.parametrize("trainer_cls", _LEGACY_STEP_TRAINERS, ids=lambda c: c.__name__)
+def test_legacy_paradigm_trainers_override_step(trainer_cls):
     assert trainer_cls._step is not Trainer._step, (
-        f"{trainer_cls.__name__}._step is still the base stub — add a concrete override"
+        f"{trainer_cls.__name__}._step should still override the base default"
     )
 
 
 def test_all_concrete_trainers_covered():
-    assert len(CONCRETE_TRAINERS) == 9, (
+    assert len(CONCRETE_TRAINERS) == 5, (
         "CONCRETE_TRAINERS list is out of date — update it when adding a new trainer"
     )
 
@@ -191,7 +214,7 @@ def test_concrete_trainers_instantiable(trainer_cls):
         max_steps=1,
     )
     model = _TinyLM()
-    if trainer_cls in (DPOTrainer, IPOTrainer, KTOTrainer, ORPOTrainer, SimPOTrainer):
+    if trainer_cls is PreferenceTrainer:
         kw["model"] = model
     elif trainer_cls is RewardModelTrainer:
         kw["model"] = _TinyBackbone()
@@ -300,14 +323,14 @@ def _pref_batch(V: int = 16, T: int = 5, B: int = 2) -> dict:
 def test_preference_family_train_step_returns_stepoutput():
     V = 16
     model = _TinyLM(V=V)
-    trainer = DPOTrainer(
+    trainer = PreferenceTrainer(
         engine=_FakeEngine(),
         data_module=_PrefDM(),
         optimizer=torch.optim.AdamW(model.parameters(), lr=1e-3),
         model=model,
         max_steps=1,
-        beta=0.1,
     )
+    trainer.ctx.loss_fn = DPOLoss(beta=0.1)
     out = trainer.train_step(_pref_batch(V=V))
     assert isinstance(out, StepOutput)
     assert out.loss is not None
@@ -380,14 +403,14 @@ def test_rm_preference_step_backward_compat():
 def test_preference_step_still_callable():
     V = 16
     model = _TinyLM(V=V)
-    trainer = DPOTrainer(
+    trainer = PreferenceTrainer(
         engine=_FakeEngine(),
         data_module=_PrefDM(),
         optimizer=torch.optim.AdamW(model.parameters(), lr=1e-3),
         model=model,
         max_steps=1,
-        beta=0.1,
     )
+    trainer.ctx.loss_fn = DPOLoss(beta=0.1)
     result = trainer._preference_step(_pref_batch(V=V))
     assert isinstance(result, dict)
     assert "loss" in result

@@ -37,6 +37,10 @@ from ..utils.seed import seed_everything
 from ..config._user_modules import _IMPORTED_USER_MODULES  # noqa: F401
 from ..config._user_modules import import_user_modules as _import_user_modules
 
+# Keystone migration (step 2): trainer names removed in favour of the single
+# ``preference`` trainer + the ``loss:`` seam. Resolved to a clear error below.
+_REMOVED_PREFERENCE_TRAINERS = frozenset({"dpo", "ipo", "simpo", "orpo", "kto"})
+
 
 def _eager_import_components() -> None:
     """Force-import every module that uses ``@register`` so the registry
@@ -60,6 +64,14 @@ def _eager_import_components() -> None:
     # Optimizers / schedulers / losses
     from ..losses import core as _loss_core  # noqa: F401
     from ..losses import distill as _loss_distill  # noqa: F401
+    # Preference losses (dpo/ipo/simpo/orpo/kto/bradley_terry) — the ``loss:``
+    # seam for the collapsed preference trainer. Previously registered via the
+    # now-deleted per-algorithm trainer shells; register them explicitly.
+    from ..losses import preference as _loss_pref  # noqa: F401
+    # RL value heads + judge->reward adapters (registry categories value_head /
+    # reward_adapter) — resolved from recipes by the RL trainers / runtime.
+    from ..rl import reward_adapters as _reward_adapters  # noqa: F401
+    from ..rl import value_heads as _value_heads  # noqa: F401
     from ..optim import schedulers as _sched  # noqa: F401
     from ..optim import wrappers as _opt  # noqa: F401
     # Logging backends
@@ -210,6 +222,108 @@ def _build_optimizer(cfg: RootConfig, model: torch.nn.Module) -> Any:
     wrapper = _resolve(spec, category="optimizer")
     wrapper.build(model)
     return wrapper
+
+
+def _build_optimizer_for(optim_spec: Any, model: torch.nn.Module) -> Any:
+    """Build + bind one optimizer from a resolved spec against ``model``.
+
+    The per-model sibling of ``_build_optimizer`` for the ``models:``/
+    ``optimizers:`` set — each trainable entry gets its OWN optimizer bound to
+    its OWN parameters (the step-4 pairing watch-point), not a single build.
+    """
+    spec = _to_dict(optim_spec)
+    if not spec:
+        raise RuntimeError("optimizer spec is empty")
+    wrapper = _resolve(spec, category="optimizer")
+    wrapper.build(model)
+    return wrapper
+
+
+def _resolve_entry_spec(spec: Any, model_profiles: Any) -> dict[str, Any]:
+    """Resolve a ``models:`` entry's ``spec`` — either an inline component spec
+    or ``{profile: <name>}`` selecting from the top-level ``model_profiles:``
+    catalogue (the variant-selection axis is orthogonal to the model-set axis)."""
+    spec = _to_dict(spec)
+    if "profile" in spec:
+        return select_model_spec(spec["profile"], model_profiles)
+    return spec
+
+
+def _desugar_models(cfg: RootConfig) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """Normalise the model/optimizer declaration into the internal set form.
+
+    Returns ``(models_cfg, optimizers_cfg)`` where each models entry is
+    ``{spec, trainable, optimizer, checkpoint}`` (``spec`` already resolved to a
+    component-spec dict) and ``optimizers_cfg`` maps name -> optimizer spec.
+
+    Single entry point (no double code path downstream): a lone ``model:`` +
+    ``model_profiles:`` + ``optim:`` desugars to ``{main: {...}}``. Declaring
+    both ``model:`` and ``models:`` is a conflict error.
+    """
+    models = getattr(cfg, "models", None)
+    optimizers = getattr(cfg, "optimizers", None)
+    has_lone_model = getattr(cfg, "model", None) is not None
+
+    if models is not None and has_lone_model:
+        raise ConfigError(
+            "recipe sets both `model:` and `models:`. Use `models:` (the model "
+            "set) and drop the lone `model:`; variant selection still works via "
+            "each entry's `spec: {profile: <name>}` into `model_profiles:`."
+        )
+
+    if models is None:
+        # Sugar: lone model:/model_profiles:/optim: → a one-entry set.
+        spec = select_model_spec(
+            getattr(cfg, "model", None), getattr(cfg, "model_profiles", None)
+        )
+        models_cfg = {
+            "main": {
+                "spec": dict(spec),
+                "trainable": True,
+                "optimizer": "main",
+                "checkpoint": None,
+            }
+        }
+        optim_spec = _to_dict(cfg.optim)
+        optimizers_cfg = {"main": optim_spec} if optim_spec else {}
+        return models_cfg, optimizers_cfg
+
+    # Explicit models: set.
+    mp = getattr(cfg, "model_profiles", None)
+    models_cfg = {}
+    for name, raw in _to_dict(models).items():
+        entry = _to_dict(raw)
+        models_cfg[name] = {
+            "spec": _resolve_entry_spec(entry.get("spec"), mp),
+            "trainable": bool(entry.get("trainable", True)),
+            "optimizer": entry.get("optimizer"),
+            "checkpoint": entry.get("checkpoint"),
+        }
+    if optimizers is not None:
+        optimizers_cfg = {k: _to_dict(v) for k, v in _to_dict(optimizers).items()}
+    else:
+        optim_spec = _to_dict(cfg.optim)
+        optimizers_cfg = {"main": optim_spec} if optim_spec else {}
+    return models_cfg, optimizers_cfg
+
+
+def _load_state_dict_into(model: torch.nn.Module, ckpt_path: str) -> None:
+    """Load weights from a .safetensors or torch checkpoint into ``model``
+    (used for frozen aux models like an OPD teacher)."""
+    p = Path(ckpt_path).expanduser()
+    if p.is_dir():
+        st = p / "model.safetensors"
+        pt = p / "model.pt"
+        p = st if st.exists() else pt
+    if str(p).endswith(".safetensors"):
+        from safetensors.torch import load_file
+
+        state = load_file(str(p))
+    else:
+        state = torch.load(str(p), map_location="cpu")
+        if isinstance(state, dict) and "model" in state:
+            state = state["model"]
+    model.load_state_dict(state, strict=False)
 
 
 def _build_scheduler(cfg: RootConfig, optimizer: Any) -> Any:
@@ -578,8 +692,38 @@ def setup_run_from_config(
     except Exception:
         lineage_store = None
 
+    # Normalise model/optimizer declaration into the internal set form. Single
+    # entry point — a lone model:/optim: desugars to a one-entry set, so the
+    # primary path below is bit-identical for single-model recipes.
+    models_cfg, optimizers_cfg = _desugar_models(cfg)
+    _trainable_names = [n for n, e in models_cfg.items() if e["trainable"]]
+    if not _trainable_names:
+        raise ConfigError(
+            "recipe defines no trainable model (every `models:` entry is "
+            "`trainable: false`)."
+        )
+    # The "primary" trainable model goes through model surgery / PP / grad_sync
+    # and is exposed as ``model=``; any further trainable models (Axis-B —
+    # GAN/actor-critic) get their own optimizer on the single-GPU path below.
+    _primary_name = _trainable_names[0]
+    _primary_entry = models_cfg[_primary_name]
+
+    def _optim_spec_for(entry: dict[str, Any]) -> Any:
+        opt_name = entry["optimizer"]
+        if opt_name is None:
+            opt_name = "main" if "main" in optimizers_cfg else (
+                next(iter(optimizers_cfg)) if optimizers_cfg else None
+            )
+        if opt_name is None or opt_name not in optimizers_cfg:
+            raise RuntimeError(
+                "recipe is missing an optimizer for a trainable model "
+                "(declare `optim:` or `optimizers:` and reference it via the "
+                "entry's `optimizer:` field)."
+            )
+        return optimizers_cfg[opt_name]
+
     # Phase B: model surgery (TP/SP/EP) — must run on bare model before FSDP/DDP.
-    model = _build_model(cfg)
+    model = _resolve(_primary_entry["spec"], category="model")
     mp_strategy = _build_model_parallel_strategy(cfg)
     if mp_strategy is not None:
         model = mp_strategy.apply(model, parallel_ctx)
@@ -604,8 +748,17 @@ def setup_run_from_config(
     # Phase D: gradient-sync wrap (DDP/FSDP/ZeRO).
     # When grad_sync is None (single-GPU / noop), fall back to the plain path.
     grad_sync = _build_grad_sync_strategy(cfg)
+    _primary_optim = _optim_spec_for(_primary_entry)
+    if grad_sync is not None and len(_trainable_names) > 1:
+        raise ConfigError(
+            "multiple trainable models + a gradient-sync strategy (distributed "
+            "Axis-B) is not supported yet; multi-optimizer training is single-GPU "
+            "for now."
+        )
     if grad_sync is not None:
-        optimizer_factory = _build_optimizer_factory(cfg)
+        def optimizer_factory(m: torch.nn.Module) -> Any:
+            return _build_optimizer_for(_primary_optim, m)
+
         data_module = _build_data(
             cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
         )
@@ -620,8 +773,29 @@ def setup_run_from_config(
         data_module = _build_data(
             cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
         )
-        optimizer = _build_optimizer(cfg, model)
+        optimizer = _build_optimizer_for(_primary_optim, model)
         scheduler = _build_scheduler(cfg, optimizer)
+
+    # Build the rest of the model set: frozen aux models (Axis A — teacher/ref/
+    # EMA) and any further TRAINABLE models with their own optimizer (Axis B —
+    # GAN/actor-critic). The primary's optimizer is keyed by ``optimizers``;
+    # each additional trainable entry gets its own (per-entry pairing).
+    models: dict[str, Any] = {_primary_name: model}
+    optimizers: dict[str, Any] = {_primary_name: optimizer}
+    for _name, _entry in models_cfg.items():
+        if _name == _primary_name:
+            continue
+        _aux = _resolve(_entry["spec"], category="model").to(device)
+        if _entry["checkpoint"]:
+            _load_state_dict_into(_aux, str(_entry["checkpoint"]))
+        if _entry["trainable"]:
+            optimizers[_name] = _build_optimizer_for(_optim_spec_for(_entry), _aux)
+        else:
+            for _p in _aux.parameters():
+                _p.requires_grad_(False)
+            _aux.eval()
+        models[_name] = _aux
+
     loss_fn = _build_loss(cfg)
     callbacks = _build_callbacks(cfg)
     logger = _build_logger(cfg, run_dir)
@@ -677,6 +851,16 @@ def setup_run_from_config(
         engine = engine_cls(**engine_kwargs)
 
     trainer_name = cfg.trainer.name if cfg.trainer is not None else "pretrain"
+    # Keystone migration (step 2): the five offline-preference trainers collapsed
+    # into one ``preference`` trainer; the algorithm is now the ``loss:`` seam.
+    if trainer_name in _REMOVED_PREFERENCE_TRAINERS:
+        raise ConfigError(
+            f"trainer `{trainer_name}` was removed. The offline-preference trainers "
+            "(dpo/ipo/simpo/orpo/kto) are now one `preference` trainer; select the "
+            f"algorithm via the loss seam:\n"
+            f"    trainer: {{ name: preference, ... }}\n"
+            f"    loss:    {{ name: {trainer_name}, ... }}   # move beta/gamma/lam here"
+        )
     trainer_cls = _registry_get("trainer", trainer_name)
 
     trainer_kwargs: dict[str, Any] = {
@@ -692,6 +876,8 @@ def setup_run_from_config(
         "ckpt_every": int(cfg.trainer.ckpt_every) if cfg.trainer else 500,
         "log_every": int(cfg.trainer.log_every) if cfg.trainer else 50,
         "model": model,
+        "models": models,
+        "optimizers": optimizers,
         "device": device,
     }
 
@@ -712,31 +898,30 @@ def setup_run_from_config(
             if k not in _RUNTIME_ONLY:
                 trainer_kwargs.setdefault(k, v)
 
-    # Build judge and wrap as a tensor-aware reward_fn for RL trainers.
-    # Only VerifierJudge is supported; other judge types use a different
-    # score() signature and require explicit adapter work.
+    # Build judge and wrap as a tensor-aware reward_fn for RL trainers, via a
+    # registrable judge->reward adapter (F2). The judge declares its reward_kind
+    # ("pointwise" by default); a recipe `reward_adapter:` overrides it. Any
+    # registered pointwise judge can back an RL reward — no isinstance whitelist.
     judge = _build_judge(cfg)
     if judge is not None and trainer_name in ("ppo", "grpo"):
-        from ..eval.judge import VerifierJudge as _VerifierJudge
         from ..config._exceptions import ConfigResolveError as _ConfigResolveError
-        if not isinstance(judge, _VerifierJudge):
-            raise _ConfigResolveError(
-                f"PPO/GRPO reward_fn currently only supports VerifierJudge; "
-                f"got {type(judge).__name__!r}. Use 'name: verifier' in the judge section."
+
+        reward_kind = getattr(judge, "reward_kind", "pointwise")
+        adapter_spec = _to_dict(getattr(cfg, "reward_adapter", None)) or {"name": reward_kind}
+        try:
+            adapter = _resolve(
+                {**adapter_spec, "judge": judge, "tokenizer": data_module.tokenizer},
+                category="reward_adapter",
             )
-        _tok = data_module.tokenizer
-        _judge_ref = judge
-
-        def _reward_fn(
-            prompt_ids: "torch.Tensor", response_ids: "torch.Tensor"
-        ) -> list[float]:
-            prompts = [_tok.decode(ids.tolist(), skip_special_tokens=True)
-                       for ids in prompt_ids]
-            responses = [_tok.decode(ids.tolist(), skip_special_tokens=True)
-                         for ids in response_ids]
-            return _judge_ref.score(list(zip(prompts, responses)))
-
-        trainer_kwargs["reward_fn"] = _reward_fn
+        except Exception as exc:  # registry miss / construction error
+            raise _ConfigResolveError(
+                f"no usable reward_adapter for judge {type(judge).__name__!r} "
+                f"(reward_kind={reward_kind!r}): {exc}. Register a "
+                f"'{reward_kind}' reward_adapter, or set `reward_adapter:` in the "
+                f"recipe. (A 'pairwise' adapter is a deferred feature — see "
+                f"lighttrain/rl/reward_adapters.py.)"
+            ) from exc
+        trainer_kwargs["reward_fn"] = adapter
 
     # VAR_KEYWORD detection: trainers with **kwargs (DPO/ORPO/…) accept all
     # remaining trainer_kwargs; trainers without (PPO/GRPO) are filtered by

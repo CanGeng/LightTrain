@@ -85,10 +85,16 @@ def _seq_logps_and_nll(
     return mean_logps, mean_nll
 
 
+@register("trainer", "preference")
 class PreferenceTrainer(Trainer):
-    """Base class for all offline preference trainers.
+    """The single offline preference trainer (DPO / IPO / SimPO / ORPO / KTO).
 
-    Subclasses must set ``self._loss_fn`` before calling ``fit()``.
+    The preference *algorithm* is now the ``loss:`` seam, not the trainer
+    identity: pick it with ``loss: {name: dpo|ipo|simpo|orpo|kto, ...}``. This
+    trainer does the shared double forward (chosen + rejected), enriches the
+    batch with per-sample log-probs / NLL / reference log-probs, then hands off
+    to ``ctx.loss_fn`` via the RL update rule. It never overwrites a
+    recipe-provided loss.
     """
 
     def __init__(
@@ -139,8 +145,6 @@ class PreferenceTrainer(Trainer):
             self.device = _device_of(self.model) if self.model is not None else None
 
         self._stop_requested = False
-        # Subclass must assign before fit():
-        self._loss_fn: Any = None
         self._rl_rule = RLUpdateRule(grad_clip=grad_clip)
 
     # ------------------------------------------------------------------ fit
@@ -150,8 +154,11 @@ class PreferenceTrainer(Trainer):
             raise RuntimeError(f"{type(self).__name__}.fit: model is not set.")
         if self.optimizer is None:
             raise RuntimeError(f"{type(self).__name__}.fit: optimizer is not set.")
-        if self._loss_fn is None:
-            raise RuntimeError(f"{type(self).__name__}.fit: _loss_fn is not set.")
+        if self.ctx.loss_fn is None:
+            raise RuntimeError(
+                f"{type(self).__name__}.fit: no preference loss configured. "
+                "Set `loss: {name: dpo|ipo|simpo|orpo|kto, ...}` in the recipe."
+            )
 
         target = int(steps) if steps is not None else self.max_steps
         loader = self.data_module.train_loader()
@@ -269,10 +276,16 @@ class PreferenceTrainer(Trainer):
         if ref_rejected_key in batch:
             enriched["ref_rejected_logps"] = batch[ref_rejected_key].to(chosen_logps.device)
 
-        # Populate ctx for RLUpdateRule (backward/callbacks delegated below)
-        # enriched (not batch) is passed so preference losses can read chosen/rejected logps
+        # Populate ctx for RLUpdateRule (backward/callbacks delegated below).
+        # enriched (not batch) is passed so preference losses can read
+        # chosen/rejected logps. The loss is the recipe-provided ``ctx.loss_fn``
+        # (the ``loss:`` seam) — never overwritten here.
+        if self.ctx.loss_fn is None:
+            raise RuntimeError(
+                f"{type(self).__name__}: no preference loss configured. "
+                "Set `loss: {name: dpo|ipo|simpo|orpo|kto, ...}` in the recipe."
+            )
         self.ctx.extras["model"] = self.model
-        self.ctx.loss_fn = self._loss_fn
         self.ctx.model = self.model
         return self._rl_rule.step(self.model, enriched, self.ctx)
 

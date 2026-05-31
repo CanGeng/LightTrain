@@ -19,8 +19,9 @@ import torch
 import torch.nn as nn
 
 from lighttrain.callbacks.base import EventBus, Signal
+from lighttrain.losses.preference import DPOLoss
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers.dpo import DPOTrainer
+from lighttrain.trainers._preference_base import PreferenceTrainer
 
 
 class _TinyLM(nn.Module):
@@ -62,18 +63,19 @@ class _PrefDM:
         return list(self._batches)
 
 
-def _make_dpo(*, callbacks=None, max_steps: int = 1, model=None) -> DPOTrainer:
+def _make_dpo(*, callbacks=None, max_steps: int = 1, model=None) -> PreferenceTrainer:
     if model is None:
         model = _TinyLM()
-    return DPOTrainer(
+    trainer = PreferenceTrainer(
         engine=_FakeEngine(),
         data_module=_PrefDM(n=max_steps + 1),
         optimizer=torch.optim.AdamW(model.parameters(), lr=1e-3),
         model=model,
         callbacks=callbacks,
         max_steps=max_steps,
-        beta=0.1,
     )
+    trainer.ctx.loss_fn = DPOLoss(beta=0.1)  # the loss: seam
+    return trainer
 
 
 # ===========================================================================

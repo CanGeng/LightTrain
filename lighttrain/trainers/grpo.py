@@ -18,7 +18,8 @@ from ..protocols import ModelOutput, StepOutput
 from ..registry import register
 from ..rl.buffers import RolloutBuffer
 from ..rl.ref_policy import freeze_as_ref
-from ..rl.rollout import HFGenerateBackend, RolloutEngine
+from ..config._resolver import resolve as _resolve
+from ..rl.rollout import RolloutEngine  # noqa: F401 — import also registers hf_generate
 from ..update_rules.rl import RLUpdateRule
 from ._utils import _device_of, _move_batch, validate_batch
 from .base import Trainer
@@ -70,6 +71,11 @@ class GRPOTrainer(Trainer):
         max_new_tokens: int = 128,
         ignore_index: int = -100,
         grad_clip: float = 1.0,
+        rollout_backend: str = "hf_generate",
+        temperature: float = 1.0,
+        top_p: float = 1.0,
+        do_sample: bool = True,
+        buffer_max_size: int | None = None,
     ) -> None:
         super().__init__(
             engine=engine,
@@ -101,15 +107,28 @@ class GRPOTrainer(Trainer):
         self.ignore_index = int(ignore_index)
         self._stop_requested = False
 
-        self._loss_fn = GRPOLoss(clip_eps=clip_eps, beta_kl=beta_kl)
+        # Default RL loss (fallback when the recipe omits a `loss:` block). The
+        # `loss:` seam wins: see Trainer._recipe_loss_or in _grpo_step.
+        self._default_loss = GRPOLoss(clip_eps=clip_eps, beta_kl=beta_kl)
         self._rl_rule = RLUpdateRule(grad_clip=grad_clip)
-        backend = HFGenerateBackend(
-            max_new_tokens=max_new_tokens,
-            do_sample=True,
-            num_return_sequences=group_size,
+        # F1: resolve the rollout backend via the rl_backend registry and forward
+        # the full sampling knob set (defaults reproduce the old inline backend).
+        backend = _resolve(
+            {
+                "name": rollout_backend,
+                "max_new_tokens": max_new_tokens,
+                "do_sample": do_sample,
+                "temperature": temperature,
+                "top_p": top_p,
+                "num_return_sequences": group_size,
+            },
+            category="rl_backend",
         )
         self._rollout_engine = RolloutEngine(backend, ignore_index=ignore_index)
-        self._buffer = RolloutBuffer(max_size=2048)
+        # F5: buffer cap is a recipe knob; None preserves the old flat 2048.
+        self._buffer = RolloutBuffer(
+            max_size=int(buffer_max_size) if buffer_max_size is not None else 2048
+        )
         self._lora_base_as_ref = bool(lora_base_as_ref)
 
     # ------------------------------------------------------------------ fit
@@ -143,23 +162,10 @@ class GRPOTrainer(Trainer):
                     self.bus.dispatch("on_epoch_begin", epoch=self.ctx.epoch, ctx=self.ctx)
                     raw = next(iterator)
 
-                batch = _move_batch(raw, self.device)
-                self.bus.dispatch("on_rollout_begin", ctx=self.ctx)
-
-                prompt_ids = batch.get("input_ids", batch.get("prompt_input_ids"))
-                prompt_mask = batch.get("attention_mask", batch.get("prompt_attention_mask"))
-
-                self._buffer.clear()
-                episodes = self._rollout_engine.rollout(
-                    self.model, prompt_ids, prompt_mask, self.reward_fn
-                )
-                for ep in episodes:
-                    self._buffer.add(ep)
-
-                self.bus.dispatch("on_rollout_end", episodes=episodes, ctx=self.ctx)
-
-                # Group-relative advantages (computed in GRPOLoss per-batch)
-                rewards = self._buffer.all_rewards()
+                # Rollout (the RL produce_batch override): fills self._buffer,
+                # returns per-sample rewards. Group-relative advantages are
+                # computed inside GRPOLoss per inner minibatch (no GAE here).
+                rewards = self.produce_batch(raw)
 
                 inner_metrics_list: list[dict[str, Any]] = []
                 for _epoch in range(self.ppo_epochs):
@@ -220,6 +226,29 @@ class GRPOTrainer(Trainer):
 
         return last_metrics
 
+    # ------------------------------------------------------------------ rollout
+
+    def produce_batch(self, raw: Any) -> torch.Tensor:  # type: ignore[override]
+        """RL rollout (the paradigm's ``produce_batch``): generate ``group_size``
+        completions per prompt, fill the rollout buffer, return per-sample
+        rewards. The outer ``fit`` loop then iterates the buffer for the inner
+        PPO-style epochs."""
+        batch = _move_batch(raw, self.device)
+        self.bus.dispatch("on_rollout_begin", ctx=self.ctx)
+
+        prompt_ids = batch.get("input_ids", batch.get("prompt_input_ids"))
+        prompt_mask = batch.get("attention_mask", batch.get("prompt_attention_mask"))
+
+        self._buffer.clear()
+        episodes = self._rollout_engine.rollout(
+            self.model, prompt_ids, prompt_mask, self.reward_fn
+        )
+        for ep in episodes:
+            self._buffer.add(ep)
+
+        self.bus.dispatch("on_rollout_end", episodes=episodes, ctx=self.ctx)
+        return self._buffer.all_rewards()
+
     # ------------------------------------------------------------------ grpo step
 
     def _grpo_step(self, batch: dict[str, Any]) -> dict[str, Any]:
@@ -269,7 +298,7 @@ class GRPOTrainer(Trainer):
             "group_ids": group_ids,
             "model": self.model,
         })
-        self.ctx.loss_fn = self._loss_fn
+        self.ctx.loss_fn = self._recipe_loss_or(self._default_loss)
         self.ctx.model = self.model
         return self._rl_rule.step(self.model, batch, self.ctx)
 

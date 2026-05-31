@@ -1,0 +1,95 @@
+# v0.2.0
+
+## 概览
+
+v0.2.0 把训练编排从「围绕 pretrain 路径设计、其它范式靠绕 seam 硬塞」重构成
+**一套公共、可复用、可重入的训练原语 + 一个扁平 `Trainer`**。结果是「想要什么自己
+选」真正落地：90% 是纯 YAML；一个全新范式（多模型蒸馏、多优化器 GAN/actor-critic、
+甚至「loop over training loops」的逐层蒸馏）是一个 ~30 行的注册 `fit()`，复用同一批
+原语，仍 `lighttrain train -c`。同时补齐了一轮 hardcoding 审计发现的 5 个配置 seam 缺口。
+
+全程 bit-check（位级一致）守护行为：每条已有范式迁移前后逐值对照，单模型路径零漂移。
+当前测试套件 **2004 passed / 0 failed**（`-m "not gpu and not heavy"`）。
+
+设计文档：[docs/design/trainer-keystone.md](../design/trainer-keystone.md)。
+
+---
+
+## 训练原语 + 扁平 Trainer
+
+样板从各 trainer 抽成 public、re-entrant 原语：
+
+- `run_train_loop(trainer, *, target_steps)`（[trainers/_primitives.py](../../lighttrain/trainers/_primitives.py)）—— epoch rollover、`batch_in_epoch` resume、`on_train_*` 事件、信号处理、log/ckpt/eval、crash bundle。
+- `apply_update(*, loss, model, optimizer, ctx, micro_state, ...)`（[update_rules/_primitives.py](../../lighttrain/update_rules/_primitives.py)）—— backward/clip/step/sched 半边（含梯度累积状态机、三路 backward）。
+- `forward_with_activations(model, batch, *, layers=None)`—— 层粒度激活捕获。
+
+`base.Trainer` 拥有共享状态并有**具体** `fit()`；两个 override seam：
+
+- `produce_batch(raw)` —— 默认 move-to-device；RL/OPD 重写为 rollout。
+- `forward_loss(batch)` —— 默认走 `engine.step`（pretrain 数值 no-op）；自定义范式返回 `(loss, metrics)` 即走 `apply_update`。
+- 可选 `before_step(batch)`（GAE / 组优势预计算）。
+
+`pretrain` 就是裸 `Trainer`。原语可不经 `Trainer` 直接调（re-entrant：每次调用 fresh
+optimizer/state），逐层蒸馏的 per-layer 训练即由此实现。
+
+## 偏好家族 → 单一 `preference` + `loss:` seam
+
+离线偏好训练是一个 `preference` trainer，算法（DPO/IPO/SimPO/ORPO/KTO）是 `loss:`：
+
+```yaml
+trainer: { name: preference, ref_namespace: ref }
+loss:    { name: dpo, beta: 0.1 }
+```
+
+grpo/ppo 同样经 `ctx.loss_fn` 读 `loss:`（`grpo` / `ppo_surrogate`）。`RLUpdateRule` 的
+backward 半边统一到 `apply_update`。`reward_model` 仍是独立 trainer。
+
+## `models:` / `optimizers:` —— 多模型 / 多优化器
+
+一次 run 可声明命名模型集与优化器集：
+
+```yaml
+models:
+  student: { spec: { profile: small }, trainable: true,  optimizer: opt_main }
+  teacher: { spec: { name: hf_causal, pretrained: gpt2 }, trainable: false,
+             checkpoint: path/to/teacher.safetensors }
+optimizers:
+  opt_main: { name: adamw, lr: 1.0e-3 }
+```
+
+- `trainable: false` entry = runtime 构建/放置/冻结/可选 checkpoint 加载的 aux（teacher/ref/EMA）。
+- 多个 `trainable: true` entry = 各自一个 optimizer，联合更新（GAN / actor-critic）。
+- 每个 entry 的 `spec` 可内联或 `{profile: <名>}`（变体选择与模型集正交）。
+- 自定义 trainer 经 `self.models[...]` / `self.optimizers[...]`（按模型名配对）取用。
+- 单模型 `model:` + `optim:` 是其糖（降糖为单 entry 集，路径不变）。
+
+## 三条范式轴（experiments/ 能力验证）
+
+- **Axis A（多模型整 forward）**：OPD 在线蒸馏——thin trainer（`produce_batch` rollout + `forward_loss` student+frozen-teacher 前向 + reverse-KL），teacher 是 `models: {trainable:false}` aux。
+- **Axis B（多 trainable 多 optimizer）**：最小 `dual_lm`——两个模型两个优化器联合更新。
+- **Axis C（loop over training loops）**：贪婪逐层蒸馏——~30 行 `fit()`，每层一次 re-entrant `run_train_loop`（fresh optimizer/state），train→freeze→喂下一层；用 `forward_with_activations` 取 teacher 目标与冻结前缀输入。
+
+## 配置 seam 补齐（hardcoding 审计 F1–F5）
+
+把写死值变成可配置 seam，默认值不改变行为：
+
+- **F1**：ppo/grpo 的 rollout backend 经 `rl_backend` 注册表解析（`rollout_backend:`），暴露 `temperature` / `top_p` / `do_sample`。
+- **F2**：judge→reward 经可注册 `reward_adapter`（judge 声明 `reward_kind`，默认 `pointwise`）；任何 pointwise judge 都能背 RL reward。
+- **F3**：`reward_model` 暴露 `grad_clip`（默认 `1.0`）。
+- **F4**：价值/奖励头参数化为单个 `value_head/linear`（去重 ppo/rm 两处），经 `value_head:` 可配。
+- **F5**：ppo/grpo 暴露 `buffer_max_size`（rollout 缓冲上限）。
+
+新增注册类别：`value_head`、`reward_adapter`（`rl_backend` 本已存在，现真正被解析使用）。
+
+## 改动文件（核心）
+
+- 原语：[trainers/_primitives.py](../../lighttrain/trainers/_primitives.py)（新）、[update_rules/_primitives.py](../../lighttrain/update_rules/_primitives.py)（新）、[rl/value_heads.py](../../lighttrain/rl/value_heads.py)（新）、[rl/reward_adapters.py](../../lighttrain/rl/reward_adapters.py)（新）
+- 扁平 Trainer + 迁移：[trainers/base.py](../../lighttrain/trainers/base.py)、[trainers/pretrain.py](../../lighttrain/trainers/pretrain.py)、[trainers/_preference_base.py](../../lighttrain/trainers/_preference_base.py)、[trainers/grpo.py](../../lighttrain/trainers/grpo.py)、[trainers/ppo.py](../../lighttrain/trainers/ppo.py)、[trainers/rm.py](../../lighttrain/trainers/rm.py)、[update_rules/standard.py](../../lighttrain/update_rules/standard.py)、[update_rules/rl.py](../../lighttrain/update_rules/rl.py)
+- 配置/运行时：[config/_schema.py](../../lighttrain/config/_schema.py)（`models:`/`optimizers:`）、[cli/_runtime.py](../../lighttrain/cli/_runtime.py)（降糖 + 多模型多优化器构建 + reward_adapter）、[registry/_core.py](../../lighttrain/registry/_core.py)（新类别）、[eval/judge.py](../../lighttrain/eval/judge.py)（`reward_kind`）
+
+## 验收
+
+- **bit-check**：pretrain / preference(5 loss) / grpo / ppo / rm 迁移前后逐值一致（golden 测试 [test_rl_loss_seam_bitcheck.py](../../tests/trainers/test_rl_loss_seam_bitcheck.py)、[test_preference_collapse_bitcheck.py](../../tests/trainers/test_preference_collapse_bitcheck.py)）；单模型降糖 = 显式 `models:` 逐值一致（[test_models_set_desugar.py](../../tests/test_models_set_desugar.py)）。
+- **可达性**：[test_hardcoding_audit_fixes.py](../../tests/test_hardcoding_audit_fixes.py) 覆盖 F1–F5 每个 knob + value-head 初始化保持。
+- **范式验收**：Axis-B 两模型两优化器联合更新（[test_axis_b_multi_optimizer.py](../../tests/test_axis_b_multi_optimizer.py)）；OPD/layerwise 在 `experiments/` 端到端跑通（逐层 `fit()` ≤30 行、re-entrant per-layer）。
+- 全套 2004 passed / 0 failed / 7 skipped。

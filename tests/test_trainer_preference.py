@@ -1,17 +1,18 @@
-"""Shared preference trainer pipeline tests (M6) — DPO / IPO / SimPO / ORPO / KTO."""
+"""Shared preference trainer pipeline tests (M6) — DPO / IPO / SimPO / ORPO / KTO.
+
+After the keystone refactor (step 2) there is a single ``PreferenceTrainer``;
+the algorithm is selected via the ``loss:`` seam (``ctx.loss_fn``) rather than a
+per-algorithm trainer subclass.
+"""
 
 from __future__ import annotations
 
 import torch
 import torch.nn as nn
 
+from lighttrain.losses.preference import DPOLoss, IPOLoss, KTOLoss, ORPOLoss, SimPOLoss
 from lighttrain.protocols import ModelOutput
 from lighttrain.trainers._preference_base import PreferenceTrainer, _seq_logps_and_nll
-from lighttrain.trainers.dpo import DPOTrainer
-from lighttrain.trainers.ipo import IPOTrainer
-from lighttrain.trainers.kto import KTOTrainer
-from lighttrain.trainers.orpo import ORPOTrainer
-from lighttrain.trainers.simpo import SimPOTrainer
 
 
 # ---- Minimal helpers -------------------------------------------------------
@@ -51,12 +52,18 @@ class _FakeEngine:
     mixed_precision = "no"
 
 
-def _make(cls, **kw):
+def _make(loss_fn, **kw):
+    """Build the single PreferenceTrainer and wire the loss seam (ctx.loss_fn),
+    exactly as the runtime would from a ``loss:`` block."""
     V = 16
     model = _TinyLM(V=V)
     dm = _FakeDataModule(V=V)
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
-    return cls(engine=_FakeEngine(), data_module=dm, optimizer=opt, model=model, max_steps=3, **kw)
+    t = PreferenceTrainer(
+        engine=_FakeEngine(), data_module=dm, optimizer=opt, model=model, max_steps=3, **kw
+    )
+    t.ctx.loss_fn = loss_fn
+    return t
 
 
 # ---- _seq_logps_and_nll ---------------------------------------------------
@@ -88,35 +95,30 @@ def test_seq_nll_nonneg():
     assert (nll >= 0).all()
 
 
-# ---- DPO -----------------------------------------------------------------
+# ---- the preference trainer + loss seam ----------------------------------
 
-def test_dpo_trainer_registers():
+def test_preference_trainer_registers():
     from lighttrain.registry import get as resolve
-    assert resolve("trainer", "dpo") is DPOTrainer
+    assert resolve("trainer", "preference") is PreferenceTrainer
 
 
 def test_dpo_preference_step_returns_loss():
-    t = _make(DPOTrainer, beta=0.1)
-    V, T, B = 16, 5, 2
+    t = _make(DPOLoss(beta=0.1))
     batch = next(t.data_module.train_loader())
     metrics = t._preference_step(batch)
     assert "loss" in metrics
     assert metrics["loss"] > 0.0
 
 
-# ---- IPO -----------------------------------------------------------------
-
 def test_ipo_preference_step_runs():
-    t = _make(IPOTrainer, beta=0.1)
+    t = _make(IPOLoss(beta=0.1))
     batch = next(t.data_module.train_loader())
     metrics = t._preference_step(batch)
     assert "loss" in metrics
 
 
-# ---- SimPO (no ref needed) -----------------------------------------------
-
 def test_simpo_no_ref_logprobs_needed():
-    t = _make(SimPOTrainer, beta=2.5, gamma=1.0)
+    t = _make(SimPOLoss(beta=2.5, gamma=1.0))
     V, T, B = 16, 5, 2
     # Batch without aux ref keys — SimPO should still work
     dm_no_ref = _FakeDataModule(V=V, T=T, B=B)
@@ -126,19 +128,15 @@ def test_simpo_no_ref_logprobs_needed():
     assert "loss" in metrics
 
 
-# ---- ORPO ----------------------------------------------------------------
-
 def test_orpo_returns_sft_loss():
-    t = _make(ORPOTrainer, lam=0.1)
+    t = _make(ORPOLoss(lam=0.1))
     batch = next(t.data_module.train_loader())
     metrics = t._preference_step(batch)
     assert "loss" in metrics
 
 
-# ---- KTO -----------------------------------------------------------------
-
 def test_kto_preference_step_runs():
-    t = _make(KTOTrainer, beta=0.1)
+    t = _make(KTOLoss(beta=0.1))
     batch = next(t.data_module.train_loader())
     metrics = t._preference_step(batch)
     assert "loss" in metrics
@@ -160,7 +158,7 @@ def test_preference_step_fires_full_callback_chain():
         def on_zero_grad(self, **kw): fired.append("on_zero_grad")
         def on_step_end(self, **kw): fired.append("on_step_end")
 
-    t = _make(DPOTrainer, callbacks=[_Recorder()])
+    t = _make(DPOLoss(beta=0.1), callbacks=[_Recorder()])
     batch = next(t.data_module.train_loader())
     t._preference_step(batch)
 

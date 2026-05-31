@@ -68,6 +68,14 @@ scheduler:
   total_steps: ${trainer.max_steps}
   min_lr_ratio: 0.1
 
+# ----- loss ——————————————————————————————————————————————————————————————————
+# The PPO surrogate is now selected via the loss: seam (keystone step 3).
+loss:
+  name: ppo_surrogate
+  clip_eps: 0.2
+  vf_coef: 0.0           # no value head in this demo
+  ent_coef: 0.01
+
 # ----- engine ————————————————————————————————————————————————————————————————
 engine:
   name: standard
@@ -84,9 +92,6 @@ trainer:
   mini_batch_size: 4
   gamma: 0.99
   lam: 0.95
-  clip_eps: 0.2
-  vf_coef: 0.0           # no value head in this demo
-  ent_coef: 0.01
   target_kl: 0.05
   max_new_tokens: 64
   lora_base_as_ref: false

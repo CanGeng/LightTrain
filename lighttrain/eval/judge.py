@@ -38,6 +38,8 @@ class VerifierJudge:
         using the pattern-based mode).
     """
 
+    reward_kind = "pointwise"  # → PointwiseRewardAdapter when used as an RL reward
+
     def __init__(
         self,
         *,
@@ -119,6 +121,8 @@ class PairwiseLLMJudge:
         "Response B: {response_b}\n\n"
         "Which response is better? Answer with exactly 'Response A' or 'Response B'."
     )
+
+    reward_kind = "pairwise"  # needs a registered pairwise reward_adapter (deferred)
 
     def __init__(
         self,

@@ -121,6 +121,13 @@ class RootConfig(BaseModel):
     # dict here is rejected at build time (run ``migrate config --to-profiles``).
     model: Any | None = None
     model_profiles: dict[str, Any] | None = None
+    # Multi-model / multi-optimizer set (keystone step 4). A lone ``model:`` +
+    # ``model_profiles:`` and a lone ``optim:`` remain valid and desugar into
+    # ``models: {main: {...}}`` / ``optimizers: {main: ...}`` at build time.
+    # Each ``models`` entry: {spec, trainable, optimizer?, checkpoint?}; ``spec``
+    # is an inline component spec or ``{profile: <name>}`` into ``model_profiles``.
+    models: dict[str, Any] | None = None
+    optimizers: dict[str, Any] | None = None
     data: Any | None = None
     optim: Any | None = None
     loss: Any | None = None

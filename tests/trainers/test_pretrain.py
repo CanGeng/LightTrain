@@ -93,6 +93,45 @@ def test_pretrain_fit_delegates_each_step_to_engine():
     assert trainer.ctx.step == 3
 
 
+class _StatefulProfile:
+    """Minimal duck-typed ArchitectureProfile for the stateful-reset path."""
+
+    state_mode = "stateful"
+
+    def __init__(self) -> None:
+        self.calls: list[int] = []
+        self.reset_state_fn = lambda m: self.calls.append(1)
+
+
+def test_pretrain_produce_batch_resets_state_on_doc_boundary():
+    """Bit-check for the stateful arch-reset path lifted into produce_batch.
+
+    The transformer regression fixtures are stateless, so this is the only
+    coverage that the RWKV/Mamba recurrent-state reset still fires after the
+    loop body moved into base.Trainer / run_train_loop.
+    """
+    model = _TinyLM()
+    profile = _StatefulProfile()
+    trainer = PretrainTrainer(
+        engine=MagicMock(),
+        data_module=_BatchListDM(1),
+        optimizer=torch.optim.SGD(model.parameters(), lr=1e-3),
+        model=model,
+        max_steps=1,
+        arch_profile=profile,
+    )
+
+    # No document boundary → no reset.
+    b = trainer.produce_batch({**_batch()})
+    assert profile.calls == []
+    assert "_reset_state" not in b
+
+    # Document boundary → reset_state_fn fired and flag propagated.
+    b2 = trainer.produce_batch({**_batch(), "_doc_boundary": True})
+    assert profile.calls == [1]
+    assert b2["_reset_state"] is True
+
+
 def test_pretrain_step_clears_loss_signal_extras():
     """Goal: ``_step`` must pop ``ctx.extras['loss_signal']`` before the
     engine call (line 227 in pretrain.py).

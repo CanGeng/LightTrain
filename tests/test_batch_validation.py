@@ -8,8 +8,9 @@ import torch.nn as nn
 from unittest.mock import MagicMock
 
 from lighttrain.exceptions import BatchValidationError, LightTrainError
+from lighttrain.losses.preference import DPOLoss
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers.dpo import DPOTrainer
+from lighttrain.trainers._preference_base import PreferenceTrainer
 from lighttrain.trainers.grpo import GRPOTrainer
 from lighttrain.trainers.ppo import PPOTrainer
 from lighttrain.trainers.rm import RewardModelTrainer
@@ -57,14 +58,15 @@ class _TinyBackbone(nn.Module):
 
 def _make_dpo_trainer():
     model = _TinyLM()
-    return DPOTrainer(
+    trainer = PreferenceTrainer(
         engine=_FakeEngine(),
         data_module=_FakeDM(),
         optimizer=torch.optim.AdamW(model.parameters(), lr=1e-3),
         model=model,
         max_steps=1,
-        beta=0.1,
     )
+    trainer.ctx.loss_fn = DPOLoss(beta=0.1)
+    return trainer
 
 
 def _make_rm_trainer():

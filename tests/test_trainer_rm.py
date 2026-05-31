@@ -71,14 +71,15 @@ def _make_trainer(**kw) -> RewardModelTrainer:
 # ---- Tests ----------------------------------------------------------------
 
 def test_linear_value_head_shape():
-    vhead = LinearValueHead(hidden_size=8)
+    # RM's value-head config on the now-parameterised shared head: last-token → (B,)
+    vhead = LinearValueHead(hidden_size=8, bias=False, reduction="last")
     h = torch.randn(3, 6, 8)
     out = vhead(h)
     assert out.shape == (3,)
 
 
 def test_linear_value_head_no_bias():
-    vhead = LinearValueHead(hidden_size=8)
+    vhead = LinearValueHead(hidden_size=8, bias=False, reduction="last")
     assert vhead.linear.bias is None
 
 

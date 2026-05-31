@@ -77,13 +77,12 @@ engine:
 
 # ----- trainer ———————————————————————————————————————————————————————————————
 trainer:
-  name: dpo
+  name: preference        # the single preference trainer; algorithm = loss: above
   max_steps: 200
   val_every: 0
   ckpt_every: 200
   log_every: 25
   ref_namespace: ref      # must match the `namespace` in the join spec above
-  beta: 0.1
 
 # ----- callbacks + logger ————————————————————————————————————————————————————
 callbacks:

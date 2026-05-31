@@ -10,34 +10,15 @@ import math
 from typing import Any, Mapping
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
+from ..config._resolver import resolve as _resolve
 from ..protocols import LossContext, ModelOutput, StepOutput
 from ..registry import register
+from ..rl.value_heads import LinearValueHead  # re-exported; registers value_head/linear
+from ..update_rules._primitives import apply_update
 from ._preference_base import PreferenceTrainer, _device_of, _move_batch
 from ._utils import validate_batch
-
-
-class LinearValueHead(nn.Module):
-    """Single linear layer projecting hidden states to a scalar reward."""
-
-    def __init__(self, hidden_size: int) -> None:
-        super().__init__()
-        self.linear = nn.Linear(hidden_size, 1, bias=False)
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """Average last-token hidden state → scalar.
-
-        Parameters
-        ----------
-        hidden_states : (B, T, H)
-
-        Returns
-        -------
-        (B,) reward scalars
-        """
-        return self.linear(hidden_states[:, -1, :]).squeeze(-1)
 
 
 @register("trainer", "reward_model")
@@ -76,6 +57,8 @@ class RewardModelTrainer(PreferenceTrainer):
         device: str | torch.device | None = None,
         margin: float = 0.0,
         shared_tower: bool = True,
+        grad_clip: float = 1.0,
+        value_head: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(
             engine=engine,
@@ -94,6 +77,11 @@ class RewardModelTrainer(PreferenceTrainer):
         )
         self.margin = float(margin)
         self.shared_tower = bool(shared_tower)
+        # F3: grad_clip is now a knob. Default is 1.0 (matches ppo/grpo/preference
+        # — RM training routinely benefits from clipping); set 0.0 for the legacy
+        # no-clip behaviour.
+        self.grad_clip = float(grad_clip)
+        self._value_head_spec = value_head
         self._value_head: LinearValueHead | None = None
 
     def _get_value_head(self, model: Any) -> LinearValueHead:
@@ -109,7 +97,14 @@ class RewardModelTrainer(PreferenceTrainer):
                     "RewardModelTrainer: cannot auto-detect hidden_size from model.config. "
                     "Set model.config.hidden_size manually."
                 )
-            self._value_head = LinearValueHead(int(hidden_size)).to(
+            # F4: resolve via the value_head registry; default spec reproduces the
+            # old reward head (last-token, no bias, default init) → bit-identical.
+            spec = {"name": "linear", "bias": False, "zero_init": False,
+                    "reduction": "last"}
+            if self._value_head_spec:
+                spec.update(self._value_head_spec)
+            spec["hidden_size"] = int(hidden_size)
+            self._value_head = _resolve(spec, category="value_head").to(
                 device=self.device, dtype=next(model.parameters()).dtype
             )
         return self._value_head
@@ -163,22 +158,22 @@ class RewardModelTrainer(PreferenceTrainer):
         loss = -F.logsigmoid(chosen_rewards - rejected_rewards - self.margin).mean()
 
         self.bus.dispatch("on_loss_computed", loss=loss, batch=batch, ctx=self.ctx)
-        self.bus.dispatch("on_backward_pre", loss=loss, ctx=self.ctx)
-        loss.backward()
-        self.bus.dispatch("on_backward_post", ctx=self.ctx)
-
-        self.bus.dispatch("on_optimizer_step_pre", ctx=self.ctx)
-        if hasattr(self.optimizer, "step"):
-            self.optimizer.step()
-        self.bus.dispatch("on_optimizer_step_post", ctx=self.ctx)
-
-        if hasattr(self.optimizer, "zero_grad"):
-            self.optimizer.zero_grad()
-        self.bus.dispatch("on_zero_grad", ctx=self.ctx)
-
-        if self.scheduler is not None and getattr(self.scheduler, "step_per_batch", True):
-            self.scheduler.step()
-            self.bus.dispatch("on_scheduler_step", ctx=self.ctx)
+        # Backward / step / scheduler via the shared primitive. RM has always
+        # used a bare backward with no gradient clipping, so pass accelerator=None
+        # and grad_clip=0.0 to preserve that exactly; micro_state is required
+        # even at accumulate=1 (RM does not accumulate).
+        apply_update(
+            loss=loss,
+            model=self.model,
+            optimizer=self.optimizer,
+            ctx=self.ctx,
+            micro_state=self._micro,
+            scheduler=self.scheduler,
+            accelerator=None,   # AMP-bypass is keystone seam#3; unchanged here
+            grad_clip=self.grad_clip,
+            accumulate_grad_batches=1,
+            bus=self.bus,
+        )
 
         return {
             "loss": float(loss.detach()),

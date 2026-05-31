@@ -23,7 +23,6 @@ exhaustion falls back to a soft SKIP_STEP and writes
 
 from __future__ import annotations
 
-from contextlib import nullcontext as _nullcontext
 from typing import Any, Mapping
 
 import torch
@@ -32,6 +31,12 @@ from ..callbacks.base import Signal
 from ..protocols import LossContext, ModelOutput
 from ..registry import register
 from ..utils.seed import restore_rng_state, rng_state
+from ._primitives import (  # noqa: F401  (_register_new_params re-exported for back-compat)
+    MicroState,
+    _current_lr,
+    _register_new_params,
+    apply_update,
+)
 
 
 def _to_metric(value: Any) -> float:
@@ -55,7 +60,17 @@ class StandardUpdateRule:
         self.grad_clip = float(grad_clip)
         self.accumulate_grad_batches = max(1, int(accumulate_grad_batches))
         self.max_retries = max(0, int(max_retries))
-        self._micro_step = 0
+        # Gradient-accumulation cursor lives in a caller-shareable holder so the
+        # backward half can be the stateless ``apply_update`` primitive.
+        self._micro = MicroState()
+
+    @property
+    def _micro_step(self) -> int:
+        return self._micro.micro_step
+
+    @_micro_step.setter
+    def _micro_step(self, value: int) -> None:
+        self._micro.micro_step = int(value)
 
     def setup(self, model: Any, sample: Any) -> None:  # noqa: ARG002
         return None
@@ -235,85 +250,21 @@ class StandardUpdateRule:
                 bus.dispatch("on_step_end", step=ctx.step, metrics=ctx.metrics, batch=batch, model=model)
             return dict(ctx.metrics)
 
-        # Drain newly-created trainable params (e.g. HiddenStatesMSELoss lazy
-        # projections) into the optimizer as a fresh param_group **before**
-        # backward, so subsequent ``optimizer.step()`` actually updates them.
-        # Loss fns push parameters into ``ctx.extras["_new_trainable_params"]``
-        # at create-time; we pop here so it's a one-shot delivery.
-        _new_params = ctx.extras.pop("_new_trainable_params", None)
-        if _new_params:
-            _register_new_params(optimizer, _new_params)
-
-        # Backward.
-        if bus is not None:
-            bus.dispatch("on_backward_pre", step=ctx.step, loss=loss)
-
-        grad_sync = getattr(ctx, "grad_sync", None)
-        parallel_ctx = getattr(ctx, "parallel_ctx", None)
-
-        # Determine accumulation state BEFORE incrementing micro_step so we can
-        # suppress inter-rank gradient sync (DDP/FSDP no_sync) on all but the
-        # last micro-batch.  After increment: accumulating = True means keep
-        # accumulating; False means this was the last micro-step — do optimizer.
-        pre_accumulating = (
-            (self._micro_step + 1) % self.accumulate_grad_batches
-        ) != 0
-
-        scaled = loss / self.accumulate_grad_batches
-        accum_ctx = grad_sync.accumulate(model) if (grad_sync and pre_accumulating) else _nullcontext()
-
-        with accum_ctx:
-            if grad_sync is not None:
-                grad_sync.backward(scaled, model)
-            elif accelerator is not None and hasattr(accelerator, "backward"):
-                accelerator.backward(scaled)
-            else:
-                scaled.backward()
-
-        self._micro_step += 1
-        accumulating = (self._micro_step % self.accumulate_grad_batches) != 0
-        ctx.is_accumulating = accumulating
-
-        if bus is not None:
-            bus.dispatch("on_backward_post", step=ctx.step, loss=loss)
-
-        grad_norm = 0.0
-        if not accumulating:
-            if self.grad_clip and self.grad_clip > 0:
-                if grad_sync is not None:
-                    grad_norm = grad_sync.clip_grad_norm(model, self.grad_clip, parallel_ctx)
-                else:
-                    params = [p for p in model.parameters() if p.grad is not None]
-                    if params:
-                        if accelerator is not None and hasattr(accelerator, "clip_grad_norm_"):
-                            gn = accelerator.clip_grad_norm_(params, max_norm=self.grad_clip)
-                        else:
-                            gn = torch.nn.utils.clip_grad_norm_(params, max_norm=self.grad_clip)
-                        grad_norm = float(gn)
-            if bus is not None:
-                bus.dispatch("on_clip_grad", step=ctx.step, grad_norm=grad_norm)
-                bus.dispatch("on_optimizer_step_pre", step=ctx.step)
-
-            if grad_sync is not None:
-                grad_sync.optimizer_step(optimizer, model)
-            else:
-                optimizer.step()
-
-            if bus is not None:
-                bus.dispatch("on_optimizer_step_post", step=ctx.step, model=model)
-
-            optimizer.zero_grad(set_to_none=True)
-            if bus is not None:
-                bus.dispatch("on_zero_grad", step=ctx.step)
-
-            if scheduler is not None and getattr(scheduler, "step_per_batch", True):
-                scheduler.step()
-                if bus is not None:
-                    bus.dispatch("on_scheduler_step", step=ctx.step)
-
-        ctx.metrics["grad_norm"] = grad_norm
-        ctx.metrics["lr"] = _current_lr(optimizer)
-        ctx.metrics["skipped"] = 0.0
+        # Backward / clip / optimizer / scheduler — the re-usable backward half.
+        # Loss fns push fresh trainable params into
+        # ``ctx.extras["_new_trainable_params"]`` (drained inside apply_update).
+        apply_update(
+            loss=loss,
+            model=model,
+            optimizer=optimizer,
+            ctx=ctx,
+            micro_state=self._micro,
+            scheduler=scheduler,
+            accelerator=accelerator,
+            grad_clip=self.grad_clip,
+            accumulate_grad_batches=self.accumulate_grad_batches,
+            bus=bus,
+        )
 
         if bus is not None:
             bus.dispatch(
@@ -326,39 +277,7 @@ class StandardUpdateRule:
         return dict(ctx.metrics)
 
 
-def _current_lr(optimizer: Any) -> float:
-    inner = getattr(optimizer, "optimizer", optimizer)
-    groups = getattr(inner, "param_groups", None)
-    if not groups:
-        return 0.0
-    return float(groups[0].get("lr", 0.0))
-
-
-def _register_new_params(optimizer: Any, new_params: Any) -> None:
-    """Add fresh trainable params to ``optimizer`` as a new param_group.
-
-    Mirrors the defaults (lr / weight_decay / betas / ...) of the first
-    existing param group so the projection layer trains under the same
-    hyperparameters as the model proper. Filters duplicates by ``id`` so a
-    repeated drain (shouldn't happen, but cheap to guard) is idempotent.
-    """
-    inner = getattr(optimizer, "optimizer", optimizer)
-    if not hasattr(inner, "add_param_group") or not hasattr(inner, "param_groups"):
-        return
-    existing_ids: set[int] = set()
-    for g in inner.param_groups:
-        for p in g.get("params", []):
-            existing_ids.add(id(p))
-    fresh = [p for p in new_params if id(p) not in existing_ids]
-    if not fresh:
-        return
-    if inner.param_groups:
-        defaults = {
-            k: v for k, v in inner.param_groups[0].items() if k != "params"
-        }
-    else:
-        defaults = {}
-    inner.add_param_group({"params": list(fresh), **defaults})
-
-
+# ``_current_lr`` / ``_register_new_params`` now live in ._primitives and are
+# imported above; re-exported here for back-compat (rl.py imports _current_lr
+# from .standard).
 __all__ = ["StandardUpdateRule"]

@@ -118,24 +118,16 @@ def test_ppo_runtime_reward_fn_injected():
     assert trainer.reward_fn is not None, "reward_fn must be injected from judge config"
 
 
-def test_dpo_runtime_no_grad_clip_leak(tmp_path):
-    """DPO recipe: grad_clip/accumulate must not leak to _PreferenceBase.__init__.
-
-    Uses a self-contained minimal recipe (no artifact store) so the test is
-    hermetic and doesn't depend on dpo_offline.yaml's artifact_joined setup.
-    """
+def _write_minimal_preference_recipe(tmp_path, fixture, *, trainer_name: str) -> Path:
+    """Self-contained minimal preference recipe (no artifact store) for hermetic
+    runtime tests. ``trainer_name`` lets callers exercise the migration error."""
     import textwrap
-    from lighttrain.cli._runtime import setup_run_from_config
 
-    fixture = Path(__file__).parent / "fixtures" / "tiny_preference.jsonl"
-    if not fixture.exists():
-        pytest.skip("tiny_preference.jsonl fixture not found")
-
-    recipe = tmp_path / "dpo_minimal.yaml"
+    recipe = tmp_path / "pref_minimal.yaml"
     recipe.write_text(textwrap.dedent(f"""
         mode: lab
         seed: 42
-        exp: test_dpo_minimal
+        exp: test_pref_minimal
         run_root: {tmp_path / "runs"}
 
         model: default
@@ -186,12 +178,11 @@ def test_dpo_runtime_no_grad_clip_leak(tmp_path):
           mixed_precision: "no"
 
         trainer:
-          name: dpo
+          name: {trainer_name}
           max_steps: 1
           val_every: 0
           ckpt_every: 0
           log_every: 1
-          beta: 0.1
           grad_clip: 1.0
           accumulate: 1
 
@@ -199,10 +190,36 @@ def test_dpo_runtime_no_grad_clip_leak(tmp_path):
         logger:
           - {{name: console, log_every: 1}}
     """).strip())
+    return recipe
 
-    # Must not raise TypeError: grad_clip/accumulate must not reach _PreferenceBase.__init__.
+
+def test_preference_runtime_no_grad_clip_leak(tmp_path):
+    """preference recipe: grad_clip/accumulate must not leak to the trainer
+    __init__ (the runtime keeps them engine-only). Hermetic; no artifact store."""
+    from lighttrain.cli._runtime import setup_run_from_config
+
+    fixture = Path(__file__).parent / "fixtures" / "tiny_preference.jsonl"
+    if not fixture.exists():
+        pytest.skip("tiny_preference.jsonl fixture not found")
+
+    recipe = _write_minimal_preference_recipe(tmp_path, fixture, trainer_name="preference")
     bundle = setup_run_from_config(recipe, mode="lab")
     assert bundle["trainer"] is not None
+
+
+def test_removed_preference_trainer_raises_migration_error(tmp_path):
+    """Keystone step 2: `trainer: dpo` (and ipo/simpo/orpo/kto) must fail with a
+    clear migration error pointing at `trainer: preference` + the `loss:` seam."""
+    from lighttrain.config import ConfigError
+    from lighttrain.cli._runtime import setup_run_from_config
+
+    fixture = Path(__file__).parent / "fixtures" / "tiny_preference.jsonl"
+    if not fixture.exists():
+        pytest.skip("tiny_preference.jsonl fixture not found")
+
+    recipe = _write_minimal_preference_recipe(tmp_path, fixture, trainer_name="dpo")
+    with pytest.raises(ConfigError, match="preference"):
+        setup_run_from_config(recipe, mode="lab")
 
 
 def test_pairwise_llm_judge_with_grpo_raises():

@@ -60,6 +60,13 @@ scheduler:
   total_steps: ${trainer.max_steps}
   min_lr_ratio: 0.0
 
+# ----- loss ——————————————————————————————————————————————————————————————————
+# The RL surrogate is now selected via the loss: seam (keystone step 3).
+loss:
+  name: grpo
+  clip_eps: 0.2
+  beta_kl: 0.0           # set > 0 to add KL penalty against frozen reference
+
 # ----- engine ————————————————————————————————————————————————————————————————
 engine:
   name: standard
@@ -74,8 +81,6 @@ trainer:
   group_size: 4          # G — completions per prompt
   ppo_epochs: 1
   mini_batch_size: 4
-  clip_eps: 0.2
-  beta_kl: 0.0           # set > 0 to add KL penalty against frozen reference
   max_new_tokens: 64
   lora_base_as_ref: false
 

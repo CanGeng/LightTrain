@@ -85,8 +85,10 @@ def test_grpo_group_size_stored():
 
 
 def test_grpo_clip_eps_propagated():
+    # clip_eps now feeds the default RL loss (used when the recipe omits a
+    # `loss:` block); the loss: seam wins when present (keystone step 3).
     trainer = _make_grpo(clip_eps=0.15)
-    assert trainer._loss_fn.clip_eps == 0.15
+    assert trainer._default_loss.clip_eps == 0.15
 
 
 # ---- callback wiring fix (bug fix verification) ----------------------------

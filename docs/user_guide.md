@@ -37,8 +37,7 @@
 **最小配置骨架：**
 
 ```yaml
-# v0.1.8+：模型用「配置组」声明，再用字符串选择器选中其一。
-# 内联 dict 形式的 `model:` 已移除（见下方迁移说明）。
+# 模型用「配置组」声明，再用字符串选择器选中其一。
 model: default            # 选择器：选中 model_profiles 中的某个 profile
 model_profiles:
   default:
@@ -58,12 +57,11 @@ optim:
   lr: 3e-4
 ```
 
-> **`model_profiles:` 配置组（v0.1.8 BREAKING）。** 一个 recipe 可声明多个完整模型配置（如
+> **`model_profiles:` 配置组（变体选择）。** 一个 recipe 可声明多个完整模型配置（如
 > `transformer` / `mamba2` / ...），用 `model: <名字>` 选中，或在 CLI 上 `model=mamba2` 切换——
-> 切换不同架构无需改动 recipe 主体。**内联 dict 的 `model:` 会直接报错**并提示运行
-> `lighttrain migrate config <recipe> --to-profiles` 自动改写。单字段覆盖语法也随之变化：
-> 旧 `model.d_model=256` → 新 `model_profiles.<名字>.d_model=256`。详见
-> [v0.1.8_recipe_migration.md](v0.1.8_recipe_migration.md)。
+> 切换不同架构无需改动 recipe 主体。单字段覆盖：`model_profiles.<名字>.d_model=256`。
+> 变体选择与「模型集」（`models:`，§3.2）正交：一次 run 多个模型时用 `models:`，其每个 entry 的
+> `spec` 仍可 `{profile: <名字>}` 选变体。
 
 ---
 
@@ -354,18 +352,29 @@ lighttrain doctor --run runs/tiny_pretrain/20260527-...
 | `run_root` | str | `"runs"` | 输出根目录 |
 | `run_dir` | str 或 None | None | 手动指定完整输出路径（覆盖 run_root + exp） |
 | `user_modules` | list[str] | `[]` | 额外加载的 Python 模块路径（用于注册自定义组件） |
+| `models:` | dict 或 None | None | 命名模型集；每个 entry `{spec, trainable, optimizer?, checkpoint?}`，`spec` 可内联或 `{profile: <名>}`。`trainable: false` = 冻结 aux（teacher/ref）；多个 `trainable: true` = 多优化器（GAN/actor-critic）。 |
+| `optimizers:` | dict 或 None | None | 命名优化器集；`models` entry 经 `optimizer:` 字段引用。 |
+
+> 单模型用 `model:` + `model_profiles:` + `optim:` 即可——它们是 `models:`/`optimizers:`
+> 的糖（降糖为单 entry 集）。`model:` 与 `models:` 同时出现报冲突错误。自定义 trainer 经
+> `self.models["teacher"]` / `self.optimizers["student"]` 取用。
 
 #### `trainer:` 节点（TrainerSection）
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `name` | str | `"pretrain"` | 训练器类型（可选值见注册表：`dpo`、`grpo`、`ppo`、`orpo` 等） |
+| `name` | str | `"pretrain"` | 训练器类型（注册名：`pretrain` / `preference` / `reward_model` / `ppo` / `grpo`，+ `user_modules` 注册的自定义范式） |
 | `max_steps` | int | `1000` | 训练总步数 |
 | `val_every` | int | `0` | 验证间隔步数（`0` = 不验证） |
 | `ckpt_every` | int | `500` | checkpoint 保存间隔 |
 | `log_every` | int | `50` | 指标日志间隔 |
 | `grad_clip` | float | `1.0` | 梯度裁剪阈值（`torch.nn.utils.clip_grad_norm_`） |
 | `accumulate` | int | `1` | 梯度累积步数 |
+
+> **偏好/ RL 算法走 `loss:` seam**：`trainer: preference` + `loss: {name: dpo|ipo|simpo|orpo|kto, ...}`；
+> `trainer: ppo|grpo` + `loss: {name: ppo_surrogate|grpo, ...}`。ppo/grpo 还接受 `rollout_backend`
+> / `temperature` / `top_p` / `do_sample` / `buffer_max_size`（rollout 采样与缓冲）；`reward_model`
+> 接受 `grad_clip`（默认 1.0）与 `value_head:`。`trainer:` 接受任意额外 kwarg（按训练器签名过滤）。
 
 #### `engine:` 节点（EngineSection）
 

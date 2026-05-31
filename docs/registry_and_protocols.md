@@ -141,7 +141,9 @@ class MyImpl:
 | 类别 | 作用 | YAML 挂载节点 |
 |------|------|--------------|
 | `invariant` | 运行时断言（返回 `bool`，失败则阻断步骤） | `invariants:` (列表) |
-| `rl_backend` | RL rollout 生成后端 | `rl_backend:` |
+| `rl_backend` | RL rollout 生成后端（ppo/grpo 经注册表解析） | `trainer.rollout_backend:` |
+| `value_head` | 价值/奖励头（PPO critic / RM 打分头） | `value_head:` |
+| `reward_adapter` | judge → RL `reward_fn` 适配器 | `reward_adapter:` |
 
 ### Distributed Strategies
 
@@ -626,57 +628,49 @@ def load_state_dict(self, sd: Mapping[str, Any]) -> None: ...
 
 **Protocol**：`TrainerProtocol`（[lighttrain/protocols.py:319](lighttrain/protocols.py#L319)）
 
-**ABC 基类**：`Trainer`（[lighttrain/trainers/base.py:20](lighttrain/trainers/base.py#L20)）— **推荐继承**
+**扁平基类**：`Trainer`（[lighttrain/trainers/base.py](lighttrain/trainers/base.py)）— 拥有共享状态
+（engine/optimizer/scheduler/logger/ckpt_manager/callbacks/`bus`/`ctx`、`models`/`optimizers`
+集、BUG-1 resume guard），并有**具体** `fit()`。90% 场景（causal-LM 预训练/SFT）无需子类体——
+`pretrain` 就是裸 `Trainer`。
 
 ```python
-class Trainer(ABC):
-    def __init__(self, *, engine, data_module, optimizer,
-                 scheduler=None, callbacks=None, logger=None,
-                 ckpt_manager=None, max_steps=1000) -> None: ...
-
-    @abstractmethod
-    def fit(self, *, steps: int | None = None) -> Any: ...
-
-    @abstractmethod
-    def _step(self, batch: dict[str, Any]) -> StepOutput | dict[str, Any]:
-        """返回 StepOutput 或含 "loss" key 的 dict。"""
+class Trainer:
+    def fit(self, *, steps=None):           # 具体：run_train_loop 组合 produce_batch/forward_loss
         ...
+    def produce_batch(self, raw):           # 默认 move-to-device；RL/OPD 重写为 rollout
+        ...
+    def forward_loss(self, batch):          # 默认 None → 走 engine.step（pretrain no-op）；
+        ...                                 #   自定义范式返回 (loss, metrics) → 走 apply_update
+    def before_step(self, batch): ...       # 可选：GAE / 组优势预计算
 ```
 
-**扩展要求**：
-- `fit()` 负责循环 + checkpoint + logging
-- `_step()` 执行单步前向/反向，返回 `StepOutput`（或含 `"loss"` 的 dict）
-- 通过 `self.bus` 触发 callback 事件
+**公共原语**（可不经 `Trainer` 直接调，re-entrant）：
+- `run_train_loop(trainer, *, target_steps)`（[trainers/_primitives.py](lighttrain/trainers/_primitives.py)）—— epoch rollover + 信号 + log/ckpt/eval + crash bundle。
+- `apply_update(*, loss, model, optimizer, ctx, micro_state, ...)`（[update_rules/_primitives.py](lighttrain/update_rules/_primitives.py)）—— backward/clip/step/sched 半边。
+- `forward_with_activations(model, batch, *, layers=None)`（[trainers/_primitives.py](lighttrain/trainers/_primitives.py)）—— 层粒度激活捕获。
 
-**极简范例**：[lighttrain/trainers/pretrain.py:38](lighttrain/trainers/pretrain.py#L38)
+**写一个新范式**：重写 `produce_batch` / `forward_loss`（多模型经 `self.models[...]`、多优化器经
+`self.optimizers[...]`），或写一个调上述原语的短 `fit()`（如逐层蒸馏的「loop over training loops」）。
+`loss:` 经 `ctx.loss_fn` 到达；base 永不覆盖 recipe 提供的 loss。
 
-```python
-@register("trainer", "pretrain")
-class PretrainTrainer(Trainer):
-    def __init__(self, *, engine, data_module, optimizer, model=None,
-                 scheduler=None, callbacks=None, logger=None, ckpt_manager=None,
-                 max_steps=1000, val_every=0, ckpt_every=500,
-                 log_every=50, device=None, arch_profile=None) -> None:
-        super().__init__(engine=engine, data_module=data_module,
-                         optimizer=optimizer, ...)
-
-    def fit(self, *, steps=None) -> Any: ...
-    def _step(self, batch) -> StepOutput: ...
-```
+**内置 `_step` / `train_step`**：`train_step` 是公共入口，默认委派到具体 `_step` → `_run_step`
+（`forward_loss` 决定走 engine 还是 apply_update）。RL/preference/reward_model 仍重写 `_step`。
 
 **内置注册项**
 
 | name | 说明 | 文件 |
 |------|------|------|
 | `pretrain` | 标准 Causal-LM 预训练 | [trainers/pretrain.py](lighttrain/trainers/pretrain.py) |
-| `dpo` | Offline DPO | [trainers/dpo.py](lighttrain/trainers/dpo.py) |
-| `ipo` | IPO | [trainers/ipo.py](lighttrain/trainers/ipo.py) |
-| `simpo` | SimPO | [trainers/simpo.py](lighttrain/trainers/simpo.py) |
-| `orpo` | ORPO | [trainers/orpo.py](lighttrain/trainers/orpo.py) |
-| `kto` | KTO | [trainers/kto.py](lighttrain/trainers/kto.py) |
+| `preference` | 离线偏好训练（算法由 `loss:` 选：dpo/ipo/simpo/orpo/kto） | [trainers/_preference_base.py](lighttrain/trainers/_preference_base.py) |
 | `grpo` | GRPO（在线 RL） | [trainers/grpo.py](lighttrain/trainers/grpo.py) |
 | `ppo` | PPO（在线 RL） | [trainers/ppo.py](lighttrain/trainers/ppo.py) |
-| `reward_model` | Reward Model 训练 | [trainers/rm.py](lighttrain/trainers/rm.py) |
+| `reward_model` | Reward Model 训练（Bradley-Terry） | [trainers/rm.py](lighttrain/trainers/rm.py) |
+
+> 偏好算法是 `loss:` seam，不是单独的 trainer：`trainer: {name: preference}` +
+> `loss: {name: dpo, beta: 0.1}`（dpo/ipo/simpo/orpo/kto）。扁平 `Trainer` 的 `fit()`
+> 由公共原语 `run_train_loop` / `apply_update` / `forward_with_activations` 组合；
+> 新范式重写 `produce_batch` / `forward_loss`（可选 `before_step`）两个 seam，或写一个
+> 调这些原语的短 `fit()`。多模型/多优化器见 `models:` / `optimizers:`。
 
 ---
 
@@ -866,10 +860,13 @@ def score(self, items: Iterable[Any], ctx: Any | None = None) -> list[Any]: ...
 
 **内置注册项**
 
-| name | 说明 | 文件 |
-|------|------|------|
-| `verifier` | 规则验证器（格式 / 数学正确性等） | [eval/judge.py](lighttrain/eval/judge.py) |
-| `pairwise_llm` | 基于 LLM 的成对打分 | [eval/judge.py](lighttrain/eval/judge.py) |
+| name | 说明 | `reward_kind` | 文件 |
+|------|------|---------------|------|
+| `verifier` | 规则验证器（格式 / 数学正确性等） | `pointwise` | [eval/judge.py](lighttrain/eval/judge.py) |
+| `pairwise_llm` | 基于 LLM 的成对打分 | `pairwise` | [eval/judge.py](lighttrain/eval/judge.py) |
+
+作为 RL reward 用时，judge 的 `reward_kind` 决定用哪个 `reward_adapter`（§4.27c）。`pointwise`
+有内置适配器；`pairwise` 需自行注册一个 `pairwise` 适配器（把成对胜负折成 pointwise reward）。
 
 ---
 
@@ -1068,7 +1065,31 @@ def generate(self, model: Any, input_ids: torch.Tensor, **kwargs) -> torch.Tenso
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `hf_generate` | 使用 HF `model.generate()` 采集 rollout | [rl/rollout.py](lighttrain/rl/rollout.py) |
+| `hf_generate` | 使用 HF `model.generate()` 采集 rollout（暴露 `temperature`/`top_p`/`do_sample`/`max_new_tokens`/`num_return_sequences`） | [rl/rollout.py](lighttrain/rl/rollout.py) |
+
+ppo/grpo 经 `rollout_backend:`（默认 `hf_generate`）从注册表解析后端并转发采样 knob，
+不再内联构造。
+
+### 4.27b `value_head`
+
+价值/奖励头。单个参数化 `LinearValueHead(hidden_size, *, bias, zero_init, reduction)`
+覆盖两种语义：PPO critic（`reduction="per_token"`，零初始化，逐 token V(s)）与 RM 打分头
+（`reduction="last"`，默认初始化，读末 token → 标量）。ppo/rm 默认各用自己的配置；recipe
+可经 `value_head: {name: linear, ...}` 覆盖。
+
+| name | 说明 | 文件 |
+|------|------|------|
+| `linear` | 线性价值/奖励头（per-token 或 last-token） | [rl/value_heads.py](lighttrain/rl/value_heads.py) |
+
+### 4.27c `reward_adapter`
+
+把 judge 包成 RL `reward_fn(prompt_ids, response_ids) -> list[float]`。judge 声明
+`reward_kind`（默认 `"pointwise"`），runtime 据此解析适配器（recipe `reward_adapter:` 可覆盖）；
+任何 pointwise judge 都能背 RL reward。
+
+| name | 说明 | 文件 |
+|------|------|------|
+| `pointwise` | 逐 (prompt, response) 打分（verifier 类） | [rl/reward_adapters.py](lighttrain/rl/reward_adapters.py) |
 
 ### 4.28 `grad_sync_strategy`
 

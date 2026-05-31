@@ -93,8 +93,10 @@ def test_ppo_target_kl_early_stop_attribute():
 
 
 def test_ppo_clip_eps_propagated():
+    # clip_eps now feeds the default RL loss (used when the recipe omits a
+    # `loss:` block); the loss: seam wins when present (keystone step 3).
     trainer = _make_ppo(clip_eps=0.3)
-    assert trainer._loss_fn.clip_eps == 0.3
+    assert trainer._default_loss.clip_eps == 0.3
 
 
 # ---- callback wiring fix (bug fix verification) ----------------------------

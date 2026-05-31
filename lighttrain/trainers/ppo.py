@@ -22,45 +22,20 @@ from typing import Any, Callable, Mapping
 import torch
 import torch.nn.functional as F
 
-import torch.nn as nn
-
+from ..config._resolver import resolve as _resolve
 from ..losses.rl import PPOSurrogateLoss
 from ..protocols import ModelOutput, StepOutput
 from ..registry import register
 from ..rl.buffers import RolloutBuffer
 from ..rl.gae import compute_gae, normalize_advantages
 from ..rl.ref_policy import ReferencePolicy, freeze_as_ref
-from ..rl.rollout import HFGenerateBackend, RolloutEngine
+from ..rl.rollout import RolloutEngine  # noqa: F401 — import also registers hf_generate
+from ..rl.value_heads import LinearValueHead  # re-exported; registers value_head/linear
 from ..update_rules.rl import RLUpdateRule
 from ._utils import _device_of, _move_batch, validate_batch
 from .base import Trainer
 
 _log = logging.getLogger(__name__)
-
-
-class LinearValueHead(nn.Module):
-    """Scalar value head for PPO — projects last hidden state to V(s).
-
-    Connects to PPOTrainer when ``use_value_head=True``.
-    The value head is a single linear layer that reads the last hidden state
-    of the model (accessed via ``ModelOutput.hidden_states[-1]``) and outputs
-    a per-token value estimate.
-    """
-
-    def __init__(self, hidden_size: int) -> None:
-        super().__init__()
-        self.linear = nn.Linear(hidden_size, 1, bias=True)
-        nn.init.zeros_(self.linear.weight)
-        nn.init.zeros_(self.linear.bias)
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            hidden_states: (B, T, H)
-        Returns:
-            values: (B, T)
-        """
-        return self.linear(hidden_states).squeeze(-1)
 
 
 @register("trainer", "ppo")
@@ -118,7 +93,13 @@ class PPOTrainer(Trainer):
         ignore_index: int = -100,
         use_value_head: bool = False,
         value_head_dim: int | None = None,
+        value_head: dict[str, Any] | None = None,
         grad_clip: float = 1.0,
+        rollout_backend: str = "hf_generate",
+        temperature: float = 1.0,
+        top_p: float = 1.0,
+        do_sample: bool = True,
+        buffer_max_size: int | None = None,
     ) -> None:
         super().__init__(
             engine=engine,
@@ -154,15 +135,31 @@ class PPOTrainer(Trainer):
         self.ignore_index = int(ignore_index)
         self._stop_requested = False
 
-        self._loss_fn = PPOSurrogateLoss(
+        # Default RL loss (fallback when the recipe omits a `loss:` block). The
+        # `loss:` seam wins: see Trainer._recipe_loss_or in _ppo_step.
+        self._default_loss = PPOSurrogateLoss(
             clip_eps=clip_eps, vf_coef=vf_coef, ent_coef=ent_coef
         )
         self._rl_rule = RLUpdateRule(grad_clip=grad_clip)
-        backend = HFGenerateBackend(
-            max_new_tokens=max_new_tokens, do_sample=True
+        # F1: resolve the rollout backend via the rl_backend registry and forward
+        # the full sampling knob set (defaults reproduce the old inline backend).
+        backend = _resolve(
+            {
+                "name": rollout_backend,
+                "max_new_tokens": max_new_tokens,
+                "do_sample": do_sample,
+                "temperature": temperature,
+                "top_p": top_p,
+                "num_return_sequences": 1,
+            },
+            category="rl_backend",
         )
         self._rollout_engine = RolloutEngine(backend, ignore_index=ignore_index)
-        self._buffer = RolloutBuffer(max_size=rollout_steps * 4)
+        # F5: buffer cap is a recipe knob; None preserves the old rollout_steps*4.
+        self._value_head_spec = value_head
+        self._buffer = RolloutBuffer(
+            max_size=int(buffer_max_size) if buffer_max_size is not None else rollout_steps * 4
+        )
         self._ref_policy: ReferencePolicy | None = None
         # optional value head for advantage estimation
         self._use_value_head = bool(use_value_head)
@@ -204,51 +201,11 @@ class PPOTrainer(Trainer):
                     self.bus.dispatch("on_epoch_begin", epoch=self.ctx.epoch, ctx=self.ctx)
                     raw = next(iterator)
 
-                batch = _move_batch(raw, self.device)
-                self.bus.dispatch("on_rollout_begin", ctx=self.ctx)
+                # ---- rollout (RL produce_batch override) -------------------
+                rewards = self.produce_batch(raw)   # (N,)
 
-                prompt_ids = batch.get("input_ids", batch.get("prompt_input_ids"))
-                prompt_mask = batch.get("attention_mask", batch.get("prompt_attention_mask"))
-
-                self._buffer.clear()
-                episodes = self._rollout_engine.rollout(
-                    self.model,
-                    prompt_ids,
-                    prompt_mask,
-                    self.reward_fn,
-                )
-                for ep in episodes:
-                    self._buffer.add(ep)
-
-                self.bus.dispatch(
-                    "on_rollout_end",
-                    episodes=episodes,
-                    ctx=self.ctx,
-                )
-
-                # ---- compute GAE -------------------------------------------
-                rewards = self._buffer.all_rewards()   # (N,)
-
-                # Populate ep.values via batched value-head inference (noop if head not ready)
-                self._compute_buffer_values()
-
-                # use value head if enabled, else zero baseline
-                if self._use_value_head and self._value_head is not None:
-                    values = self._buffer.all_values()  # (N, 1) — ep.values is (1,) scalar
-                    if values is not None:
-                        values_for_gae = values.to(rewards.device)      # (N, 1) ✅
-                    else:
-                        values_for_gae = torch.zeros_like(rewards.unsqueeze(1))
-                else:
-                    values_for_gae = torch.zeros_like(rewards.unsqueeze(1))  # (N, 1)
-
-                advantages_seq, returns_seq = compute_gae(
-                    rewards.unsqueeze(1).expand(-1, 1),   # (N, 1)
-                    values_for_gae,
-                    gamma=self.gamma,
-                    lam=self.lam,
-                )
-                advantages_seq = normalize_advantages(advantages_seq)
+                # ---- compute GAE (before_step: per-rollout advantage est.) -
+                advantages_seq, returns_seq = self._compute_advantages(rewards)
 
                 # ---- PPO inner epochs ---------------------------------------
                 inner_metrics: list[dict[str, Any]] = []
@@ -327,6 +284,58 @@ class PPOTrainer(Trainer):
 
         return last_metrics
 
+    # ------------------------------------------------------------------ rollout / GAE
+
+    def produce_batch(self, raw: Any) -> torch.Tensor:  # type: ignore[override]
+        """RL rollout (the paradigm's ``produce_batch``): generate completions,
+        fill the rollout buffer, return per-sample rewards. The outer ``fit``
+        loop then computes advantages and iterates the buffer for PPO epochs."""
+        batch = _move_batch(raw, self.device)
+        self.bus.dispatch("on_rollout_begin", ctx=self.ctx)
+
+        prompt_ids = batch.get("input_ids", batch.get("prompt_input_ids"))
+        prompt_mask = batch.get("attention_mask", batch.get("prompt_attention_mask"))
+
+        self._buffer.clear()
+        episodes = self._rollout_engine.rollout(
+            self.model,
+            prompt_ids,
+            prompt_mask,
+            self.reward_fn,
+        )
+        for ep in episodes:
+            self._buffer.add(ep)
+
+        self.bus.dispatch("on_rollout_end", episodes=episodes, ctx=self.ctx)
+        return self._buffer.all_rewards()   # (N,)
+
+    def _compute_advantages(
+        self, rewards: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """GAE over the rollout buffer (the per-rollout advantage-estimation
+        step). Returns (advantages_seq, returns_seq), each (N, 1)."""
+        # Populate ep.values via batched value-head inference (noop if head not ready)
+        self._compute_buffer_values()
+
+        # use value head if enabled, else zero baseline
+        if self._use_value_head and self._value_head is not None:
+            values = self._buffer.all_values()  # (N, 1) — ep.values is (1,) scalar
+            if values is not None:
+                values_for_gae = values.to(rewards.device)      # (N, 1) ✅
+            else:
+                values_for_gae = torch.zeros_like(rewards.unsqueeze(1))
+        else:
+            values_for_gae = torch.zeros_like(rewards.unsqueeze(1))  # (N, 1)
+
+        advantages_seq, returns_seq = compute_gae(
+            rewards.unsqueeze(1).expand(-1, 1),   # (N, 1)
+            values_for_gae,
+            gamma=self.gamma,
+            lam=self.lam,
+        )
+        advantages_seq = normalize_advantages(advantages_seq)
+        return advantages_seq, returns_seq
+
     # ------------------------------------------------------------------ ppo step
 
     def _ppo_step(self, batch: dict[str, Any]) -> dict[str, Any]:
@@ -374,8 +383,14 @@ class PPOTrainer(Trainer):
         values_new: torch.Tensor | None = None
         if self._use_value_head and hidden is not None:
             if self._value_head is None:
-                # Lazy init: infer hidden size from tensor
-                self._value_head = LinearValueHead(hidden.shape[-1]).to(hidden.device)
+                # Lazy init via the value_head registry; default spec reproduces
+                # the old PPO critic (per-token, bias, zero-init) → bit-identical.
+                spec = {"name": "linear", "bias": True, "zero_init": True,
+                        "reduction": "per_token"}
+                if self._value_head_spec:
+                    spec.update(self._value_head_spec)
+                spec["hidden_size"] = hidden.shape[-1]
+                self._value_head = _resolve(spec, category="value_head").to(hidden.device)
                 # Register value head params with the inner optimizer (unwraps Accelerator)
                 from ..update_rules.standard import _register_new_params
                 _register_new_params(self.optimizer, list(self._value_head.parameters()))
@@ -390,7 +405,7 @@ class PPOTrainer(Trainer):
             "returns": returns.unsqueeze(1) if returns is not None else torch.zeros_like(log_probs_old),
             "model": self.model,
         })
-        self.ctx.loss_fn = self._loss_fn
+        self.ctx.loss_fn = self._recipe_loss_or(self._default_loss)
         self.ctx.model = self.model
         return self._rl_rule.step(self.model, batch, self.ctx)
 

@@ -29,13 +29,15 @@ def _load(name: str) -> dict:
 
 def test_r4_recipe_parses():
     cfg = _load("dpo_offline.yaml")
-    assert cfg["trainer"]["name"] == "dpo"
+    # keystone step 2: single preference trainer; algorithm via loss: seam
+    assert cfg["trainer"]["name"] == "preference"
+    assert cfg["loss"]["name"] == "dpo"
 
 
-def test_r4_dpo_trainer_registered():
+def test_r4_preference_trainer_registered():
     from lighttrain.registry import get as resolve
-    from lighttrain.trainers.dpo import DPOTrainer
-    assert resolve("trainer", "dpo") is DPOTrainer
+    from lighttrain.trainers._preference_base import PreferenceTrainer
+    assert resolve("trainer", "preference") is PreferenceTrainer
 
 
 # ---- R5 PPO online --------------------------------------------------------

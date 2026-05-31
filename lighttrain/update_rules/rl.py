@@ -26,7 +26,7 @@ import torch
 from ..callbacks.base import Signal
 from ..protocols import LossContext, ModelOutput
 from ..registry import register
-from .standard import _current_lr
+from ._primitives import MicroState, _current_lr, apply_update
 
 
 @register("update_rule", "rl")
@@ -35,6 +35,9 @@ class RLUpdateRule:
 
     def __init__(self, *, grad_clip: float = 1.0) -> None:
         self.grad_clip = float(grad_clip)
+        # RL does not accumulate gradients; a private cursor lets the backward
+        # half be the shared, stateless ``apply_update`` primitive.
+        self._micro = MicroState()
 
     def setup(self, model: Any, sample: Any) -> None:  # noqa: ARG002
         return None
@@ -56,8 +59,6 @@ class RLUpdateRule:
         scheduler = ctx.scheduler
         loss_fn = ctx.loss_fn
         accelerator = ctx.accelerator
-        grad_sync = getattr(ctx, "grad_sync", None)
-        parallel_ctx = getattr(ctx, "parallel_ctx", None)
 
         if bus is not None:
             bus.dispatch("on_step_begin", step=ctx.step, ctx=ctx, batch=batch)
@@ -99,55 +100,24 @@ class RLUpdateRule:
                              batch=batch, model=model)
             return dict(ctx.metrics)
 
-        # Backward — three-path (mirrors StandardUpdateRule lines 265-271)
-        if bus is not None:
-            bus.dispatch("on_backward_pre", step=ctx.step, loss=loss)
-        if grad_sync is not None:
-            grad_sync.backward(loss, model)
-        elif accelerator is not None and hasattr(accelerator, "backward"):
-            accelerator.backward(loss)  # handles GradScaler internally
-        else:
-            loss.backward()
-        if bus is not None:
-            bus.dispatch("on_backward_post", step=ctx.step, loss=loss)
+        # Backward / clip / optimizer / scheduler — the shared backward half.
+        # RL has no gradient accumulation, so accumulate_grad_batches=1 with a
+        # private MicroState makes this numerically identical to the previous
+        # inline three-path implementation. grad_clip / grad_sync / accelerator
+        # are honoured exactly as before (read from ctx inside apply_update).
+        apply_update(
+            loss=loss,
+            model=model,
+            optimizer=optimizer,
+            ctx=ctx,
+            micro_state=self._micro,
+            scheduler=scheduler,
+            accelerator=accelerator,
+            grad_clip=self.grad_clip,
+            accumulate_grad_batches=1,
+            bus=bus,
+        )
 
-        # Grad clip — three-path (mirrors StandardUpdateRule lines 282-292)
-        grad_norm = 0.0
-        if self.grad_clip > 0:
-            if grad_sync is not None:
-                grad_norm = grad_sync.clip_grad_norm(model, self.grad_clip, parallel_ctx)
-            else:
-                params = [p for p in model.parameters() if p.grad is not None]
-                if params:
-                    if accelerator is not None and hasattr(accelerator, "clip_grad_norm_"):
-                        gn = accelerator.clip_grad_norm_(params, max_norm=self.grad_clip)
-                    else:
-                        gn = torch.nn.utils.clip_grad_norm_(params, max_norm=self.grad_clip)
-                    grad_norm = float(gn)
-        if bus is not None:
-            bus.dispatch("on_clip_grad", step=ctx.step, grad_norm=grad_norm)
-            bus.dispatch("on_optimizer_step_pre", step=ctx.step)
-
-        # Optimizer step — three-path (mirrors StandardUpdateRule lines 297-300)
-        if grad_sync is not None:
-            grad_sync.optimizer_step(optimizer, model)
-        else:
-            optimizer.step()
-        if bus is not None:
-            bus.dispatch("on_optimizer_step_post", step=ctx.step, model=model)
-
-        optimizer.zero_grad(set_to_none=True)
-        if bus is not None:
-            bus.dispatch("on_zero_grad", step=ctx.step)
-
-        if scheduler is not None and getattr(scheduler, "step_per_batch", True):
-            scheduler.step()
-            if bus is not None:
-                bus.dispatch("on_scheduler_step", step=ctx.step)
-
-        ctx.metrics["grad_norm"] = grad_norm
-        ctx.metrics["lr"] = _current_lr(optimizer)
-        ctx.metrics["skipped"] = 0.0
         if bus is not None:
             bus.dispatch("on_step_end", step=ctx.step, metrics=ctx.metrics,
                          batch=batch, model=model)

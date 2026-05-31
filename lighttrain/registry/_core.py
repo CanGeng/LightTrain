@@ -58,6 +58,9 @@ KNOWN_CATEGORIES: tuple[str, ...] = (
     "invariant",
     # RL backends
     "rl_backend",
+    # RL value/reward heads + judge->reward adapters
+    "value_head",
+    "reward_adapter",
     # Distributed strategies (implementations live in plugins/distributed/)
     "grad_sync_strategy",
     "model_parallel_strategy",

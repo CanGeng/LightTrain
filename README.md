@@ -68,7 +68,8 @@ The framework defines five clean seams; everything else remains straightforward.
    Short name to class resolution over a pre-declared category set:
    `model`, `loss`, `optimizer`, `dataset`, `data_module`, `tokenizer`,
    `collator`, `sampler`, `callback`, `logger`, `trainer`, `engine`,
-   `update_rule`, `processor`, `prep_node`, and others.
+   `update_rule`, `processor`, `prep_node`, `judge`, `rl_backend`,
+   `value_head`, `reward_adapter`, and others.
 
 2. **Config** ([lighttrain/config/](lighttrain/config/)) —
    OmegaConf loading (`defaults:` composition, `${var}` interpolation, CLI
@@ -82,6 +83,15 @@ The framework defines five clean seams; everything else remains straightforward.
    [lighttrain/update_rules/](lighttrain/update_rules/)) —
    The engine owns the accelerator and delegates per-step mathematics
    (forward / backward / clip / step / scheduler) to a swappable `UpdateRule`.
+
+   **Trainer primitives** ([lighttrain/trainers/](lighttrain/trainers/)) —
+   The flat `Trainer` has a concrete `fit()` built from public, re-entrant
+   primitives: `run_train_loop` (the epoch/signal/log/ckpt loop),
+   `apply_update` (the backward/clip/step half), and
+   `forward_with_activations` (layer-granularity capture). The 90% case is
+   pure YAML; a new paradigm overrides `produce_batch` / `forward_loss` (and
+   optionally `before_step`) or writes a short registered `fit()` that calls
+   the same primitives. See [docs/design/trainer-keystone.md](docs/design/trainer-keystone.md).
 
 4. **EventBus** ([lighttrain/callbacks/base.py](lighttrain/callbacks/base.py)) —
    39 lifecycle events dispatched via `getattr`; per-callback exceptions
@@ -109,7 +119,7 @@ The framework defines five clean seams; everything else remains straightforward.
 #### Specifying the model (`model_profiles`)
 
 A recipe declares one or more complete model configs under `model_profiles:`
-and picks one with a `model: <name>` selector:
+and picks one with a `model: <name>` selector (variant selection):
 
 ```yaml
 model: base                 # selector (override on the CLI: model=big)
@@ -123,9 +133,10 @@ lighttrain train -c recipe.yaml model=big                 # switch profile
 lighttrain train -c recipe.yaml model_profiles.base.d_model=384   # tweak a field
 ```
 
-A single-profile recipe may omit the selector. **A bare-dict `model:` block is
-not accepted** — run `lighttrain migrate config <recipe> --to-profiles` to
-auto-convert an old recipe (see [docs/v0.1.8_recipe_migration.md](docs/v0.1.8_recipe_migration.md)).
+A single-profile recipe may omit the selector. Variant selection
+(`model_profiles`) is orthogonal to the **model set** (`models:`, below): a
+`models:` entry's `spec` can itself be `{ profile: <name> }` to select a
+variant. A lone `model:` builds a single trainable model.
 
 ### Data Pipeline
 
@@ -152,19 +163,27 @@ auto-convert an old recipe (see [docs/v0.1.8_recipe_migration.md](docs/v0.1.8_re
 | -------- | ---------------- |
 | Standard | `cross_entropy`, `mlm`, `z_loss`, `composite` |
 | Distillation | `kl_topk`, `hidden_mse`, `hidden_cosine`, `attention_transfer` |
-| Preference | `bradley_terry`, `dpo`, `ipo`, `simpo`, `orpo`, `kto` |
-| Reinforcement learning | `ppo_surrogate`, `grpo_loss` |
+| Preference | `bradley_terry`, `dpo`, `ipo`, `simpo`, `orpo`, `kto` (selected via `loss:` under the `preference` trainer) |
+| Reinforcement learning | `ppo_surrogate`, `grpo` (selected via `loss:` under the `ppo`/`grpo` trainers) |
 | Auxiliary | `info_nce`, `moe_balance` |
 
 ### Trainers
 
 | Registered name | Use case |
 | --------------- | -------- |
-| `pretrain` | Causal language model pretraining and SFT |
-| `dpo` / `ipo` / `simpo` / `orpo` / `kto` | Offline preference learning |
-| `reward_model` | Reward model training |
+| `pretrain` | Causal language model pretraining and SFT (the flat `Trainer`) |
+| `preference` | Offline preference learning; the algorithm (DPO/IPO/SimPO/ORPO/KTO) is the `loss:` seam |
+| `reward_model` | Reward model training (Bradley-Terry) |
 | `ppo` | Online PPO with rollout buffer and GAE |
 | `grpo` | Group Relative Policy Optimization |
+
+> The preference algorithm (DPO/IPO/SimPO/ORPO/KTO) is the `loss:` seam, not a
+> separate trainer — `trainer: preference` + `loss: { name: dpo, beta: 0.1 }`.
+> A new paradigm (multi-model distillation, GAN/actor-critic, layer-wise
+> distillation) is a short **registered trainer** that overrides two seams —
+> `produce_batch` (what a batch is) and `forward_loss` (forward + loss) — and
+> reuses the public primitives `run_train_loop` / `apply_update` /
+> `forward_with_activations`.
 
 ### Callbacks and Loggers
 
@@ -392,29 +411,65 @@ lighttrain produce-artifact -c recipes/produce_teacher.yaml   # generate referen
 lighttrain train            -c recipes/dpo_offline.yaml        # DPO fine-tuning
 ```
 
+One `preference` trainer; the algorithm is the `loss:` seam (its params —
+`beta` / `gamma` / `lam` — live under `loss:`):
+
 ```yaml
 trainer:
-  name: dpo          # or: ipo | simpo | orpo | kto | reward_model
-  beta: 0.1
+  name: preference        # single offline-preference trainer
   ref_namespace: ref
+loss:
+  name: dpo               # or: ipo | simpo | orpo | kto
+  beta: 0.1
 ```
 
+> `reward_model` is a separate trainer (Bradley-Terry); it takes a `grad_clip`
+> knob (default `1.0`) and a pluggable `value_head:`.
+
 ### Online RL (PPO / GRPO)
+
+The RL loss is also the `loss:` seam, and the rollout backend is resolved from
+the `rl_backend` registry with full sampling knobs:
 
 ```yaml
 trainer:
   name: ppo
   rollout_steps: 32
   ppo_epochs: 4
-  clip_eps: 0.2
-  grad_clip: 1.0    # optional; default 1.0
+  temperature: 1.0        # sampling knobs forwarded to the rollout backend
+  top_p: 1.0
+  rollout_backend: hf_generate
+  grad_clip: 1.0
+loss: { name: ppo_surrogate, clip_eps: 0.2 }
 
 trainer:
   name: grpo
   group_size: 4
-  clip_eps: 0.2
-  grad_clip: 1.0    # optional; default 1.0
+  buffer_max_size: 4096   # optional rollout-buffer cap (default derives from volume)
+loss: { name: grpo, clip_eps: 0.2, beta_kl: 0.0 }
 ```
+
+### Multi-model and multi-optimizer (`models:` / `optimizers:`)
+
+A run can declare a **named set of models**. `trainable: false` entries are
+frozen, on-device, optionally checkpoint-loaded auxiliaries (a distillation
+teacher, a frozen reference); each `trainable: true` entry gets its own
+optimizer (GAN / actor-critic). A lone `model:`/`optim:` is sugar for a
+one-entry set.
+
+```yaml
+models:
+  student: { spec: { profile: small },  trainable: true,  optimizer: opt_main }
+  teacher: { spec: { name: hf_causal, pretrained: gpt2 }, trainable: false,
+             checkpoint: path/to/teacher.safetensors }   # frozen aux (Axis A)
+optimizers:
+  opt_main: { name: adamw, lr: 1.0e-3 }
+```
+
+A custom trainer reaches them as `self.models["teacher"]` /
+`self.optimizers["student"]`. See OPD (on-policy distillation), a minimal
+GAN-LM, and greedy layer-wise distillation under `experiments/` for the three
+generality axes.
 
 ### EvalSuite
 
@@ -513,12 +568,11 @@ so the resolver passes everything through and the filter is a no-op. With
 an explicit signature, a stray key that doesn't belong to this architecture
 gets dropped with a `UserWarning` before reaching your inner builder.
 
-> Since v0.1.8, `model_profiles:` makes each architecture a **separate,
-> disjoint profile** — there is no longer an ambient `model:` block for a CLI
-> override to merge sibling keys into, so the original cross-architecture leak
-> (Issue #1) is prevented by construction. The explicit-signature rule remains
-> the recommended backstop: it still catches a mistyped or copy-pasted key
-> within a profile, which is exactly when you want the warning to fire.
+> `model_profiles:` makes each architecture a **separate, disjoint profile** —
+> there is no ambient `model:` block for a CLI override to merge sibling keys
+> into, so a cross-architecture key leak is prevented by construction. The
+> explicit-signature rule is the backstop: it catches a mistyped or
+> copy-pasted key within a profile, which is exactly when you want the warning.
 
 > **Escape hatch — adapters that genuinely need `**kwargs`.** If your
 > adapter has to forward an open-ended set of kwargs to a downstream
@@ -720,7 +774,7 @@ reading mutable global state (e.g. `time.time()`) in `__init__`.
 | Document | Contents |
 | -------- | -------- |
 | [docs/user_guide.md](docs/user_guide.md) | Complete CLI reference, YAML schema, and internal initialization order |
-| [docs/registry_and_protocols.md](docs/registry_and_protocols.md) | All 39 registered categories, protocol signatures, and built-in entries |
+| [docs/registry_and_protocols.md](docs/registry_and_protocols.md) | All registered categories, protocol signatures, and built-in entries |
 
 ---
 

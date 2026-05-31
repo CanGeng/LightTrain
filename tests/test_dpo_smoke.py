@@ -13,11 +13,12 @@ import torch
 import pytest
 
 from lighttrain.data.core.collators import PreferenceCollator
-from lighttrain.trainers.dpo import DPOTrainer
+from lighttrain.losses.preference import DPOLoss
+from lighttrain.trainers._preference_base import PreferenceTrainer
 
 
 def _make_engine():
-    """Minimal engine mock that satisfies DPOTrainer._step."""
+    """Minimal engine mock that satisfies PreferenceTrainer._step."""
     engine = MagicMock()
     engine.update_rule = MagicMock()
     return engine
@@ -63,15 +64,15 @@ def test_dpo_step_with_aux_logprobs():
     # Confirm aux keys are present before calling _step.
     assert "aux.ref.chosen_logprobs" in batch
 
-    # Construct a minimal DPOTrainer (engine and data_module are mocked).
-    trainer = DPOTrainer(
-        beta=0.1,
+    # Construct the PreferenceTrainer + DPO loss seam (engine/data_module mocked).
+    trainer = PreferenceTrainer(
         engine=_make_engine(),
         data_module=MagicMock(),
         optimizer=MagicMock(),
         model=model,
         device="cpu",
     )
+    trainer.ctx.loss_fn = DPOLoss(beta=0.1)
 
     # _preference_step() reads aux.* and calls DPOLoss.
     loss_dict = trainer._preference_step(batch)
