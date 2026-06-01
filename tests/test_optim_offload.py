@@ -6,7 +6,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-import plugins.layer_offload  # noqa: F401 — register cpu_offload
+import lighttrain.plugins.layer_offload  # noqa: F401 — register cpu_offload
 import lighttrain.optim.wrappers  # noqa: F401 — register adamw / lion
 
 from lighttrain.registry import get as _registry_get

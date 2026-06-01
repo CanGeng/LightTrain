@@ -7,7 +7,7 @@ Equivalent CLI:
 from lighttrain.config import load_config
 from lighttrain.cli._runtime import setup_run_from_config
 
-import plugins.layer_offload  # registers LayerOffloadEngine  # noqa: F401
+import lighttrain.plugins.layer_offload  # registers LayerOffloadEngine  # noqa: F401
 
 cfg = load_config("recipes/offload_fullparam.yaml")
 bundle = setup_run_from_config(cfg)

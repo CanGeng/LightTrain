@@ -1,0 +1,182 @@
+{
+  "architecture": [],
+  "artifact_producer": [
+    "model_forward"
+  ],
+  "artifact_store": [
+    "memmap-fixed",
+    "parquet-rows",
+    "safetensors-shards"
+  ],
+  "callback": [
+    "best_ckpt",
+    "dead_neuron",
+    "dynamic_artifact",
+    "early_stop",
+    "ema",
+    "file_signals",
+    "frozen_step",
+    "grad_flow",
+    "invariants",
+    "lineage_recorder",
+    "loss_attribution",
+    "nan_hunter",
+    "nan_skip",
+    "sample_preview",
+    "throughput"
+  ],
+  "chunker": [],
+  "collator": [
+    "causal_lm",
+    "multimodal",
+    "preference"
+  ],
+  "data_module": [
+    "prep_graph",
+    "simple"
+  ],
+  "dataset": [
+    "artifact_joined",
+    "line_file_text",
+    "preference_jsonl"
+  ],
+  "engine": [
+    "layer_offload",
+    "standard"
+  ],
+  "environment": [],
+  "generation_strategy": [],
+  "grad_sync_strategy": [
+    "ddp",
+    "deepspeed",
+    "fsdp",
+    "noop"
+  ],
+  "invariant": [
+    "batch_nonempty",
+    "dtype_stable",
+    "grad_norm_bounded",
+    "label_mask_nonzero",
+    "loss_finite",
+    "lr_nonneg",
+    "param_count_stable",
+    "regression_gate"
+  ],
+  "judge": [
+    "pairwise_llm",
+    "verifier"
+  ],
+  "logger": [
+    "console",
+    "jsonl",
+    "tb",
+    "tensorboard"
+  ],
+  "loss": [
+    "attention_transfer",
+    "bradley_terry",
+    "bt",
+    "ce",
+    "composite",
+    "cross_entropy",
+    "dpo",
+    "grpo",
+    "hidden_cosine",
+    "hidden_mse",
+    "ipo",
+    "kl_topk",
+    "kto",
+    "mlm",
+    "orpo",
+    "ppo_surrogate",
+    "simpo",
+    "z_loss"
+  ],
+  "metric": [],
+  "model": [
+    "adalora",
+    "hf_causal",
+    "ia3",
+    "lora",
+    "qlora",
+    "tiny_lm"
+  ],
+  "model_parallel_strategy": [
+    "expert_parallel",
+    "sequence_parallel",
+    "tensor_parallel",
+    "tp_aware"
+  ],
+  "objective": [],
+  "optimizer": [
+    "adamw",
+    "cpu_offload",
+    "lion"
+  ],
+  "pipeline_schedule": [
+    "1f1b",
+    "gpipe",
+    "interleaved_1f1b"
+  ],
+  "prep_node": [
+    "chunk",
+    "index",
+    "join",
+    "load",
+    "materialize",
+    "mix",
+    "pack",
+    "tokenize",
+    "validate"
+  ],
+  "probe": [],
+  "processor": [
+    "chat_template",
+    "decord_video",
+    "frame_folder",
+    "hf_audio",
+    "hf_image",
+    "hf_text",
+    "mel_spectrogram",
+    "simple_image"
+  ],
+  "retriever": [],
+  "reward_adapter": [
+    "pointwise"
+  ],
+  "rl_backend": [
+    "hf_generate"
+  ],
+  "sampler": [
+    "curriculum",
+    "length_grouped",
+    "sequential",
+    "shuffle",
+    "stateful_resumable"
+  ],
+  "scheduler": [
+    "constant",
+    "linear",
+    "warmup_cosine",
+    "wsd"
+  ],
+  "tokenizer": [
+    "byte"
+  ],
+  "trainer": [
+    "grpo",
+    "ppo",
+    "preference",
+    "pretrain",
+    "reward_model"
+  ],
+  "update_rule": [
+    "mezo",
+    "rl",
+    "sam",
+    "standard"
+  ],
+  "value_head": [
+    "linear"
+  ]
+}

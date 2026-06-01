@@ -240,6 +240,10 @@ class TinyCausalLM(nn.Module):
 | `ia3` | IA³ PEFT 适配器 | [models/peft/_ia3.py](../../lighttrain/models/peft/_ia3.py) |
 | `adalora` | AdaLoRA 自适应秩 PEFT | [models/peft/_adalora.py](../../lighttrain/models/peft/_adalora.py) |
 | `jepa` | JEPA 架构（图像 / 语言 JEPA 训练） | [architectures/jepa.py](../../lighttrain/architectures/jepa.py) |
+| `qlora` *(plugin)* | QLoRA（4-bit 量化 base + LoRA）PEFT | [lighttrain/plugins/quant/_qlora.py](../../lighttrain/plugins/quant/_qlora.py) |
+| `tiny_rwkv` *(plugin)* | RWKV 时间混合架构 | [lighttrain/plugins/architectures/rwkv/](../../lighttrain/plugins/architectures/rwkv/__init__.py) |
+| `tiny_mamba` *(plugin)* | Mamba / SSM 架构 | [lighttrain/plugins/architectures/mamba/](../../lighttrain/plugins/architectures/mamba/__init__.py) |
+| `tiny_unet` *(plugin)* | Diffusion U-Net | [lighttrain/plugins/architectures/diffusion_unet/](../../lighttrain/plugins/architectures/diffusion_unet/__init__.py) |
 
 ---
 
@@ -397,6 +401,7 @@ optimizer:
 |------|------|------|
 | `adamw` | `torch.optim.AdamW` 包装 | [optim/wrappers.py](../../lighttrain/optim/wrappers.py) |
 | `lion` | Lion 优化器（纯 PyTorch 参考实现） | [optim/wrappers.py](../../lighttrain/optim/wrappers.py) |
+| `cpu_offload` *(plugin)* | 优化器状态 CPU offload 包装 | [lighttrain/plugins/layer_offload/_optim_offload.py](../../lighttrain/plugins/layer_offload/_optim_offload.py) |
 
 ---
 
@@ -1066,6 +1071,7 @@ def generate(self, model: Any, input_ids: torch.Tensor, **kwargs) -> torch.Tenso
 | name | 说明 | 文件 |
 |------|------|------|
 | `hf_generate` | 使用 HF `model.generate()` 采集 rollout（暴露 `temperature`/`top_p`/`do_sample`/`max_new_tokens`/`num_return_sequences`） | [rl/rollout.py](../../lighttrain/rl/rollout.py) |
+| `vllm` *(plugin)* | vLLM 高吞吐 rollout 后端（opt-in） | [lighttrain/plugins/generation_backends/vllm/](../../lighttrain/plugins/generation_backends/vllm/__init__.py) |
 
 ppo/grpo 经 `rollout_backend:`（默认 `hf_generate`）从注册表解析后端并转发采样 knob，
 不再内联构造。
@@ -1131,9 +1137,9 @@ class GradSyncStrategy(Protocol):
 | name | 说明 | 文件 |
 |------|------|------|
 | `noop` | 单卡直通，无分布式开销 | [lighttrain/distributed/_noop.py](../../lighttrain/distributed/_noop.py) |
-| `ddp` | `torch.nn.parallel.DistributedDataParallel` | [frontier_plugins/distributed/strategies/ddp.py](../../plugins/distributed/strategies/ddp.py) |
-| `fsdp` | `torch.distributed.fsdp.FullyShardedDataParallel` | [frontier_plugins/distributed/strategies/fsdp.py](../../plugins/distributed/strategies/fsdp.py) |
-| `deepspeed` | DeepSpeed ZeRO-1/2/3 engine | [frontier_plugins/distributed/strategies/zero.py](../../plugins/distributed/strategies/zero.py) |
+| `ddp` | `torch.nn.parallel.DistributedDataParallel` | [lighttrain/plugins/distributed/strategies/ddp.py](../../lighttrain/plugins/distributed/strategies/ddp.py) |
+| `fsdp` | `torch.distributed.fsdp.FullyShardedDataParallel` | [lighttrain/plugins/distributed/strategies/fsdp.py](../../lighttrain/plugins/distributed/strategies/fsdp.py) |
+| `deepspeed` | DeepSpeed ZeRO-1/2/3 engine | [lighttrain/plugins/distributed/strategies/zero.py](../../lighttrain/plugins/distributed/strategies/zero.py) |
 
 ---
 
@@ -1159,10 +1165,10 @@ class ModelParallelStrategy(Protocol):
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `tensor_parallel` | ColWise/RowWise Linear 手术（llama / gpt2 / mistral 内置方案） | [frontier_plugins/distributed/model_parallel/tp_auto.py](../../plugins/distributed/model_parallel/tp_auto.py) |
-| `tp_aware` | 对已实现 `tp_plan()` 方法的模型做 TP 适配 | [frontier_plugins/distributed/model_parallel/tp_aware.py](../../plugins/distributed/model_parallel/tp_aware.py) |
-| `sequence_parallel` | 沿 seq 维度切分，与 TP 配合使用 | [frontier_plugins/distributed/model_parallel/sp.py](../../plugins/distributed/model_parallel/sp.py) |
-| `expert_parallel` | MoE 专家层 all-to-all dispatch | [frontier_plugins/distributed/model_parallel/ep.py](../../plugins/distributed/model_parallel/ep.py) |
+| `tensor_parallel` | ColWise/RowWise Linear 手术（llama / gpt2 / mistral 内置方案） | [lighttrain/plugins/distributed/model_parallel/tp_auto.py](../../lighttrain/plugins/distributed/model_parallel/tp_auto.py) |
+| `tp_aware` | 对已实现 `tp_plan()` 方法的模型做 TP 适配 | [lighttrain/plugins/distributed/model_parallel/tp_aware.py](../../lighttrain/plugins/distributed/model_parallel/tp_aware.py) |
+| `sequence_parallel` | 沿 seq 维度切分，与 TP 配合使用 | [lighttrain/plugins/distributed/model_parallel/sp.py](../../lighttrain/plugins/distributed/model_parallel/sp.py) |
+| `expert_parallel` | MoE 专家层 all-to-all dispatch | [lighttrain/plugins/distributed/model_parallel/ep.py](../../lighttrain/plugins/distributed/model_parallel/ep.py) |
 
 ---
 
@@ -1193,9 +1199,9 @@ class PipelineSchedule(Protocol):
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `1f1b` | One-Forward-One-Backward（均衡内存与效率） | [frontier_plugins/distributed/pipeline/schedules.py](../../plugins/distributed/pipeline/schedules.py) |
-| `gpipe` | GPipe 全前向后全后向（简单但峰值内存高） | [frontier_plugins/distributed/pipeline/schedules.py](../../plugins/distributed/pipeline/schedules.py) |
-| `interleaved_1f1b` | 交错 1F1B（多块 stage，进一步降低 bubble） | [frontier_plugins/distributed/pipeline/schedules.py](../../plugins/distributed/pipeline/schedules.py) |
+| `1f1b` | One-Forward-One-Backward（均衡内存与效率） | [lighttrain/plugins/distributed/pipeline/schedules.py](../../lighttrain/plugins/distributed/pipeline/schedules.py) |
+| `gpipe` | GPipe 全前向后全后向（简单但峰值内存高） | [lighttrain/plugins/distributed/pipeline/schedules.py](../../lighttrain/plugins/distributed/pipeline/schedules.py) |
+| `interleaved_1f1b` | 交错 1F1B（多块 stage，进一步降低 bubble） | [lighttrain/plugins/distributed/pipeline/schedules.py](../../lighttrain/plugins/distributed/pipeline/schedules.py) |
 
 ---
 

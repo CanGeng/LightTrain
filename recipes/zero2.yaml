@@ -1,6 +1,6 @@
 # 8-GPU DeepSpeed ZeRO-2 training.
-# Launch: deepspeed --num_gpus 8 -m lighttrain.cli train -c plugins/distributed/recipes/zero2.yaml
-# Or:     torchrun --nproc_per_node 8 -m lighttrain.cli train -c plugins/distributed/recipes/zero2.yaml
+# Launch: deepspeed --num_gpus 8 -m lighttrain.cli train -c recipes/zero2.yaml
+# Or:     torchrun --nproc_per_node 8 -m lighttrain.cli train -c recipes/zero2.yaml
 
 parallel:
   backend: nccl

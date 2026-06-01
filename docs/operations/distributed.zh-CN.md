@@ -77,7 +77,7 @@ engine:   { mixed_precision: "no" }
 ```
 
 完整 recipe 示例见
-[`plugins/distributed/recipes/`](../../plugins/distributed/recipes)。
+[`recipes/`](../../recipes)。
 
 ## 相关
 

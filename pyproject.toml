@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.2.0"
+version = "0.2.1"
 description = "PyTorch LM training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -46,7 +46,7 @@ optuna = []
 lighttrain = "lighttrain.cli._app:app"
 
 [tool.setuptools.packages.find]
-include = ["lighttrain*", "frontier_plugins*"]
+include = ["lighttrain*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

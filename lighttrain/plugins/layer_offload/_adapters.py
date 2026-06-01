@@ -128,7 +128,7 @@ def get_layered_view(model) -> _DefaultLayeredView:
             return get_layered_view(next_base)
     raise LayerOffloadNotSupported(
         f"No layered_view registered for {cls_name!r}. Add one via "
-        "`from plugins.layer_offload._adapters import register_layered_view`."
+        "`from lighttrain.plugins.layer_offload._adapters import register_layered_view`."
     )
 
 

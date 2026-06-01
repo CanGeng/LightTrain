@@ -240,3 +240,98 @@ def test_eval_cmd_does_not_crash_on_config_path(runner, tmp_path):
     assert "argument should be a str" not in combined
     assert "not 'RootConfig'" not in combined
     assert "cannot unpack non-iterable dict" not in combined
+
+
+# ===========================================================================
+# Unified model-build paths (dry-run --build) + positional overrides + export
+# wiring — close the v0.1.8 / Step-4 drift at the CLI surface.
+# ===========================================================================
+
+_REPO = Path(__file__).resolve().parents[2]
+_PROFILES = _REPO / "recipes" / "pretrain_causal.yaml"  # model: + model_profiles:
+
+
+def _write_models_set_recipe(tmp_path: Path) -> Path:
+    """A minimal ``models:`` set (no user_modules): a trainable student + a
+    frozen teacher, both tiny_lm. Exercises the set path without external deps."""
+    import yaml
+
+    recipe = tmp_path / "models_set.yaml"
+    spec = {"name": "tiny_lm", "vocab_size": 64, "d_model": 32,
+            "n_layers": 2, "n_heads": 4, "max_seq_len": 32}
+    recipe.write_text(
+        yaml.safe_dump(
+            {
+                "mode": "lab", "seed": 7, "exp": "ms", "run_root": str(tmp_path),
+                "models": {
+                    "student": {"spec": dict(spec), "trainable": True, "optimizer": "main"},
+                    "teacher": {"spec": dict(spec), "trainable": False},
+                },
+                "optimizers": {"main": {"name": "adamw", "lr": 1.0e-3}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return recipe
+
+
+@pytest.mark.skipif(not _PROFILES.exists(), reason="pretrain_causal.yaml missing")
+def test_dry_run_build_on_model_profiles_recipe(runner):
+    """#7 — ``dry-run --build`` on a ``model:``+``model_profiles:`` recipe."""
+    res = runner.invoke(app, ["dry-run", "-c", str(_PROFILES), "--build"])
+    assert res.exit_code == 0, res.stdout
+    assert "model built" in res.stdout
+
+
+def test_dry_run_build_on_models_set_recipe(runner, tmp_path):
+    """#7 — ``dry-run --build`` on a ``models:`` set (used to raise
+    'recipe is missing model:/model_profiles:')."""
+    recipe = _write_models_set_recipe(tmp_path)
+    res = runner.invoke(app, ["dry-run", "-c", str(recipe), "--build"])
+    assert res.exit_code == 0, res.stdout
+    assert "model built" in res.stdout
+
+
+@pytest.mark.skipif(not _PROFILES.exists(), reason="pretrain_causal.yaml missing")
+def test_estimate_accepts_positional_override(runner):
+    """#8 (B) — ``estimate`` accepts a key=value override (was rejected)."""
+    res = runner.invoke(app, ["estimate", "-c", str(_PROFILES), "++seed=1"])
+    assert res.exit_code == 0, res.stdout
+
+
+@pytest.mark.skipif(not _PROFILES.exists(), reason="pretrain_causal.yaml missing")
+def test_dry_run_accepts_positional_override(runner):
+    """#8 (B) — ``dry-run`` (no build) applies a key=value override."""
+    res = runner.invoke(app, ["dry-run", "-c", str(_PROFILES), "++seed=42"])
+    assert res.exit_code == 0, res.stdout
+    assert "seed: 42" in res.stdout
+
+
+@pytest.mark.skipif(not _PROFILES.exists(), reason="pretrain_causal.yaml missing")
+def test_export_hf_reaches_save_stage_not_build(runner, tmp_path):
+    """#10 — export-wiring lock: ``export --to hf`` on a ``model_profiles:`` recipe
+    must build the model (via the unified ``build_primary_model``) and only then
+    fail at the HF ``save_pretrained`` stage — NOT at the build/parse stage (the
+    pre-fix ``dictionary update`` ValueError). Cheap: no real export possible,
+    TinyCausalLM has no ``save_pretrained``."""
+    pytest.importorskip("transformers")
+    import torch
+
+    ckpt = tmp_path / "step_1"
+    ckpt.mkdir()
+    # Empty state dict + strict=False → all keys 'missing', load succeeds, so we
+    # reach save_pretrained. (A non-empty/arbitrary state could size-mismatch at
+    # the load stage and mask the wiring we are locking.)
+    torch.save({}, ckpt / "model.pt")
+
+    res = runner.invoke(
+        app,
+        ["export", "--to", "hf", "--ckpt", str(ckpt), "-c", str(_PROFILES),
+         "--out", str(tmp_path / "hf_out")],
+    )
+    assert res.exit_code == 1, res.stdout
+    low = res.stdout.lower()
+    assert "save_pretrained" in low or "no attribute" in low, res.stdout
+    # Must NOT be a build/parse failure (the pre-fix bug):
+    assert "dictionary update" not in low
+    assert "missing `model:`" not in low and "missing 'model:'" not in low

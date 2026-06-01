@@ -23,7 +23,7 @@ from omegaconf import OmegaConf
 from ..config import RootConfig, load_config
 from ..utils.run_dir import make_run_dir, slugify
 from ..utils.seed import seed_everything
-from ._runtime import _build_data, _build_model, _eager_import_components, _to_dict
+from ._runtime import _build_data, _build_model, _to_dict
 
 
 def run_produce(
@@ -33,8 +33,8 @@ def run_produce(
     estimate: bool = False,
     console: Any | None = None,
 ) -> Path:
-    _eager_import_components()
     snapshot_yaml = Path(config).read_text(encoding="utf-8")
+    # load_config populates the registry (register_components default True).
     cfg = load_config(config, overrides=overrides or [])
     seed_everything(int(cfg.seed))
 

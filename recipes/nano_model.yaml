@@ -1,7 +1,7 @@
 # nano_model.yaml — gloo + CPU multi-process communication test
 # Purpose: verify gloo process group init, DDP AllReduce, and full training loop without deadlock.
 #
-# Launch: torchrun --nproc_per_node=4 -m lighttrain.cli train -c plugins/distributed/recipes/nano_model.yaml
+# Launch: torchrun --nproc_per_node=4 -m lighttrain.cli train -c recipes/nano_model.yaml
 #
 # Model size: ~115K params (embed 16K + 2 × Transformer layers ~50K each)
 

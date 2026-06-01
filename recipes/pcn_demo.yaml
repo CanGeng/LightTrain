@@ -5,7 +5,7 @@
 # Loss should decrease over 100 steps.
 #
 # Run with:
-#   python -c "from plugins.update_rules.pcn import PCNUpdateRule"
+#   python -c "from lighttrain.plugins.update_rules.pcn import PCNUpdateRule"
 #   lighttrain train -c recipes/pcn_demo.yaml
 
 mode: lab

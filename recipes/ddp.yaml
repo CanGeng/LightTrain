@@ -1,5 +1,5 @@
 # Single-machine 4-GPU DDP training.
-# Launch: torchrun --nproc_per_node 4 -m lighttrain.cli train -c plugins/distributed/recipes/ddp.yaml
+# Launch: torchrun --nproc_per_node 4 -m lighttrain.cli train -c recipes/ddp.yaml
 #
 # Parallel topology: dp=4 (data-parallel only)
 

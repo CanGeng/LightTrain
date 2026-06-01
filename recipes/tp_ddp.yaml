@@ -1,5 +1,5 @@
 # 8-GPU TP=2 + DDP=4 training (LLaMA-style architecture).
-# Launch: torchrun --nproc_per_node 8 -m lighttrain.cli train -c plugins/distributed/recipes/tp_ddp.yaml
+# Launch: torchrun --nproc_per_node 8 -m lighttrain.cli train -c recipes/tp_ddp.yaml
 
 parallel:
   backend: nccl

@@ -93,15 +93,16 @@ class StepOutput:
 
 ## Built-in entries (condensed)
 
-- **models**: `tiny_lm`, `hf_causal`, `lora`, `ia3`, `adalora`, `jepa`, `tiny_rwkv`, `tiny_mamba`, `tiny_unet`
-- **losses**: `cross_entropy`/`ce`, `mlm`, `z_loss`, `composite`, `dpo`, `bradley_terry`, `ipo`, `simpo`, `orpo`, `kto`, `ppo_surrogate`, `grpo`, `info_nce`, `moe_balance`, `kl_topk`, `hidden_mse`, `hidden_cosine`, `attention_transfer`
-- **optimizers**: `adamw`, `lion` · **schedulers**: `constant`, `linear`, `warmup_cosine`, `wsd`
+- **models**: `tiny_lm`, `hf_causal`, `lora`, `ia3`, `adalora`, `jepa`, and plugin `qlora`, `tiny_rwkv`, `tiny_mamba`, `tiny_unet`
+- **objectives**: `next_token`, `masked_denoising`, `diffusion`, `flow_matching`, `jepa`
+- **losses**: `cross_entropy`/`ce`, `mlm`, `z_loss`, `composite`, `dpo`, `bradley_terry`/`bt`, `ipo`, `simpo`, `orpo`, `kto`, `ppo_surrogate`, `grpo`, `info_nce`, `moe_balance`, `kl_topk`, `hidden_mse`, `hidden_cosine`, `attention_transfer`
+- **optimizers**: `adamw`, `lion`, and plugin `cpu_offload` · **schedulers**: `constant`, `linear`, `warmup_cosine`, `wsd`
 - **update_rules**: `standard`, `sam`, `mezo`, `rl` (internal), and plugin `forward_forward`, `pcn`, `dfa`
 - **trainers**: `pretrain`, `preference`, `reward_model`, `ppo`, `grpo`
 - **datasets**: `line_file_text`, `preference_jsonl`, `artifact_joined` · **collators**: `causal_lm`, `preference`, `multimodal` · **samplers**: `shuffle`, `sequential`, `length_grouped`, `curriculum`, `stateful_resumable` · **tokenizers**: `byte`
 - **prep_node**: `load`, `tokenize`, `chunk`, `pack`, `mix`, `join`, `index`, `validate`, `materialize`
 - **callbacks**: `ema`, `best_ckpt`, `throughput`, `early_stop`, `nan_skip`, `invariants`, `nan_hunter`, `frozen_step`, `loss_attribution`, `dead_neuron`, `grad_flow`, `sample_preview`, `dynamic_artifact`, `lineage_recorder`, `file_signals`
-- **loggers**: `console`, `jsonl`, `tensorboard`/`tb` · **judges**: `verifier`, `pairwise_llm` · **rl_backend**: `hf_generate`
+- **loggers**: `console`, `jsonl`, `tensorboard`/`tb` · **judges**: `verifier`, `pairwise_llm` · **rl_backend**: `hf_generate`, and plugin `vllm`
 - **grad_sync**: `noop`, `ddp`, `fsdp`, `deepspeed` · **model_parallel**: `tensor_parallel`, `tp_aware`, `sequence_parallel`, `expert_parallel` · **pipeline**: `1f1b`, `gpipe`, `interleaved_1f1b`
 
 ## Exceptions

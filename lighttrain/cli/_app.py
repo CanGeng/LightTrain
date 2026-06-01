@@ -236,8 +236,14 @@ def train_cmd(
 
     if print_config:
         try:
-            # Pure config dump — don't trigger user_modules plugin imports.
-            cfg = load_config(config, overrides=overrides, import_user_modules=False)
+            # Pure config dump — don't trigger built-in registry population or
+            # user_modules plugin imports (both are torch-heavy / side-effecting).
+            cfg = load_config(
+                config,
+                overrides=overrides,
+                import_user_modules=False,
+                register_components=False,
+            )
             if mode is not None:
                 cfg.mode = _validate_mode_override(mode)  # type: ignore[union-attr]
         except (ConfigError, FileNotFoundError) as e:
@@ -735,6 +741,7 @@ def replay_cmd(
 @app.command("estimate")
 def estimate_cmd(
     config: Path = typer.Option(..., "-c", "--config"),
+    overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
     json_out: Optional[Path] = typer.Option(
         None, "--json", help="Also write the report as JSON to this path."
     ),
@@ -749,12 +756,12 @@ def estimate_cmd(
     """
     import json
 
-    from ..cli._runtime import _eager_import_components
     from ..lab.estimate import estimate, report_to_dict
 
-    _eager_import_components()
     try:
-        cfg = load_config(config)
+        # load_config populates the registry (register_components default True);
+        # estimate() also self-imports as a safety net for direct dict callers.
+        cfg = load_config(config, overrides=list(overrides or []))
     except ConfigError as e:
         console.print(f"[red]config error:[/] {e}")
         raise typer.Exit(code=1) from e
@@ -820,6 +827,7 @@ def estimate_cmd(
 @app.command("eval")
 def eval_cmd(
     config: Path = typer.Option(..., "-c", "--config"),
+    overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
     checkpoint: Optional[Path] = typer.Option(
         None, "--checkpoint", help="Checkpoint directory to evaluate (overrides config)."
     ),
@@ -845,7 +853,11 @@ def eval_cmd(
     # invocation (Issue #6). Mint into a temp dir that we clean up afterwards.
     _tmp_run = tempfile.TemporaryDirectory(prefix="lighttrain-eval-")
     try:
-        bundle = setup_run_from_config(config, existing_run_dir=Path(_tmp_run.name))
+        bundle = setup_run_from_config(
+            config,
+            overrides=list(overrides or []),
+            existing_run_dir=Path(_tmp_run.name),
+        )
         trainer = bundle["trainer"]
         cfg = bundle["cfg"]
 
@@ -1524,8 +1536,8 @@ def dry_run_cmd(
     build: bool = typer.Option(
         False,
         "--build",
-        help="Also import user_modules and construct the model — exercises the "
-        "`model:`/`model_profiles:` resolver. No run dir, no training.",
+        help="Also import user_modules and construct the primary model from "
+        "`model:`/`model_profiles:` or a `models:` set. No run dir, no training.",
     ),
 ) -> None:
     """Resolve a recipe and print the resolved config — no training.
@@ -1536,18 +1548,23 @@ def dry_run_cmd(
     the resolver path runs, making it a real migration/build verifier.
     """
     try:
-        cfg = load_config(config, overrides=list(overrides or []))
+        # Only populate the built-in registry when --build: a plain dry-run is a
+        # pure config dump and must not pull in torch-heavy modules. (user_modules
+        # stay imported either way — matching the pre-refactor behaviour.)
+        cfg = load_config(
+            config,
+            overrides=list(overrides or []),
+            register_components=build,
+        )
     except (ConfigError, FileNotFoundError) as e:
         console.print(f"[red]config error:[/] {e}")
         raise typer.Exit(code=1) from e
     if build:
-        from ._runtime import _build_model, _eager_import_components
+        from ._runtime import _build_model
 
         try:
-            # Mirror setup_run_from_config's registry population so --build sees
-            # the same adapter set as a real `train` run. cfg came from
-            # load_config above, which already imported cfg.user_modules.
-            _eager_import_components()
+            # cfg came from load_config above with register_components=True, so
+            # the registry has the same adapter set as a real `train` run.
             model = _build_model(cfg)
         except Exception as e:  # noqa: BLE001
             console.print(f"[red]build error:[/] {e}")
@@ -1891,6 +1908,7 @@ def export_cmd(
     config: Optional[Path] = typer.Option(
         None, "-c", "--config", help="Recipe YAML (needed for hf / gguf export)."
     ),
+    overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
 ) -> None:
     """Export a checkpoint to safetensors, HuggingFace, or GGUF format.
 
@@ -1949,8 +1967,7 @@ def export_cmd(
                 raise RuntimeError(
                     "hf export requires transformers: pip install transformers"
                 ) from exc
-            cfg = load_config(config)
-            model = _build_model_for_export(cfg)
+            model = _export_primary_model(config, overrides)
             if weight_file.suffix == ".safetensors":
                 from safetensors.torch import load_file
 
@@ -1982,8 +1999,7 @@ def export_cmd(
             with tempfile.TemporaryDirectory() as tmpdir:
                 from transformers import AutoConfig, AutoModelForCausalLM  # noqa: F401
 
-                cfg = load_config(config)
-                model = _build_model_for_export(cfg)
+                model = _export_primary_model(config, overrides)
                 if weight_file.suffix == ".safetensors":
                     from safetensors.torch import load_file as _load_sf
 
@@ -2020,18 +2036,24 @@ def export_cmd(
         raise typer.Exit(code=1) from exc
 
 
-def _build_model_for_export(cfg: Any) -> Any:
-    """Build an nn.Module from a loaded config for HF export."""
-    from ..config._resolver import resolve as _resolve
+def _export_primary_model(config: Path, overrides: list[str] | None = None) -> Any:
+    """Build the primary model to export, via the single source of truth
+    (`build_primary_model`), so export supports every declaration form
+    (`model:`+`model_profiles:` or a `models:` set) like every other command.
 
-    model_spec = cfg.get("model") if hasattr(cfg, "get") else None
-    if model_spec is None and hasattr(cfg, "model"):
-        model_spec = cfg.model
-    if model_spec is None:
-        raise RuntimeError("export: recipe missing 'model:' section")
-    if hasattr(model_spec, "model_dump"):
-        model_spec = model_spec.model_dump()
-    return _resolve(dict(model_spec), category="model")
+    Warns when the recipe declares multiple trainable models: export ships the
+    primary one — the model the trainer checkpoints (`ctx.model`).
+    """
+    from ..config._models import build_primary_model
+
+    cfg = load_config(config, overrides=list(overrides or []))
+    model, n_trainable = build_primary_model(cfg)
+    if n_trainable > 1:
+        console.print(
+            f"[yellow]note:[/] recipe declares {n_trainable} trainable models; "
+            "exporting the primary one (the model the trainer checkpoints)."
+        )
+    return model
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch.nn as nn
 
-from plugins.layer_offload import (
+from lighttrain.plugins.layer_offload import (
     LayerHandle,
     LayerOffloadNotSupported,
     get_layered_view,

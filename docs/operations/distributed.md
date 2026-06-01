@@ -78,7 +78,7 @@ engine:   { mixed_precision: "no" }
 ```
 
 Full recipe examples live under
-[`plugins/distributed/recipes/`](../../plugins/distributed/recipes).
+[`recipes/`](../../recipes).
 
 ## See also
 

@@ -3,9 +3,9 @@ import pytest
 import torch
 import torch.nn as nn
 
-from plugins.update_rules.forward_forward import ForwardForwardUpdateRule
-from plugins.update_rules.pcn import PCNUpdateRule
-from plugins.update_rules.dfa import DFAUpdateRule
+from lighttrain.plugins.update_rules.forward_forward import ForwardForwardUpdateRule
+from lighttrain.plugins.update_rules.pcn import PCNUpdateRule
+from lighttrain.plugins.update_rules.dfa import DFAUpdateRule
 
 
 def _ctx(model=None):

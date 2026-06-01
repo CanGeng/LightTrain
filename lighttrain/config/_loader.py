@@ -179,17 +179,22 @@ def load_config(
     overrides: list[str] | None = None,
     validate: bool = True,
     import_user_modules: bool = True,
+    register_components: bool = True,
 ) -> RootConfig | DictConfig:
     """Load a YAML config, apply overrides, and (by default) validate to RootConfig.
 
     Pass ``validate=False`` to get the raw resolved DictConfig (useful for tests
     and for ``--print-config``).
 
-    This is the single chokepoint where a recipe's ``user_modules:`` are
-    imported, so every recipe-eating command populates the registry with custom
-    components without each command having to remember to do it. Pass
-    ``import_user_modules=False`` for pure config-dump paths (``--print-config``)
-    that must not trigger plugin side effects.
+    This is the single chokepoint where the registry is populated:
+    ``register_components`` imports every built-in ``@register`` module and
+    ``import_user_modules`` imports the recipe's ``user_modules:`` — built-ins
+    first so user modules can override/extend them. Together they mean no
+    recipe-eating command has to remember to populate the registry. The two are
+    independent switches: pass ``register_components=False`` (and/or
+    ``import_user_modules=False``) for pure config-dump paths (``--print-config``,
+    a no-build ``dry-run``) that must not trigger torch-heavy imports or plugin
+    side effects.
     """
     path = Path(path)
     cfg = _compose_defaults(path)
@@ -207,6 +212,10 @@ def load_config(
     except ValidationError as e:
         raise ConfigSchemaError(str(e)) from e
 
+    # Built-in components first (so user modules can override/extend them).
+    if register_components:
+        from ._components import import_all_components
+        import_all_components()
     if import_user_modules:
         from ._user_modules import import_user_modules as _import
         _import(list(root.user_modules or []))

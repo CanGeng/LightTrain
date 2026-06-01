@@ -15,7 +15,7 @@ import pytest
 import torch
 
 # Force eager registration.
-import plugins.layer_offload  # noqa: F401
+import lighttrain.plugins.layer_offload  # noqa: F401
 
 from lighttrain.callbacks.base import EventBus
 from lighttrain.engine._context import StepContext

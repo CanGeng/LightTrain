@@ -15,7 +15,7 @@ Usage::
       max_model_len: 2048
 
     # In Python (requires pip install vllm):
-    from plugins.generation_backends.vllm import VLLMBackend
+    from lighttrain.plugins.generation_backends.vllm import VLLMBackend
     backend = VLLMBackend(model_name_or_path="gpt2")
 
 Interface matches ``HFGenerateBackend``::

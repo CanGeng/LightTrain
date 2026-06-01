@@ -16,8 +16,15 @@ from omegaconf import OmegaConf
 from .. import __version__
 from ..checkpoint.manager import CheckpointManager
 from ..config import ConfigError, RootConfig, load_config
+from ..config._components import import_all_components
+from ..config._models import (
+    build_primary_model,
+    normalize_model_set,
+    optim_spec_for,
+    primary_trainable,
+)
+from ..config._resolver import _as_plain_dict as _to_dict
 from ..config._resolver import resolve as _resolve
-from ..config._resolver import select_model_spec
 from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
 from ..engine.standard import StandardEngine
@@ -42,117 +49,24 @@ from ..config._user_modules import import_user_modules as _import_user_modules
 _REMOVED_PREFERENCE_TRAINERS = frozenset({"dpo", "ipo", "simpo", "orpo", "kto"})
 
 
-def _eager_import_components() -> None:
-    """Force-import every module that uses ``@register`` so the registry
-    is fully populated before we resolve recipe specs."""
-    # Models
-    from ..models import adapters as _models_adapters  # noqa: F401
-    from ..models.adapters import tiny_lm as _tiny_lm  # noqa: F401
-    # Data core
-    from ..data.core import _module as _dm  # noqa: F401
-    from ..data.core import _prep_module as _pdm  # noqa: F401
-    from ..data.core import collators as _coll  # noqa: F401
-    from ..data.core import datasets as _ds  # noqa: F401
-    from ..data.core import samplers as _samp  # noqa: F401
-    from ..data.core import tokenizers as _tok  # noqa: F401
-    # Multimodal data
-    from ..data import collators as _mm_coll  # noqa: F401
-    from ..data import processors as _proc  # noqa: F401
-    from ..data import samplers as _samp2  # noqa: F401
-    # PrepGraph nodes
-    from ..prepgraph import nodes as _nodes  # noqa: F401
-    # Optimizers / schedulers / losses
-    from ..losses import core as _loss_core  # noqa: F401
-    from ..losses import distill as _loss_distill  # noqa: F401
-    # Preference losses (dpo/ipo/simpo/orpo/kto/bradley_terry) — the ``loss:``
-    # seam for the collapsed preference trainer. Previously registered via the
-    # now-deleted per-algorithm trainer shells; register them explicitly.
-    from ..losses import preference as _loss_pref  # noqa: F401
-    # RL value heads + judge->reward adapters (registry categories value_head /
-    # reward_adapter) — resolved from recipes by the RL trainers / runtime.
-    from ..rl import reward_adapters as _reward_adapters  # noqa: F401
-    from ..rl import value_heads as _value_heads  # noqa: F401
-    from ..optim import schedulers as _sched  # noqa: F401
-    from ..optim import wrappers as _opt  # noqa: F401
-    # Logging backends
-    from ..logging.backends import console as _con  # noqa: F401
-    from ..logging.backends import jsonl as _jsonl  # noqa: F401
-    try:
-        from ..logging.backends import tb as _tb  # noqa: F401
-    except Exception:  # pragma: no cover — tensorboard optional
-        pass
-    # Callbacks
-    from ..callbacks import builtins as _cbs  # noqa: F401
-    # Trainers
-    from ..trainers import pretrain as _ptr  # noqa: F401
-    # Eval (judges)
-    from ..eval import judge as _judge_mod  # noqa: F401
-    # Artifacts + lineage
-    from ..artifacts import producer as _ap  # noqa: F401
-    from ..artifacts import store as _as  # noqa: F401
-    from ..artifacts import joined_dataset as _ajd  # noqa: F401
-    from ..artifacts import dynamic_producer as _adp  # noqa: F401
-    # Failure-first callbacks (invariants / diagnostics / realtime_control).
-    # Each module is allowed to fail import silently; the eager import
-    # ensures their @register decorators run when available.
-    try:
-        from .. import invariants as _inv  # noqa: F401
-        from ..callbacks import invariants as _cb_inv  # noqa: F401
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        from ..callbacks.builtins import frozen_step as _fs_cb  # noqa: F401
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        from ..diagnostics import nan_hunter as _nh  # noqa: F401
-        from ..diagnostics import dead_neuron as _dn  # noqa: F401
-        from ..diagnostics import grad_flow as _gf  # noqa: F401
-        from ..diagnostics import sample_preview as _sp  # noqa: F401
-        from ..diagnostics import loss_attribution as _la  # noqa: F401
-        from ..diagnostics import callback_isolation as _ci  # noqa: F401
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        from ..realtime_control import file_signals as _rfs  # noqa: F401
-    except Exception:  # noqa: BLE001
-        pass
-    # PEFT adapters. peft is an opt-in extra; import lazily so a recipe
-    # that doesn't use LoRA / IA3 / QLoRA still works without the package.
-    try:
-        from ..models import peft as _peft  # noqa: F401
-    except ImportError:
-        pass
-    # Frontier plugins (layer_offload + quant + distributed). Same opt-in pattern.
-    try:
-        import plugins.layer_offload as _lo_plugin  # noqa: F401
-    except ImportError:
-        pass
-    try:
-        import plugins.quant as _quant_plugin  # noqa: F401
-    except ImportError:
-        pass
-    try:
-        import plugins.distributed as _dist_plugin  # noqa: F401
-    except ImportError:
-        pass
+# Eager registry population now lives in ``config/_components.py`` (auto-discovery
+# over a curated package list, invoked at the ``load_config`` chokepoint). Kept
+# under the old private name for the non-load_config entry point (this module's
+# ``setup_run_from_config`` RootConfig branch) and for callers/tests that import it.
+_eager_import_components = import_all_components
 
-
-def _to_dict(spec: Any) -> dict[str, Any] | None:
-    if spec is None:
-        return None
-    if hasattr(spec, "model_dump"):
-        return spec.model_dump()
-    if isinstance(spec, Mapping):
-        return dict(spec)
-    return spec  # already concrete
+# ``_to_dict`` (the pydantic/Mapping → dict coercion) is imported from
+# ``config._resolver`` at the top of this file — its many internal callers below
+# and ``cli/_produce.py`` keep using the name unchanged.
 
 
 def _build_model(cfg: RootConfig) -> Any:
-    # v0.1.8: ``model`` is a string selector into ``model_profiles``; a bare
-    # dict ``model:`` is rejected by select_model_spec with a migration hint.
-    spec = select_model_spec(getattr(cfg, "model", None), getattr(cfg, "model_profiles", None))
-    return _resolve(spec, category="model")
+    """Build the PRIMARY trainable model from any declaration form
+    (``model:``+``model_profiles:`` or a ``models:`` set). Thin wrapper over the
+    single source of truth ``build_primary_model`` — used by ``dry-run --build``,
+    ``export`` and ``produce-artifact`` (which only need the one model). For the
+    full multi-model set use ``normalize_model_set`` directly."""
+    return build_primary_model(cfg)[0]
 
 
 def _build_judge(cfg: RootConfig) -> Any | None:
@@ -239,72 +153,10 @@ def _build_optimizer_for(optim_spec: Any, model: torch.nn.Module) -> Any:
     return wrapper
 
 
-def _resolve_entry_spec(spec: Any, model_profiles: Any) -> dict[str, Any]:
-    """Resolve a ``models:`` entry's ``spec`` — either an inline component spec
-    or ``{profile: <name>}`` selecting from the top-level ``model_profiles:``
-    catalogue (the variant-selection axis is orthogonal to the model-set axis)."""
-    spec = _to_dict(spec)
-    if "profile" in spec:
-        return select_model_spec(spec["profile"], model_profiles)
-    return spec
-
-
-def _desugar_models(cfg: RootConfig) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
-    """Normalise the model/optimizer declaration into the internal set form.
-
-    Returns ``(models_cfg, optimizers_cfg)`` where each models entry is
-    ``{spec, trainable, optimizer, checkpoint}`` (``spec`` already resolved to a
-    component-spec dict) and ``optimizers_cfg`` maps name -> optimizer spec.
-
-    Single entry point (no double code path downstream): a lone ``model:`` +
-    ``model_profiles:`` + ``optim:`` desugars to ``{main: {...}}``. Declaring
-    both ``model:`` and ``models:`` is a conflict error.
-    """
-    models = getattr(cfg, "models", None)
-    optimizers = getattr(cfg, "optimizers", None)
-    has_lone_model = getattr(cfg, "model", None) is not None
-
-    if models is not None and has_lone_model:
-        raise ConfigError(
-            "recipe sets both `model:` and `models:`. Use `models:` (the model "
-            "set) and drop the lone `model:`; variant selection still works via "
-            "each entry's `spec: {profile: <name>}` into `model_profiles:`."
-        )
-
-    if models is None:
-        # Sugar: lone model:/model_profiles:/optim: → a one-entry set.
-        spec = select_model_spec(
-            getattr(cfg, "model", None), getattr(cfg, "model_profiles", None)
-        )
-        models_cfg = {
-            "main": {
-                "spec": dict(spec),
-                "trainable": True,
-                "optimizer": "main",
-                "checkpoint": None,
-            }
-        }
-        optim_spec = _to_dict(cfg.optim)
-        optimizers_cfg = {"main": optim_spec} if optim_spec else {}
-        return models_cfg, optimizers_cfg
-
-    # Explicit models: set.
-    mp = getattr(cfg, "model_profiles", None)
-    models_cfg = {}
-    for name, raw in _to_dict(models).items():
-        entry = _to_dict(raw)
-        models_cfg[name] = {
-            "spec": _resolve_entry_spec(entry.get("spec"), mp),
-            "trainable": bool(entry.get("trainable", True)),
-            "optimizer": entry.get("optimizer"),
-            "checkpoint": entry.get("checkpoint"),
-        }
-    if optimizers is not None:
-        optimizers_cfg = {k: _to_dict(v) for k, v in _to_dict(optimizers).items()}
-    else:
-        optim_spec = _to_dict(cfg.optim)
-        optimizers_cfg = {"main": optim_spec} if optim_spec else {}
-    return models_cfg, optimizers_cfg
+# Model/optimizer declaration normalisation (``normalize_model_set`` +
+# ``_resolve_entry_spec``) moved to ``config/_models.py`` — the single source of
+# truth shared by the CLI runtime, ``lab.estimate`` and ``export``. Imported at
+# the top of this file.
 
 
 def _load_state_dict_into(model: torch.nn.Module, ckpt_path: str) -> None:
@@ -608,7 +460,11 @@ def setup_run_from_config(
     scheduler, loss_fn, callbacks, logger, ckpt_manager, engine, accelerator,
     trainer.  Caller decides whether to ``trainer.fit()``.
     """
-    _eager_import_components()
+    # Unconditional (before the path/RootConfig branch): covers the RootConfig
+    # branch that bypasses load_config; the path branch's load_config also does
+    # it, but the _DONE guard makes the second call ~free. Order: built-ins here,
+    # user_modules imported by load_config / the bypass branch below.
+    import_all_components()
     if isinstance(config, (str, Path)):
         config_path: Path | None = Path(config)
         snapshot_yaml = config_path.read_text(encoding="utf-8")
@@ -695,32 +551,24 @@ def setup_run_from_config(
     # Normalise model/optimizer declaration into the internal set form. Single
     # entry point — a lone model:/optim: desugars to a one-entry set, so the
     # primary path below is bit-identical for single-model recipes.
-    models_cfg, optimizers_cfg = _desugar_models(cfg)
-    _trainable_names = [n for n, e in models_cfg.items() if e["trainable"]]
-    if not _trainable_names:
-        raise ConfigError(
-            "recipe defines no trainable model (every `models:` entry is "
-            "`trainable: false`)."
-        )
+    models_cfg, optimizers_cfg = normalize_model_set(cfg)
     # The "primary" trainable model goes through model surgery / PP / grad_sync
     # and is exposed as ``model=``; any further trainable models (Axis-B —
     # GAN/actor-critic) get their own optimizer on the single-GPU path below.
-    _primary_name = _trainable_names[0]
-    _primary_entry = models_cfg[_primary_name]
+    # ``primary_trainable`` is the single owner of "first trainable + no-trainable
+    # error" (shared with build_primary_model).
+    _primary_name, _primary_entry = primary_trainable(models_cfg)
+    _n_trainable = sum(1 for e in models_cfg.values() if e["trainable"])
 
     def _optim_spec_for(entry: dict[str, Any]) -> Any:
-        opt_name = entry["optimizer"]
-        if opt_name is None:
-            opt_name = "main" if "main" in optimizers_cfg else (
-                next(iter(optimizers_cfg)) if optimizers_cfg else None
-            )
-        if opt_name is None or opt_name not in optimizers_cfg:
+        spec = optim_spec_for(entry, optimizers_cfg)
+        if spec is None:
             raise RuntimeError(
                 "recipe is missing an optimizer for a trainable model "
                 "(declare `optim:` or `optimizers:` and reference it via the "
                 "entry's `optimizer:` field)."
             )
-        return optimizers_cfg[opt_name]
+        return spec
 
     # Phase B: model surgery (TP/SP/EP) — must run on bare model before FSDP/DDP.
     model = _resolve(_primary_entry["spec"], category="model")
@@ -749,7 +597,7 @@ def setup_run_from_config(
     # When grad_sync is None (single-GPU / noop), fall back to the plain path.
     grad_sync = _build_grad_sync_strategy(cfg)
     _primary_optim = _optim_spec_for(_primary_entry)
-    if grad_sync is not None and len(_trainable_names) > 1:
+    if grad_sync is not None and _n_trainable > 1:
         raise ConfigError(
             "multiple trainable models + a gradient-sync strategy (distributed "
             "Axis-B) is not supported yet; multi-optimizer training is single-GPU "
@@ -1009,10 +857,10 @@ def build_prep_runner(
     Returns a dict ``{cfg, runner, graph, store_root}``. Used by the
     ``prep`` family of CLI commands.
     """
-    _eager_import_components()
     from ..prepgraph.dag import PrepGraph
     from ..prepgraph.runner import PrepRunner
 
+    # load_config below populates the registry (register_components default True).
     cfg = load_config(config_path, overrides=overrides or [])
     prep_spec = _to_dict(cfg.prep_graph)
     if not prep_spec:

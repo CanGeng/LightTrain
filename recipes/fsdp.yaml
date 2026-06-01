@@ -1,5 +1,5 @@
 # Single-machine 8-GPU FSDP training (ZeRO-3 equivalent).
-# Launch: torchrun --nproc_per_node 8 -m lighttrain.cli train -c plugins/distributed/recipes/fsdp.yaml
+# Launch: torchrun --nproc_per_node 8 -m lighttrain.cli train -c recipes/fsdp.yaml
 
 parallel:
   backend: nccl

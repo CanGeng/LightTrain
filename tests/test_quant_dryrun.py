@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-import plugins.quant  # noqa: F401 — register qlora
+import lighttrain.plugins.quant  # noqa: F401 — register qlora
 
 from lighttrain.registry import contains as _has
 
@@ -30,7 +30,7 @@ def test_qlora_construction_without_bnb_raises_clear_hint():
         pytest.skip("bitsandbytes is installed; this test exercises the missing-bnb path")
     except ImportError:
         pass
-    from plugins.quant import QLoRAAdapter
+    from lighttrain.plugins.quant import QLoRAAdapter
 
     with pytest.raises(ImportError, match="bitsandbytes"):
         QLoRAAdapter(

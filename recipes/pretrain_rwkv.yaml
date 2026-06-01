@@ -5,7 +5,7 @@
 # boundaries (batch["_doc_boundary"] = True).
 #
 # Run with:
-#   python -c "from plugins.architectures.rwkv import TinyRWKVModel"
+#   python -c "from lighttrain.plugins.architectures.rwkv import TinyRWKVModel"
 #   lighttrain train -c recipes/pretrain_rwkv.yaml
 
 mode: lab

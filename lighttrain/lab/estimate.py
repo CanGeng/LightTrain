@@ -169,18 +169,6 @@ class EstimateReport:
     offload: OffloadEstimate | None = None
 
 
-def _build_model(cfg: Mapping[str, Any]) -> torch.nn.Module:
-    from ..config._resolver import resolve as _resolve
-    from ..config._resolver import select_model_spec
-
-    # v0.1.8: honour the `model:` selector + `model_profiles:` group, same as
-    # the CLI runtime. A bare-dict `model:` is rejected with a migration hint.
-    model = cfg.get("model") if isinstance(cfg, Mapping) else None
-    profiles = cfg.get("model_profiles") if isinstance(cfg, Mapping) else None
-    spec = select_model_spec(model, profiles)
-    return _resolve(spec, category="model")
-
-
 def _spec_name(spec: Any) -> str:
     if spec is None:
         return ""
@@ -264,7 +252,7 @@ def _offload_estimate(
     # Try to import the plugin to get accurate per-layer probing; fall back
     # to a coarse estimate if it isn't installed.
     try:
-        from plugins.layer_offload._io import (
+        from lighttrain.plugins.layer_offload._io import (
             probe_layer_bandwidth,
         )
 
@@ -297,40 +285,47 @@ def _offload_estimate(
 
 def estimate(cfg: Mapping[str, Any]) -> EstimateReport:
     """Build a recipe's model and report resource estimates."""
-    cfg_dict: dict[str, Any]
-    if hasattr(cfg, "model_dump"):
-        cfg_dict = cfg.model_dump()
-    elif isinstance(cfg, Mapping):
-        cfg_dict = dict(cfg)
-    else:
+    # Lazy imports keep lab decoupled at module load.
+    from ..config._components import import_all_components
+    from ..config._models import (
+        normalize_model_set,
+        optim_spec_for,
+        primary_trainable,
+    )
+    from ..config._resolver import _as_plain_dict
+    from ..config._resolver import resolve as _resolve
+
+    cfg_dict = _as_plain_dict(cfg)
+    if not isinstance(cfg_dict, dict):
         raise TypeError(f"estimate: cfg must be a mapping, got {type(cfg).__name__}")
 
-    from ..config._resolver import select_model_spec
-
     # estimate() is public API (lab/__init__) and can be called directly with a
-    # raw dict that never went through load_config's chokepoint — so import the
-    # recipe's user_modules here too (idempotent; free when load_config already
-    # ran via estimate_cmd). Lazy import keeps lab decoupled at module load.
+    # raw dict that never went through load_config's chokepoint — populate the
+    # built-in registry and the recipe's user_modules here too (both idempotent;
+    # free when load_config already ran via estimate_cmd).
+    import_all_components()
     user_mods = cfg_dict.get("user_modules") or []
     if user_mods:
         from ..config._user_modules import import_user_modules
 
         import_user_modules(list(user_mods))
 
-    model = _build_model(cfg_dict)
-    optim_name = _spec_name(cfg_dict.get("optim"))
+    # Single normalisation (no second declaration parse): build the primary
+    # model and read its name + optimizer off the SAME resolved entry — supports
+    # `models:` sets, not just the lone `model:`+`model_profiles:` form.
+    models_cfg, optimizers_cfg = normalize_model_set(cfg_dict)
+    _primary_name, _primary_entry = primary_trainable(models_cfg)
+    model = _resolve(_primary_entry["spec"], category="model")
+    model_name = _spec_name(_primary_entry["spec"])
+    optim_spec = optim_spec_for(_primary_entry, optimizers_cfg)
+    optim_name = _spec_name(optim_spec)
     engine_name = _spec_name(cfg_dict.get("engine"))
-    # Resolve the v0.1.8 selector → profile so the name reflects the model
-    # actually built, not the literal `model: <selector>` string.
-    model_name = _spec_name(
-        select_model_spec(cfg_dict.get("model"), cfg_dict.get("model_profiles"))
-    )
 
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     n_all = sum(p.numel() for p in model.parameters())
     p_bytes = _param_bytes(model)
     g_bytes = _grad_bytes(model)
-    o_bytes = _resolve_optim_state_bytes(cfg_dict.get("optim"), model, optim_name)
+    o_bytes = _resolve_optim_state_bytes(optim_spec, model, optim_name)
     _tok, a_bytes = _activation_estimate(cfg_dict, model)
     tps = _tokens_per_sec(model, max(8, _tok))
     notes: list[str] = []
