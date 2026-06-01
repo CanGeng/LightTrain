@@ -37,7 +37,7 @@ def test_r7_rwkv_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r8_diffusion_smoke():
-    from lighttrain.objectives.diffusion import DiffusionObjective
+    from lighttrain.plugins.objectives.diffusion import DiffusionObjective
     from lighttrain.protocols import LossContext, ModelOutput
 
     obj = DiffusionObjective(target="eps", noise_schedule="linear", timesteps=50)
@@ -67,10 +67,10 @@ def test_r8_diffusion_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r9_jepa_smoke():
-    from lighttrain.architectures.jepa import (
+    from lighttrain.plugins.architectures.jepa import (
         JEPAEncoder, JEPAModelConfig, EMATargetEncoder, JEPAPredictor,
     )
-    from lighttrain.objectives.jepa import JEPAObjective
+    from lighttrain.plugins.objectives.jepa import JEPAObjective
     from lighttrain.protocols import LossContext, ModelOutput
 
     cfg = JEPAModelConfig(patch_dim=16, embed_dim=32, num_heads=2, depth=2, predictor_depth=1)

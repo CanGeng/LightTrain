@@ -1,11 +1,11 @@
-"""Adversarial tests for lighttrain.objectives.diffusion."""
+"""Adversarial tests for lighttrain.plugins.objectives.diffusion."""
 
 from __future__ import annotations
 
 import pytest
 import torch
 
-from lighttrain.objectives.diffusion import DiffusionObjective
+from lighttrain.plugins.objectives.diffusion import DiffusionObjective
 from lighttrain.protocols import LossContext, ModelOutput
 
 

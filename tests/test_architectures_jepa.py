@@ -3,7 +3,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.architectures.jepa import (
+from lighttrain.plugins.architectures.jepa import (
     JEPAEncoder,
     JEPAModelConfig,
     JEPAPredictor,

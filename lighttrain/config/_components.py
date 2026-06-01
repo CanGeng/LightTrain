@@ -27,9 +27,8 @@ from types import ModuleType
 # '@register(' lighttrain/`` is the source of truth for this list — a brand-new
 # top-level package is the one residual maintenance point.
 _FIRST_PARTY_PACKAGES: tuple[str, ...] = (
-    "lighttrain.models",            # adapters, peft (qlora/lora/...)
-    "lighttrain.architectures",     # jepa (model)
-    "lighttrain.objectives",        # jepa + others (objective)
+    "lighttrain.models",            # adapters (tiny_lm/hf_causal), peft (lora/ia3/adalora)
+    "lighttrain.objectives",        # next_token / masked_denoising (generative ones are plugins)
     "lighttrain.data",              # core datasets/samplers/tokenizers/collators + mm
     "lighttrain.prepgraph",         # prep_node graph nodes
     "lighttrain.losses",            # core/distill/preference/aux (info_nce/moe_balance)
@@ -41,7 +40,7 @@ _FIRST_PARTY_PACKAGES: tuple[str, ...] = (
     "lighttrain.logging.backends",  # console/jsonl/tb (tb optional)
     "lighttrain.callbacks",         # builtins + invariants + frozen_step
     "lighttrain.trainers",          # pretrain/preference/ppo/grpo/...
-    "lighttrain.eval",              # judges
+    "lighttrain.eval",              # regression_gate invariant (judges are plugins)
     "lighttrain.artifacts",         # producer/store/joined_dataset/dynamic_producer
     "lighttrain.invariants",        # invariant registry
     "lighttrain.diagnostics",       # nan_hunter/dead_neuron/... (some optional)

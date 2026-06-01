@@ -85,7 +85,7 @@ def test_f1_defaults_reproduce_old_backend():
 # --------------------------------------------------------------------------- #
 
 def test_f2_pointwise_adapter_matches_old_reward_fn():
-    from lighttrain.eval.judge import VerifierJudge
+    from lighttrain.plugins.judges.judge import VerifierJudge
     from lighttrain.registry import get as _get
 
     class _Tok:
@@ -123,7 +123,7 @@ def test_f2_pairwise_adapter_is_deferred_seam_open_not_implemented():
     category) is open and pointwise ships, but no `pairwise` adapter is
     registered, so resolving one raises (clean missing-registration, not a
     hardcoded whitelist). Also: PairwiseLLMJudge declares reward_kind='pairwise'."""
-    from lighttrain.eval.judge import PairwiseLLMJudge
+    from lighttrain.plugins.judges.judge import PairwiseLLMJudge
     from lighttrain.registry import get as _get, list_entries
     from lighttrain.registry._exceptions import NotRegisteredError
 

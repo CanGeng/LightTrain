@@ -239,7 +239,7 @@ class TinyCausalLM(nn.Module):
 | `lora` | LoRA PEFT 适配器（包装 base model） | [models/peft/_lora.py](../../lighttrain/models/peft/_lora.py) |
 | `ia3` | IA³ PEFT 适配器 | [models/peft/_ia3.py](../../lighttrain/models/peft/_ia3.py) |
 | `adalora` | AdaLoRA 自适应秩 PEFT | [models/peft/_adalora.py](../../lighttrain/models/peft/_adalora.py) |
-| `jepa` | JEPA 架构（图像 / 语言 JEPA 训练） | [architectures/jepa.py](../../lighttrain/architectures/jepa.py) |
+| `jepa` *(plugin)* | JEPA 架构（图像 / 语言 JEPA 训练） | [lighttrain/plugins/architectures/jepa.py](../../lighttrain/plugins/architectures/jepa.py) |
 | `qlora` *(plugin)* | QLoRA（4-bit 量化 base + LoRA）PEFT | [lighttrain/plugins/quant/_qlora.py](../../lighttrain/plugins/quant/_qlora.py) |
 | `tiny_rwkv` *(plugin)* | RWKV 时间混合架构 | [lighttrain/plugins/architectures/rwkv/](../../lighttrain/plugins/architectures/rwkv/__init__.py) |
 | `tiny_mamba` *(plugin)* | Mamba / SSM 架构 | [lighttrain/plugins/architectures/mamba/](../../lighttrain/plugins/architectures/mamba/__init__.py) |
@@ -849,9 +849,9 @@ class NextTokenObjective:
 |------|-------------|------|
 | `next_token` | `next_token` | [objectives/next_token.py](../../lighttrain/objectives/next_token.py) |
 | `masked_denoising` | `mlm` | [objectives/masked_denoising.py](../../lighttrain/objectives/masked_denoising.py) |
-| `diffusion` | `denoising` | [objectives/diffusion.py](../../lighttrain/objectives/diffusion.py) |
-| `flow_matching` | `flow_matching` | [objectives/flow_matching.py](../../lighttrain/objectives/flow_matching.py) |
-| `jepa` | `jepa` | [objectives/jepa.py](../../lighttrain/objectives/jepa.py) |
+| `diffusion` *(plugin)* | `denoising` | [lighttrain/plugins/objectives/diffusion.py](../../lighttrain/plugins/objectives/diffusion.py) |
+| `flow_matching` *(plugin)* | `flow_matching` | [lighttrain/plugins/objectives/flow_matching.py](../../lighttrain/plugins/objectives/flow_matching.py) |
+| `jepa` *(plugin)* | `jepa` | [lighttrain/plugins/objectives/jepa.py](../../lighttrain/plugins/objectives/jepa.py) |
 
 ---
 
@@ -867,8 +867,8 @@ def score(self, items: Iterable[Any], ctx: Any | None = None) -> list[Any]: ...
 
 | name | 说明 | `reward_kind` | 文件 |
 |------|------|---------------|------|
-| `verifier` | 规则验证器（格式 / 数学正确性等） | `pointwise` | [eval/judge.py](../../lighttrain/eval/judge.py) |
-| `pairwise_llm` | 基于 LLM 的成对打分 | `pairwise` | [eval/judge.py](../../lighttrain/eval/judge.py) |
+| `verifier` *(plugin)* | 规则验证器（格式 / 数学正确性等） | `pointwise` | [lighttrain/plugins/judges/judge.py](../../lighttrain/plugins/judges/judge.py) |
+| `pairwise_llm` *(plugin)* | 基于 LLM 的成对打分 | `pairwise` | [lighttrain/plugins/judges/judge.py](../../lighttrain/plugins/judges/judge.py) |
 
 作为 RL reward 用时，judge 的 `reward_kind` 决定用哪个 `reward_adapter`（§4.27c）。`pointwise`
 有内置适配器；`pairwise` 需自行注册一个 `pairwise` 适配器（把成对胜负折成 pointwise reward）。

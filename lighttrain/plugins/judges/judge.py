@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Iterable
 
-from ..registry import register
+from lighttrain.registry import register
 
 
 # ---------------------------------------------------------------------------

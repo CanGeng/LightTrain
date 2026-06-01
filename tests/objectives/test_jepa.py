@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.objectives.jepa."""
+"""Adversarial tests for lighttrain.plugins.objectives.jepa."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.objectives.jepa import JEPAObjective
+from lighttrain.plugins.objectives.jepa import JEPAObjective
 from lighttrain.protocols import LossContext, ModelOutput
 
 

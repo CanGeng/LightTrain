@@ -1,11 +1,11 @@
-"""Adversarial tests for lighttrain.objectives.flow_matching."""
+"""Adversarial tests for lighttrain.plugins.objectives.flow_matching."""
 
 from __future__ import annotations
 
 import pytest
 import torch
 
-from lighttrain.objectives.flow_matching import FlowMatchingObjective
+from lighttrain.plugins.objectives.flow_matching import FlowMatchingObjective
 from lighttrain.protocols import LossContext, ModelOutput
 
 

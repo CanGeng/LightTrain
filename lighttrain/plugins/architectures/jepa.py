@@ -14,8 +14,7 @@ ArchitectureProfile is exported as ``jepa_profile()``.
 
 Usage::
 
-    from lighttrain.architectures.jepa import JEPAModel, JEPAModelConfig
-    from lighttrain.architectures import jepa_profile
+    from lighttrain.plugins.architectures.jepa import JEPAModel, JEPAModelConfig, jepa_profile
 
     cfg = JEPAModelConfig(patch_dim=64, embed_dim=256, num_heads=4, depth=4)
     model = JEPAModel(cfg)
@@ -32,9 +31,9 @@ from typing import Any, Iterator
 import torch
 import torch.nn as nn
 
-from ..protocols import ModelOutput
-from ..registry import register
-from .profile import ArchitectureProfile
+from lighttrain.protocols import ModelOutput
+from lighttrain.registry import register
+from lighttrain.architectures.profile import ArchitectureProfile
 
 
 # ---------------------------------------------------------------------------

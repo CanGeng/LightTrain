@@ -1,15 +1,14 @@
-"""Training objectives (next-token / diffusion / flow / JEPA / masked-denoising)."""
+"""Basic training objectives (next-token / masked-denoising).
 
-from .diffusion import DiffusionObjective
-from .flow_matching import FlowMatchingObjective
-from .jepa import JEPAObjective
+Generative objectives (diffusion / flow-matching / JEPA) moved to
+``lighttrain.plugins.objectives`` (DESIGN §3.3: specific objective impls are
+frontier; the Protocol stays in ``lighttrain.protocols``).
+"""
+
 from .masked_denoising import MaskedDenoisingObjective
 from .next_token import NextTokenObjective
 
 __all__ = [
-    "DiffusionObjective",
-    "FlowMatchingObjective",
-    "JEPAObjective",
     "MaskedDenoisingObjective",
     "NextTokenObjective",
 ]
