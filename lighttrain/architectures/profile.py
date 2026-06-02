@@ -137,4 +137,32 @@ class ObjectiveProfile(Protocol):
         ...
 
 
-__all__ = ["ArchitectureProfile", "ObjectiveProfile"]
+# ---------------------------------------------------------------------------
+# LossOnlyObjective — runtime adapter (NOT a registered objective)
+# ---------------------------------------------------------------------------
+
+class LossOnlyObjective:
+    """Adapt a plain ``loss_fn`` to the :class:`ObjectiveProfile` seam.
+
+    When a recipe writes ``loss:`` (not ``objective:``) the runtime wraps the
+    resolved loss in this adapter so the trainer always holds a single canonical
+    ``objective``. ``prepare_batch`` is the identity (a plain loss needs no batch
+    transform); ``__call__`` stamps ``ctx.loss_family`` then delegates.
+
+    This is plumbing, not a paradigm — it is deliberately **not** ``@register``ed
+    under the ``objective`` category.
+    """
+
+    def __init__(self, loss_fn: Any, loss_family: str = "generic") -> None:
+        self.loss_fn = loss_fn
+        self.loss_family = loss_family
+
+    def prepare_batch(self, batch: dict, *, step: int, device: Any) -> dict:  # noqa: ARG002
+        return batch
+
+    def __call__(self, outputs: Any, batch: dict, ctx: Any) -> dict:
+        ctx.loss_family = self.loss_family
+        return self.loss_fn(outputs, batch, ctx)
+
+
+__all__ = ["ArchitectureProfile", "LossOnlyObjective", "ObjectiveProfile"]

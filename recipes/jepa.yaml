@@ -12,6 +12,9 @@ seed: 13
 exp: r9_jepa
 run_root: runs
 
+# Demo-only toy dataset/collator (synthetic_patches / patches); not a core component.
+user_modules: [examples/lab_components.py]
+
 model: default
 model_profiles:
   default:
@@ -59,10 +62,8 @@ scheduler:
 engine:
   name: standard
   mixed_precision: "no"
-
-update_rule:
-  name: standard
-  grad_clip: 1.0
+  update_rule:
+    name: standard   # grad_clip/accumulate are controlled by trainer:
 
 trainer:
   name: pretrain
@@ -73,6 +74,9 @@ trainer:
 
 callbacks:
   - { name: throughput, window: 20 }
+  # Advance JEPAModel's internal EMA target encoder each optimizer step
+  # (distinct from `ema`, which is a Polyak parameter shadow for eval).
+  - { name: target_ema }
 
 logger:
   - { name: console, log_every: 20 }

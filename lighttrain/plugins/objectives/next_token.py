@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..protocols import LossContext, ModelOutput
-from ..registry import register
+from lighttrain.protocols import LossContext, ModelOutput
+from lighttrain.registry import register
 
 
 @register("objective", "next_token")
@@ -33,7 +33,7 @@ class NextTokenObjective:
 
     def _get_loss_fn(self) -> Any:
         if self._loss_fn is None:
-            from ..losses.core import CrossEntropyLoss
+            from lighttrain.losses.core import CrossEntropyLoss
             self._loss_fn = CrossEntropyLoss(ignore_index=self.ignore_index)
         return self._loss_fn
 

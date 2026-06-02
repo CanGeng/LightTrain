@@ -39,6 +39,14 @@ class RewardModelTrainer(PreferenceTrainer):
         are used (more memory-efficient for long sequences).
     """
 
+    # Inline Bradley-Terry loss (computed in ``_reward_step``); does NOT go
+    # through ``ctx.loss_fn``. Override the consuming ``PreferenceTrainer``
+    # declarations in full so the runtime treats it as inline (a recipe that
+    # writes loss:/objective: for it is rejected, and it isn't required to).
+    consumes_objective = False
+    consumes_objective_prepare = False
+    requires_objective = False
+
     def __init__(
         self,
         *,
@@ -158,10 +166,10 @@ class RewardModelTrainer(PreferenceTrainer):
         loss = -F.logsigmoid(chosen_rewards - rejected_rewards - self.margin).mean()
 
         self.bus.dispatch("on_loss_computed", loss=loss, batch=batch, ctx=self.ctx)
-        # Backward / step / scheduler via the shared primitive. RM has always
-        # used a bare backward with no gradient clipping, so pass accelerator=None
-        # and grad_clip=0.0 to preserve that exactly; micro_state is required
-        # even at accumulate=1 (RM does not accumulate).
+        # Backward / step / scheduler via the shared primitive. RM keeps an
+        # AMP-bypassed bare backward (accelerator=None); gradient clipping is
+        # configurable via the ``grad_clip`` arg (default 1.0). micro_state is
+        # required even at accumulate=1 (RM does not accumulate).
         apply_update(
             loss=loss,
             model=self.model,

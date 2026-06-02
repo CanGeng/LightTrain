@@ -62,6 +62,16 @@ class PPOTrainer(Trainer):
         Use LoRA base weights as the reference policy (no deepcopy).
     """
 
+    # Consumes the objective as a loss, but brings its own rollout batches
+    # (overrides produce_batch) — so it never runs objective.prepare_batch.
+    consumes_objective_prepare = False
+
+    def default_objective(self) -> Any:
+        """When the recipe omits loss/objective, use the PPO surrogate."""
+        from ..architectures.profile import LossOnlyObjective
+
+        return LossOnlyObjective(self._default_loss, loss_family="rl")
+
     def __init__(
         self,
         *,
@@ -405,7 +415,13 @@ class PPOTrainer(Trainer):
             "returns": returns.unsqueeze(1) if returns is not None else torch.zeros_like(log_probs_old),
             "model": self.model,
         })
-        self.ctx.loss_fn = self._recipe_loss_or(self._default_loss)
+        # Re-assert the trainer-owned objective on ctx each step (guards against
+        # a callback / resume / test mutating ctx.loss_fn between steps). When
+        # constructed without the runtime (direct/programmatic), fall back to the
+        # trainer's own default surrogate.
+        if self.objective is None:
+            self.objective = self.default_objective()
+        self.ctx.loss_fn = self.objective
         self.ctx.model = self.model
         return self._rl_rule.step(self.model, batch, self.ctx)
 

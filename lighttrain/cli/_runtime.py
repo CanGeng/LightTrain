@@ -14,6 +14,7 @@ import torch
 from omegaconf import OmegaConf
 
 from .. import __version__
+from ..architectures.profile import ArchitectureProfile, LossOnlyObjective
 from ..checkpoint.manager import CheckpointManager
 from ..config import ConfigError, RootConfig, load_config
 from ..config._components import import_all_components
@@ -189,11 +190,114 @@ def _build_scheduler(cfg: RootConfig, optimizer: Any) -> Any:
     return sched
 
 
-def _build_loss(cfg: RootConfig) -> Any:
-    spec = _to_dict(cfg.loss)
-    if not spec:
-        spec = {"name": "cross_entropy"}
-    return _resolve(spec, category="loss")
+def _build_objective(cfg: RootConfig) -> tuple[Any, str]:
+    """Build the single canonical training objective.
+
+    Returns ``(objective_or_None, source)`` where ``source`` is:
+      - ``"objective"`` — a real ``ObjectiveProfile`` from ``cfg.objective``
+        (owns ``prepare_batch`` + loss);
+      - ``"loss"`` — a ``LossOnlyObjective`` wrapping ``cfg.loss`` (identity
+        prepare; the user wrote a plain loss);
+      - ``"none"`` — neither given; the trainer supplies its own default
+        (``Trainer.default_objective``). The runtime deliberately does **not**
+        inject a universal cross-entropy here — the default belongs to the
+        trainer (so RL/preference don't have to type-sniff it back).
+    """
+    obj_spec = _to_dict(getattr(cfg, "objective", None))
+    if obj_spec:
+        return _resolve(obj_spec, category="objective"), "objective"
+    loss_spec = _to_dict(cfg.loss)
+    if loss_spec:
+        loss_fn = _resolve(loss_spec, category="loss")
+        family = getattr(loss_fn, "loss_family", "generic")
+        return LossOnlyObjective(loss_fn, loss_family=family), "loss"
+    return None, "none"
+
+
+def _wire_objective(
+    trainer: Any, engine: Any, recipe_objective: Any, source: str, trainer_name: str
+) -> Any:
+    """Bind the canonical objective to a freshly-built trainer + enforce contract.
+
+    Done *after* construction so ``trainer.default_objective()`` can read fields
+    a subclass set in ``__init__`` (e.g. a built RL surrogate loss). Returns the
+    final ``loss_fn`` to publish in the bundle (``None`` for inline trainers).
+    """
+    consumes = bool(getattr(trainer, "consumes_objective", True))
+    consumes_prepare = bool(getattr(trainer, "consumes_objective_prepare", True))
+    requires = bool(getattr(trainer, "requires_objective", False))
+
+    # Author-declaration sanity (a trainer-class bug, not a recipe error).
+    if not consumes and requires:
+        raise TypeError(
+            f"Trainer class {type(trainer).__name__} declares consumes_objective=False "
+            f"with requires_objective=True — illegal combination "
+            f"(requires_objective only applies when consumes_objective=True)."
+        )
+
+    # Direction ①: recipe provided loss/objective but the trainer is inline.
+    if recipe_objective is not None and not consumes:
+        if source == "loss":
+            raise ConfigError(
+                f"trainer `{trainer_name}` has a trainer-owned inline loss; remove `loss:`."
+            )
+        raise ConfigError(
+            f"trainer `{trainer_name}` does not consume the objective seam; remove `objective:`."
+        )
+    # Direction ②: a real objective (with prepare_batch) given to a trainer that
+    # never runs the prepare path → would only half-apply, so reject loudly.
+    if source == "objective" and not consumes_prepare:
+        raise ConfigError(
+            f"trainer `{trainer_name}` does not run objective.prepare_batch; "
+            f"use `loss:` for a plain loss, or a trainer that supports the prepare path."
+        )
+
+    if not consumes:
+        return None  # inline trainer: leave trainer.objective = None, no backfill.
+
+    if recipe_objective is not None:
+        trainer.objective = recipe_objective
+    elif requires:
+        raise ConfigError(
+            f"trainer `{trainer_name}` requires an explicit `loss:`/`objective:` "
+            f"(no sensible default)."
+        )
+    else:
+        trainer.objective = trainer.default_objective()
+
+    trainer.ctx.loss_fn = trainer.objective
+    if engine is not None and hasattr(engine, "loss_fn"):
+        engine.loss_fn = trainer.objective
+    return trainer.objective
+
+
+def _build_arch_profile(cfg: RootConfig) -> Any | None:
+    """Resolve ``trainer.arch_profile`` to an ``ArchitectureProfile`` object.
+
+    A string (e.g. ``rwkv``) is looked up in the ``architecture`` registry and
+    the factory is called; an already-built profile passes through; ``None``
+    stays ``None``. An unknown name is a clear ``ConfigError`` (vs. the old
+    silent no-op where a bare string never activated the stateful reset path).
+    """
+    trainer_cfg = getattr(cfg, "trainer", None)
+    if trainer_cfg is None:
+        return None
+    ap = getattr(trainer_cfg, "arch_profile", None)
+    if ap is None or isinstance(ap, ArchitectureProfile):
+        return ap
+    if isinstance(ap, str):
+        try:
+            factory = _registry_get("architecture", ap)
+        except Exception as exc:  # registry miss
+            raise ConfigError(
+                f"unknown arch_profile {ap!r} — not registered under 'architecture'. "
+                f"Built-ins: transformer, rwkv."
+            ) from exc
+        return factory()
+    raise ConfigError(
+        f"trainer.arch_profile must be a registered name or an ArchitectureProfile, "
+        f"got {type(ap).__name__}."
+    )
 
 
 def _build_callbacks(cfg: RootConfig) -> list[Any]:
@@ -644,7 +748,12 @@ def setup_run_from_config(
             _aux.eval()
         models[_name] = _aux
 
-    loss_fn = _build_loss(cfg)
+    # The single canonical seam. ``recipe_objective`` may be None (neither
+    # loss: nor objective: given) — the trainer's ``default_objective()`` then
+    # supplies it, resolved post-construction in ``_wire_objective``. The engine
+    # is built with this (possibly None) loss_fn and re-wired after the trainer.
+    recipe_objective, _obj_source = _build_objective(cfg)
+    loss_fn = recipe_objective
     callbacks = _build_callbacks(cfg)
     logger = _build_logger(cfg, run_dir)
     ckpt_manager = CheckpointManager(run_dir)
@@ -730,11 +839,14 @@ def setup_run_from_config(
     }
 
     # Forward trainer-specific recipe fields (rollout_steps, ppo_epochs, beta, …).
-    # Always exclude grad_clip and accumulate — they are engine-only fields consumed
-    # by StandardUpdateRule; no trainer constructor accepts them.
+    # ``grad_clip`` is forwarded (ppo/grpo/preference/rm/online_distill declare it
+    # and must receive it; the signature filter drops it for trainers that don't,
+    # and the StandardUpdateRule still reads it off cfg.trainer for the standard
+    # path). ``accumulate`` stays runtime-only — it's an engine-layer field no
+    # trainer constructor accepts (forwarding it would break **kwargs trainers
+    # that relay to the base ``Trainer.__init__``).
     _RUNTIME_ONLY = {
-        "name", "max_steps", "val_every", "ckpt_every", "log_every",
-        "grad_clip", "accumulate",
+        "name", "max_steps", "val_every", "ckpt_every", "log_every", "accumulate",
     }
     if cfg.trainer is not None:
         trainer_raw = (
@@ -745,6 +857,11 @@ def setup_run_from_config(
         for k, v in trainer_raw.items():
             if k not in _RUNTIME_ONLY:
                 trainer_kwargs.setdefault(k, v)
+        # Resolve trainer.arch_profile (str → ArchitectureProfile), overriding the
+        # raw-string passthrough above so the stateful-reset path actually triggers.
+        _arch_profile = _build_arch_profile(cfg)
+        if _arch_profile is not None:
+            trainer_kwargs["arch_profile"] = _arch_profile
 
     # Build judge and wrap as a tensor-aware reward_fn for RL trainers, via a
     # registrable judge->reward adapter (F2). The judge declares its reward_kind
@@ -789,7 +906,11 @@ def setup_run_from_config(
     # Wire ctx components the trainer didn't take in __init__.
     ctx: StepContext = trainer.ctx
     ctx.model = model
-    ctx.loss_fn = loss_fn
+    # Bind the canonical objective to the trainer (resolving its default
+    # post-construction) and enforce the consume/require contract both ways.
+    # Sets trainer.objective / ctx.loss_fn / engine.loss_fn for consuming
+    # trainers; leaves them None for inline ones. Returns the final loss_fn.
+    loss_fn = _wire_objective(trainer, engine, recipe_objective, _obj_source, trainer_name)
     ctx.accelerator = accelerator
     ctx.lineage_store = lineage_store
     ctx.run_id = run_dir.name

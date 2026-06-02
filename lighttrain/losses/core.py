@@ -45,6 +45,10 @@ class CrossEntropyLoss:
     so the collator does not need to anticipate the loss target.
     """
 
+    # Paradigm tag so ``LossOnlyObjective`` inherits a meaningful loss_family
+    # (not "generic") when a recipe writes ``loss: cross_entropy`` explicitly.
+    loss_family: str = "next_token"
+
     def __init__(self, ignore_index: int = -100, label_smoothing: float = 0.0) -> None:
         self.ignore_index = int(ignore_index)
         self.label_smoothing = float(label_smoothing)

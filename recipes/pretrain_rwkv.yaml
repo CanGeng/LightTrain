@@ -28,15 +28,21 @@ data:
     name: line_file_text
     path: tests/fixtures/tiny_corpus.txt
     max_len: 64
+    # Split each document into fixed-size chunks; the first chunk carries
+    # _doc_boundary=True so the RWKV state resets at document boundaries and is
+    # carried across a document's chunks.
+    chunk_size: 16
   tokenizer:
     name: byte
   collator:
     name: causal_lm
     max_len: 64
+  # Sequential (not shuffled) + batch_size 1: chunks arrive in document order so
+  # recurrent state is carried within a document; the per-step _doc_boundary flag
+  # is batch-level, so batch_size must be 1 (the collator enforces this).
   sampler:
-    name: shuffle
-    seed: ${seed}
-  batch_size: 2
+    name: sequential
+  batch_size: 1
   num_workers: 0
 
 optim:
@@ -54,11 +60,8 @@ scheduler:
 engine:
   name: standard
   mixed_precision: "no"
-
-update_rule:
-  name: standard
-  grad_clip: 1.0
-  accumulate_grad_batches: 1
+  update_rule:
+    name: standard   # grad_clip/accumulate are controlled by trainer:
 
 trainer:
   name: pretrain

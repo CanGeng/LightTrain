@@ -131,6 +131,12 @@ class RootConfig(BaseModel):
     data: Any | None = None
     optim: Any | None = None
     loss: Any | None = None
+    # Non-standard training objective (diffusion/jepa/...). The canonical
+    # training seam: when present it replaces ``loss:`` (the runtime wraps a
+    # bare ``loss:`` into a LossOnlyObjective). ``loss:`` and ``objective:`` are
+    # mutually exclusive at the top level (checked at load_config); an objective
+    # may carry a *nested* ``loss:``/``aux_losses:`` for composite paradigms.
+    objective: Any | None = None
     scheduler: Any | None = None
     callbacks: Any | None = None
     logger: Any | None = None

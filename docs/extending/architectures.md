@@ -14,9 +14,39 @@ lighttrain train -c recipes/ff_demo.yaml         # Forward-Forward
 lighttrain train -c recipes/mezo_sft.yaml        # MeZO zero-order SFT
 ```
 
-Built-in objectives carry a `loss_family`: `next_token`, `masked_denoising`
-(`mlm`), `diffusion`, `flow_matching`, `jepa`. Alternative update rules:
-`mezo`, `sam`, `forward_forward`, `pcn`, `dfa` (set `update_rule.name`).
+Built-in objectives carry a `loss_family`: `next_token`, `masked_denoising`,
+`diffusion`, `flow_matching`, `jepa`. Alternative update rules:
+`mezo`, `sam`, `forward_forward`, `pcn`, `dfa` (set `engine.update_rule.name` —
+a top-level `update_rule:` is rejected with a clear error).
+
+## Writing a custom trainer (objective-seam contract)
+
+A trainer declares how it relates to the canonical `objective` seam via three
+class attributes (the runtime reads and enforces them after construction):
+
+```python
+class MyTrainer(Trainer):
+    consumes_objective = True          # uses objective.__call__ as the loss (ctx.loss_fn)
+    consumes_objective_prepare = True  # runs objective.prepare_batch before the forward
+    requires_objective = False         # True ⇒ recipe MUST name a loss/objective (no default)
+    def default_objective(self): ...   # used when consuming + recipe omits loss/objective
+```
+
+- **Inline-algorithm** trainers (compute their own loss, e.g. reward-model
+  Bradley-Terry, online-distill REINFORCE) **must** set
+  `consumes_objective = False`; the runtime then errors if a recipe hands them a
+  `loss:`/`objective:`.
+- A trainer that uses the objective as a loss but brings its own batches (RL /
+  preference) sets `consumes_objective_prepare = False`; the runtime then rejects
+  a *real* `objective:` (with a non-trivial `prepare_batch`) — a plain `loss:` is
+  always fine.
+
+## Writing a custom engine
+
+The engine receives `loss_fn` at construction, but it may be `None`: the default
+objective is resolved *after* the trainer is built and the runtime then back-fills
+`engine.loss_fn = trainer.objective`. So an engine `__init__` **must tolerate
+`loss_fn=None`** (read `ctx.loss_fn` at step time, as `StandardEngine` does).
 
 ## Writing model adapters (two rules)
 

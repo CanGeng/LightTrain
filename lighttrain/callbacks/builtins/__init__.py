@@ -1,7 +1,7 @@
 """Built-in callbacks.
 
-Each is registered under its own short name (``ema``, ``best_ckpt``,
-``throughput``, ``early_stop``, ``nan_skip``).
+Each is registered under its own short name (``ema``, ``target_ema``,
+``best_ckpt``, ``throughput``, ``early_stop``, ``nan_skip``).
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from .ema import EMACallback
 from .frozen_step import FrozenStepCallback
 from .lineage_recorder import LineageRecorderCallback
 from .nan_skip import NaNSkipCallback
+from .target_ema import TargetEMACallback
 from .throughput import ThroughputCallback
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "FrozenStepCallback",
     "LineageRecorderCallback",
     "NaNSkipCallback",
+    "TargetEMACallback",
     "ThroughputCallback",
 ]

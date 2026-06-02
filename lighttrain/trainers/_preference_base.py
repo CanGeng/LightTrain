@@ -97,6 +97,12 @@ class PreferenceTrainer(Trainer):
     recipe-provided loss.
     """
 
+    # Consumes the objective as a loss but does its own double-forward batch
+    # prep (not objective.prepare_batch), and has no sensible default loss —
+    # the recipe must name the preference algorithm via ``loss:`` (dpo/ipo/…).
+    consumes_objective_prepare = False
+    requires_objective = True
+
     def __init__(
         self,
         *,
@@ -154,7 +160,10 @@ class PreferenceTrainer(Trainer):
             raise RuntimeError(f"{type(self).__name__}.fit: model is not set.")
         if self.optimizer is None:
             raise RuntimeError(f"{type(self).__name__}.fit: optimizer is not set.")
-        if self.ctx.loss_fn is None:
+        # Only the consuming preference trainer needs a recipe loss; inline
+        # subclasses (reward_model: Bradley-Terry) declare consumes_objective=False
+        # and compute their own loss — they must not trip this guard.
+        if self.consumes_objective and self.ctx.loss_fn is None:
             raise RuntimeError(
                 f"{type(self).__name__}.fit: no preference loss configured. "
                 "Set `loss: {name: dpo|ipo|simpo|orpo|kto, ...}` in the recipe."
@@ -280,7 +289,7 @@ class PreferenceTrainer(Trainer):
         # enriched (not batch) is passed so preference losses can read
         # chosen/rejected logps. The loss is the recipe-provided ``ctx.loss_fn``
         # (the ``loss:`` seam) — never overwritten here.
-        if self.ctx.loss_fn is None:
+        if self.consumes_objective and self.ctx.loss_fn is None:
             raise RuntimeError(
                 f"{type(self).__name__}: no preference loss configured. "
                 "Set `loss: {name: dpo|ipo|simpo|orpo|kto, ...}` in the recipe."

@@ -14,9 +14,10 @@ lighttrain train -c recipes/ff_demo.yaml         # Forward-Forward
 lighttrain train -c recipes/mezo_sft.yaml        # MeZO 零阶 SFT
 ```
 
-内置 objective 带 `loss_family`：`next_token`、`masked_denoising`（`mlm`）、
+内置 objective 带 `loss_family`：`next_token`、`masked_denoising`、
 `diffusion`、`flow_matching`、`jepa`。其他 update rule：`mezo`、`sam`、
-`forward_forward`、`pcn`、`dfa`（设 `update_rule.name`）。
+`forward_forward`、`pcn`、`dfa`（设 `engine.update_rule.name`——顶层
+`update_rule:` 会被明确报错）。
 
 ## 写模型适配器（两条规则）
 

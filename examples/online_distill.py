@@ -54,6 +54,12 @@ class OnlineDistillTrainer(Trainer):
     """Student rolls out on-policy; a frozen teacher scores each sampled token;
     a REINFORCE surrogate moves the student toward the teacher."""
 
+    # Inline REINFORCE loss (computed in ``_step``); does not consume the
+    # objective seam, so a recipe must not write loss:/objective: for it.
+    consumes_objective = False
+    consumes_objective_prepare = False
+    requires_objective = False
+
     # Explicit signature (no ``**kwargs``): the config resolver filters recipe /
     # runtime kwargs against it, so declaring ``models`` / ``optimizers`` is what
     # lets this trainer receive the named model set (and the frozen teacher).

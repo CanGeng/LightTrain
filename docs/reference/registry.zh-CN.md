@@ -827,7 +827,7 @@ def prepare_batch(self, batch: dict, *, step: int, device: Any) -> dict: ...
 def __call__(self, outputs: ModelOutput, batch: dict, ctx: LossContext) -> dict: ...
 ```
 
-**极简范例**：[lighttrain/objectives/next_token.py:16](../../lighttrain/objectives/next_token.py#L16)
+**极简范例**：[lighttrain/plugins/objectives/next_token.py:16](../../lighttrain/plugins/objectives/next_token.py#L16)
 
 ```python
 @register("objective", "next_token")
@@ -847,8 +847,8 @@ class NextTokenObjective:
 
 | name | loss_family | 文件 |
 |------|-------------|------|
-| `next_token` | `next_token` | [objectives/next_token.py](../../lighttrain/objectives/next_token.py) |
-| `masked_denoising` | `mlm` | [objectives/masked_denoising.py](../../lighttrain/objectives/masked_denoising.py) |
+| `next_token` *(plugin)* | `next_token` | [lighttrain/plugins/objectives/next_token.py](../../lighttrain/plugins/objectives/next_token.py) |
+| `masked_denoising` *(plugin)* | `masked_denoising` | [lighttrain/plugins/objectives/masked_denoising.py](../../lighttrain/plugins/objectives/masked_denoising.py) |
 | `diffusion` *(plugin)* | `denoising` | [lighttrain/plugins/objectives/diffusion.py](../../lighttrain/plugins/objectives/diffusion.py) |
 | `flow_matching` *(plugin)* | `flow_matching` | [lighttrain/plugins/objectives/flow_matching.py](../../lighttrain/plugins/objectives/flow_matching.py) |
 | `jepa` *(plugin)* | `jepa` | [lighttrain/plugins/objectives/jepa.py](../../lighttrain/plugins/objectives/jepa.py) |

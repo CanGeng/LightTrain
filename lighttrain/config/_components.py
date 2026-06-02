@@ -27,8 +27,8 @@ from types import ModuleType
 # '@register(' lighttrain/`` is the source of truth for this list — a brand-new
 # top-level package is the one residual maintenance point.
 _FIRST_PARTY_PACKAGES: tuple[str, ...] = (
+    "lighttrain.architectures",     # arch-profile factories (architecture: transformer)
     "lighttrain.models",            # adapters (tiny_lm/hf_causal), peft (lora/ia3/adalora)
-    "lighttrain.objectives",        # next_token / masked_denoising (generative ones are plugins)
     "lighttrain.data",              # core datasets/samplers/tokenizers/collators + mm
     "lighttrain.prepgraph",         # prep_node graph nodes
     "lighttrain.losses",            # core/distill/preference/aux (info_nce/moe_balance)

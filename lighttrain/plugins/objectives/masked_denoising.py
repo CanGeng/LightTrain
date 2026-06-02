@@ -25,8 +25,8 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
-from ..protocols import LossContext, ModelOutput
-from ..registry import register
+from lighttrain.protocols import LossContext, ModelOutput
+from lighttrain.registry import register
 
 
 @register("objective", "masked_denoising")

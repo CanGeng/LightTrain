@@ -53,6 +53,35 @@ _RECIPE_CONTROLLED_KEYS: tuple[str, ...] = ("max_steps", "max_epochs")
 class Trainer:
     """Flat trainer: shared scaffolding + the composed training loop."""
 
+    # ---- objective-seam contract (class-level declarations) ----------------
+    # Whether this trainer drives loss through the canonical ``objective`` seam
+    # (``ctx.loss_fn`` = ``self.objective``). Inline-algorithm trainers
+    # (reward-model BT, online-distill REINFORCE) compute loss themselves and
+    # declare ``consumes_objective = False`` — the runtime then rejects a recipe
+    # that hands them a ``loss:``/``objective:``.
+    consumes_objective: bool = True
+    # Whether this trainer runs ``objective.prepare_batch`` before the forward
+    # (the default ``produce_batch`` path does). RL/preference trainers consume
+    # the objective as a loss but bring their own batches, so they set this
+    # False; the runtime then rejects a *real* ``objective:`` (with a non-trivial
+    # prepare) given to them (a plain ``loss:`` is always fine).
+    consumes_objective_prepare: bool = True
+    # Consuming trainers with no sensible built-in default (preference) set this
+    # True; the runtime then errors when a recipe omits both loss and objective.
+    requires_objective: bool = False
+
+    def default_objective(self) -> Any:
+        """The objective used when a consuming trainer's recipe omits loss/obj.
+
+        Called by the runtime *after* construction (so subclasses can wrap a
+        surrogate loss they built in ``__init__``). The base default is
+        next-token cross-entropy.
+        """
+        from ..architectures.profile import LossOnlyObjective
+        from ..losses.core import CrossEntropyLoss
+
+        return LossOnlyObjective(CrossEntropyLoss(), loss_family="next_token")
+
     def __init__(
         self,
         *,
@@ -104,6 +133,10 @@ class Trainer:
             self.device = _device_of(self.model) if self.model is not None else None
 
         self._stop_requested = False
+        # The canonical training objective. Left None here; the runtime binds it
+        # post-construction (recipe-provided or ``default_objective()``) via
+        # ``_wire_objective``. Inline-algorithm trainers keep it None.
+        self.objective: Any | None = None
         # optional ArchitectureProfile for stateful architectures (RWKV/Mamba)
         self.arch_profile = arch_profile
         # The named model set (Axis A/B). Single-model recipes get
@@ -136,12 +169,26 @@ class Trainer:
 
     # ---- override points --------------------------------------------------
 
-    def produce_batch(self, raw: Any) -> dict[str, Any]:
-        """Default: move a raw loader batch to the device.
+    def _prepare_with_objective(self, batch: dict[str, Any]) -> dict[str, Any]:
+        """Run ``objective.prepare_batch`` if an objective is attached.
 
-        Also handles stateful-architecture (RWKV / Mamba) recurrent-state reset
-        on document boundaries — a no-op unless an ``arch_profile`` in stateful
-        mode is attached. RL/OPD trainers override this with rollout.
+        The single place both ``produce_batch`` (train) and ``eval`` route
+        through, so the objective's batch transform (diffusion noise, JEPA patch
+        sampling, …) is never duplicated. Presence-based: inline trainers leave
+        ``self.objective`` None → identity; ``LossOnlyObjective`` is identity too.
+        """
+        if self.objective is None:
+            return batch
+        return self.objective.prepare_batch(
+            batch, step=self.ctx.step, device=self.device
+        )
+
+    def produce_batch(self, raw: Any) -> dict[str, Any]:
+        """Default: move a raw loader batch to the device, reset recurrent state
+        at document boundaries, then run the objective's batch preparation.
+
+        Order: move → arch-profile state reset (RWKV/Mamba, on ``_doc_boundary``)
+        → ``objective.prepare_batch``. RL/OPD trainers override this with rollout.
         """
         batch = _move_batch(raw, self.device)
         if (
@@ -153,7 +200,10 @@ class Trainer:
         ):
             self.arch_profile.reset_state_fn(self.model)
             batch["_reset_state"] = True
-        return batch
+        # ``_doc_boundary`` is trainer-only metadata — drop it so it never reaches
+        # ``model(**batch)`` (no reliance on the model tolerating unknown kwargs).
+        batch.pop("_doc_boundary", None)
+        return self._prepare_with_objective(batch)
 
     def forward_loss(self, batch: dict[str, Any]) -> Any:
         """Default: ``None`` ⇒ route the whole step through ``engine.step``.
@@ -170,22 +220,6 @@ class Trainer:
     def before_step(self, batch: dict[str, Any]) -> None:  # noqa: ARG002
         """Optional pre-step precompute hook (e.g. GAE / group advantages)."""
         return None
-
-    def _recipe_loss_or(self, default: Any) -> Any:
-        """Honour the ``loss:`` seam: return the recipe-provided ``ctx.loss_fn``
-        unless it is absent or the runtime's ``cross_entropy`` fallback (the
-        "nothing specified" sentinel), in which case use ``default``.
-
-        Lets paradigms with a natural built-in loss (RL surrogate, preference)
-        be driven by ``loss:`` when set, yet stay usable when a recipe omits it.
-        Never overwrites a genuinely recipe-selected loss.
-        """
-        lf = self.ctx.loss_fn
-        from ..losses.core import CrossEntropyLoss
-
-        if lf is None or isinstance(lf, CrossEntropyLoss):
-            return default
-        return lf
 
     # ---- step -------------------------------------------------------------
 
@@ -280,6 +314,12 @@ class Trainer:
             with torch.no_grad():
                 for raw in val_loader:
                     batch = _move_batch(raw, self.device)
+                    # Trainer-only metadata — never feed it to ``model(**batch)``.
+                    batch.pop("_doc_boundary", None)
+                    # Same objective batch-prep as training (diffusion noise,
+                    # JEPA patches, …) so objective recipes don't KeyError in eval.
+                    # Not via produce_batch — that would trigger RL rollout overrides.
+                    batch = self._prepare_with_objective(batch)
                     self.bus.dispatch("on_eval_batch_start", batch=batch, ctx=self.ctx)
                     out = self.model(**batch)
                     if not isinstance(out, ModelOutput):
@@ -336,6 +376,7 @@ class Trainer:
             with torch.no_grad():
                 for raw in loader:
                     batch = _move_batch(raw, self.device)
+                    batch.pop("_doc_boundary", None)  # trainer-only metadata
                     out = self.model(**batch)
                     if not isinstance(out, ModelOutput):
                         out = ModelOutput(

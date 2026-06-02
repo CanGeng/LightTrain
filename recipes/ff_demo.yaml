@@ -13,6 +13,9 @@ seed: 77
 exp: r10_ff
 run_root: runs
 
+# Demo-only toy model/dataset/collator (mlp_toy / synthetic_binary / x_labels); not core.
+user_modules: [examples/lab_components.py]
+
 model: default
 model_profiles:
   default:
@@ -47,11 +50,10 @@ scheduler:
 engine:
   name: standard
   mixed_precision: "no"
-
-update_rule:
-  name: forward_forward
-  threshold: 2.0
-  grad_clip: 1.0
+  update_rule:
+    name: forward_forward
+    threshold: 2.0
+    grad_clip: 1.0
 
 trainer:
   name: pretrain

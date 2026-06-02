@@ -3,9 +3,11 @@
 1. Bit-check: the RLUpdateRule->apply_update backward unification + loss-seam
    refactor leave the per-step update numerics EXACTLY unchanged (golden
    sequences captured from the pre-migration code).
-2. Loss seam: the recipe-provided ``ctx.loss_fn`` is now actually used (it was
-   silently overwritten by a hardcoded ``self._loss_fn`` before). A sentinel
-   loss set on ctx must drive the step; with none set, the RL default is used.
+2. Objective seam: the canonical source of the per-step loss is now
+   ``trainer.objective`` (the runtime binds it; RL trainers fall back to their
+   own ``default_objective()`` surrogate). A recipe-provided objective drives
+   the step; with none, the RL default surrogate is used. (No more
+   ``ctx.loss_fn`` type-sniffing / cross_entropy sentinel.)
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import pytest
 import torch
 import torch.nn as nn
 
+from lighttrain.architectures.profile import LossOnlyObjective
 from lighttrain.protocols import ModelOutput
 from lighttrain.trainers.grpo import GRPOTrainer
 from lighttrain.trainers.ppo import PPOTrainer
@@ -113,29 +116,27 @@ class _SentinelLoss:
 
 
 @pytest.mark.parametrize("make", [_make_grpo, _make_ppo], ids=["grpo", "ppo"])
-def test_recipe_loss_fn_actually_selects_rl_loss(make):
-    """Gate 2: setting ctx.loss_fn (the `loss:` seam) must drive the RL step —
-    previously self._loss_fn was hardcoded and the recipe loss ignored."""
+def test_recipe_objective_drives_rl_step(make):
+    """Gate 2: a recipe-provided ``trainer.objective`` (the canonical seam) must
+    drive the RL step — bound by the runtime, here set directly."""
     t = make(_TinyLM())
-    t.ctx.loss_fn = _SentinelLoss()
+    t.objective = LossOnlyObjective(_SentinelLoss())
     batch = _grpo_batch() if make is _make_grpo else _ppo_batch()
     out = t._step(batch)
     assert float(out.loss) == 42.0
 
 
 @pytest.mark.parametrize("make", [_make_grpo, _make_ppo], ids=["grpo", "ppo"])
-def test_rl_default_loss_used_when_recipe_omits_loss(make):
-    """Fallback: with no recipe loss (ctx.loss_fn None or the cross_entropy
-    runtime default), the RL trainer uses its own surrogate default."""
-    from lighttrain.losses.core import CrossEntropyLoss
-
+def test_rl_default_objective_used_when_unbound(make):
+    """Fallback: with no objective bound (``trainer.objective is None``), the RL
+    trainer resolves its own ``default_objective()`` surrogate — no CE sniffing."""
     t = make(_TinyLM())
+    assert t.objective is None  # not wired by the runtime here
+    # default_objective wraps the trainer's own surrogate loss.
+    assert isinstance(t.default_objective(), LossOnlyObjective)
     batch = _grpo_batch() if make is _make_grpo else _ppo_batch()
-    # None → default
-    t.ctx.loss_fn = None
-    out_none = t._step(batch)
-    assert float(out_none.loss) != 42.0 and torch.isfinite(torch.tensor(float(out_none.loss)))
-    # cross_entropy sentinel → default (not the misapplied CE)
-    t.ctx.loss_fn = CrossEntropyLoss()
-    out_ce = t._step(batch)
-    assert torch.isfinite(torch.tensor(float(out_ce.loss)))
+    out = t._step(batch)
+    assert float(out.loss) != 42.0
+    assert torch.isfinite(torch.tensor(float(out.loss)))
+    # the step resolved + bound the default objective on first use.
+    assert isinstance(t.objective, LossOnlyObjective)

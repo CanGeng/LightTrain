@@ -13,6 +13,9 @@ seed: 42
 exp: r10_pcn
 run_root: runs
 
+# Demo-only toy model/dataset/collator (mlp_toy / synthetic_binary / x_labels); not core.
+user_modules: [examples/lab_components.py]
+
 model: default
 model_profiles:
   default:
@@ -45,13 +48,12 @@ scheduler:
 engine:
   name: standard
   mixed_precision: "no"
-
-update_rule:
-  name: pcn
-  n_infer: 10
-  lr_infer: 0.05
-  lr_weight: 0.005
-  activation: relu
+  update_rule:
+    name: pcn
+    n_infer: 10
+    lr_infer: 0.05
+    lr_weight: 0.005
+    activation: relu
 
 trainer:
   name: pretrain

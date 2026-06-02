@@ -15,6 +15,9 @@ seed: 7
 exp: r8_diffusion
 run_root: runs
 
+# Demo-only toy dataset/collator (synthetic_signal / signal); not a core component.
+user_modules: [examples/lab_components.py]
+
 model: default
 model_profiles:
   default:
@@ -57,10 +60,8 @@ scheduler:
 engine:
   name: standard
   mixed_precision: "no"
-
-update_rule:
-  name: standard
-  grad_clip: 1.0
+  update_rule:
+    name: standard   # grad_clip/accumulate are controlled by trainer:
 
 trainer:
   name: pretrain

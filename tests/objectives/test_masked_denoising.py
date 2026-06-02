@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.objectives.masked_denoising."""
+"""Adversarial tests for lighttrain.plugins.objectives.masked_denoising."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
-from lighttrain.objectives.masked_denoising import MaskedDenoisingObjective
+from lighttrain.plugins.objectives.masked_denoising import MaskedDenoisingObjective
 from lighttrain.protocols import LossContext, ModelOutput
 
 

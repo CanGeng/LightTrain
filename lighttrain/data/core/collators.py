@@ -50,9 +50,20 @@ class CausalLMCollator:
             label_src = list(label_src)[:max_len]
             labels[i, : len(label_src)] = torch.tensor(label_src, dtype=torch.long)
 
-        out: dict[str, torch.Tensor] = {
+        out: dict[str, Any] = {
             "input_ids": input_ids, "attention_mask": attention, "labels": labels,
         }
+        # Stateful-architecture document-boundary signal (opt-in chunked dataset).
+        # It is a per-step batch-level flag, so it only makes sense at batch_size=1
+        # (sequential streaming) — fail loudly rather than silently dropping the
+        # other samples' boundary flags and corrupting the recurrent-state resets.
+        if any("_doc_boundary" in s for s in samples):
+            if len(samples) > 1:
+                raise ValueError(
+                    "_doc_boundary (chunk_size streaming) requires batch_size=1; "
+                    f"got a batch of {len(samples)}. Set data.batch_size: 1."
+                )
+            out["_doc_boundary"] = bool(samples[0].get("_doc_boundary", False))
         # Preserve ``aux.*`` keys from ArtifactJoinedDataset by stacking
         # the matching tensor across the batch. Hidden-state stacks come in
         # as (L, T, H); we permute the layer axis to the front of the batch

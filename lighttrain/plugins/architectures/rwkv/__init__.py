@@ -220,6 +220,7 @@ def _rwkv_blocks(model: nn.Module) -> Iterator[nn.Module]:
     yield from model.blocks
 
 
+@register("architecture", "rwkv")
 def rwkv_profile() -> ArchitectureProfile:
     return ArchitectureProfile(
         name="rwkv",

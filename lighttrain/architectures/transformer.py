@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import torch.nn as nn
 
+from ..registry import register
 from .profile import ArchitectureProfile
 
 
@@ -67,6 +68,7 @@ def _transformer_head(model: nn.Module) -> nn.Module:
 # Factory
 # ---------------------------------------------------------------------------
 
+@register("architecture", "transformer")
 def transformer_profile(
     loss_family: str = "next_token",
     *,

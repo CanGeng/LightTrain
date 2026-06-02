@@ -94,7 +94,9 @@ class StepOutput:
 ## Built-in entries (condensed)
 
 - **models**: `tiny_lm`, `hf_causal`, `lora`, `ia3`, `adalora`, and plugin `jepa`, `qlora`, `tiny_rwkv`, `tiny_mamba`, `tiny_unet`
-- **objectives**: `next_token`, `masked_denoising`, and plugin `diffusion`, `flow_matching`, `jepa`
+- **objectives** (all plugin; the Protocol `ObjectiveProfile` is core): `next_token`, `masked_denoising`, `diffusion`, `flow_matching`, `jepa`
+  - `objective:` is the **internal canonical training seam** (owns `prepare_batch` + loss). When present it replaces `loss:`; a plain `loss:` is wrapped into a `LossOnlyObjective` (identity `prepare_batch`) so there is one seam. `loss:` and top-level `objective:` are mutually exclusive (an objective may carry a *nested* `loss:`/`aux_losses:`). The default objective belongs to the **trainer** (`Trainer.default_objective()`), not the runtime.
+- **architectures** (profile factories, by `trainer.arch_profile`): `transformer` (core), `rwkv` (plugin) — resolve a string to an `ArchitectureProfile` (block/embedding/head seams + stateful reset).
 - **losses**: `cross_entropy`/`ce`, `mlm`, `z_loss`, `composite`, `dpo`, `bradley_terry`/`bt`, `ipo`, `simpo`, `orpo`, `kto`, `ppo_surrogate`, `grpo`, `info_nce`, `moe_balance`, `kl_topk`, `hidden_mse`, `hidden_cosine`, `attention_transfer`
 - **optimizers**: `adamw`, `lion`, and plugin `cpu_offload` · **schedulers**: `constant`, `linear`, `warmup_cosine`, `wsd`
 - **update_rules**: `standard`, `sam`, `mezo`, `rl` (internal), and plugin `forward_forward`, `pcn`, `dfa`
@@ -103,7 +105,8 @@ class StepOutput:
 - **prep_node**: `load`, `tokenize`, `chunk`, `pack`, `mix`, `join`, `index`, `validate`, `materialize`
 - **callbacks**: `ema`, `best_ckpt`, `throughput`, `early_stop`, `nan_skip`, `invariants`, `nan_hunter`, `frozen_step`, `loss_attribution`, `dead_neuron`, `grad_flow`, `sample_preview`, `dynamic_artifact`, `lineage_recorder`, `file_signals`
 - **loggers**: `console`, `jsonl`, `tensorboard`/`tb` · **judges**: plugin `verifier`, `pairwise_llm` · **rl_backend**: `hf_generate`, and plugin `vllm`
-- **grad_sync**: `noop`, `ddp`, `fsdp`, `deepspeed` · **model_parallel**: `tensor_parallel`, `tp_aware`, `sequence_parallel`, `expert_parallel` · **pipeline**: `1f1b`, `gpipe`, `interleaved_1f1b`
+- **grad_sync**: `noop`, `ddp`, `fsdp`, `deepspeed` · **model_parallel**: `tensor_parallel`, `tp_aware`, `sequence_parallel`*, `expert_parallel`* · **pipeline**: `1f1b`, `gpipe`, `interleaved_1f1b`
+  - *`sequence_parallel` / `expert_parallel` are registered but **not yet wired into the train runtime** (the selector only picks `tensor_parallel`; EP is a skeleton). See the v0.2.3 changelog "Known issues".*
 
 ## Exceptions
 

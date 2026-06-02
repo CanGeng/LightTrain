@@ -2,9 +2,15 @@
 
 > [中文版](distributed.zh-CN.md) · [Docs index](../README.md)
 
-> **Status:** DDP/FSDP/ZeRO/TP/PP/SP/EP are implemented and unit-tested via
+> **Status:** DDP/FSDP/ZeRO/TP/PP strategies are implemented and unit-tested via
 > CPU-based multiprocess (gloo) spawn tests. They have **not** been validated at
 > scale on multi-node GPU clusters. Use at your own risk for production.
+>
+> **Known limitation (SP/EP):** the `sequence_parallel` / `expert_parallel`
+> strategies are registered, but the train runtime's strategy selector only wires
+> `tensor_parallel` — `parallel.sp` / `parallel.ep` do **not** yet select them,
+> and EP is still a skeleton (no all-to-all). They are not usable from a recipe
+> at present. See the v0.2.3 changelog "Known issues".
 
 The `parallel:` block scales a run from single-GPU to multi-GPU **without
 changing model or trainer code**. Omitting it is equivalent to `dp=tp=pp=ep=1`.

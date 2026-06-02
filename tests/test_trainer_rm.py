@@ -125,6 +125,17 @@ def test_rm_value_head_auto_detected():
     assert trainer._value_head.linear.in_features == 8
 
 
+def test_rm_fit_runs_without_recipe_loss():
+    """Regression: reward_model is inline (consumes_objective=False); its fit must
+    NOT be blocked by the inherited preference 'no loss configured' guard — it
+    computes its own Bradley-Terry loss and the runtime leaves ctx.loss_fn=None."""
+    trainer = _make_trainer()
+    assert trainer.consumes_objective is False
+    assert trainer.ctx.loss_fn is None  # inline: runtime never binds an objective
+    metrics = trainer.fit(steps=2)  # must not raise "no preference loss configured"
+    assert "loss" in metrics
+
+
 def test_rm_margin_shifts_loss():
     trainer_no = _make_trainer(margin=0.0)
     trainer_mg = _make_trainer(margin=5.0)

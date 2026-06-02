@@ -23,6 +23,7 @@ class LineFileTextDataset:
         *,
         tokenizer: Any,
         max_len: int = 256,
+        chunk_size: int | None = None,
         encoding: str = "utf-8",
     ) -> None:
         self.path = Path(path)
@@ -30,6 +31,12 @@ class LineFileTextDataset:
             raise FileNotFoundError(f"Dataset file not found: {self.path}")
         self.tokenizer = tokenizer
         self.max_len = int(max_len)
+        # Opt-in document chunking for stateful (RWKV/Mamba) streaming: a long
+        # document is split into fixed-size chunks and the *first* chunk of each
+        # document carries ``_doc_boundary=True`` (the recurrent-state reset
+        # point). Chunk first, then cap each chunk at ``max_len`` (keep
+        # chunk_size <= max_len). ``None`` keeps the one-line-per-sample default.
+        self.chunk_size = int(chunk_size) if chunk_size else None
 
         text = self.path.read_text(encoding=encoding, errors="replace")
         self.samples: list[Sample] = []
@@ -40,14 +47,28 @@ class LineFileTextDataset:
             ids = tokenizer.encode(line)
             if not ids:
                 continue
-            ids = ids[: self.max_len]
-            self.samples.append(
-                {
-                    "input_ids": ids,
-                    "attention_mask": [1] * len(ids),
-                    "labels": list(ids),
-                }
-            )
+            if self.chunk_size:
+                for ci in range(0, len(ids), self.chunk_size):
+                    chunk = ids[ci : ci + self.chunk_size][: self.max_len]
+                    if not chunk:
+                        continue
+                    self.samples.append(
+                        {
+                            "input_ids": chunk,
+                            "attention_mask": [1] * len(chunk),
+                            "labels": list(chunk),
+                            "_doc_boundary": ci == 0,
+                        }
+                    )
+            else:
+                ids = ids[: self.max_len]
+                self.samples.append(
+                    {
+                        "input_ids": ids,
+                        "attention_mask": [1] * len(ids),
+                        "labels": list(ids),
+                    }
+                )
 
         if not self.samples:
             raise ValueError(f"No usable lines in {self.path}.")

@@ -173,6 +173,37 @@ def _apply_overrides(cfg: DictConfig, overrides: list[str]) -> DictConfig:
     return cfg
 
 
+def _check_top_level_structure(plain: dict) -> None:
+    """Reject misplaced top-level keys loudly (as ``ConfigError``).
+
+    ``RootConfig`` uses ``extra='allow'`` so these would otherwise be silently
+    accepted and ignored. Done here (not in a pydantic validator) so the failure
+    surfaces as the CLI-facing ``ConfigError``, not a wrapped ValidationError.
+    """
+    # Finding 1: ``loss:`` and ``objective:`` are the same seam; exactly one at
+    # the top level. A *nested* loss under an objective is fine (composite).
+    if plain.get("loss") is not None and plain.get("objective") is not None:
+        raise ConfigError(
+            "`loss:` and `objective:` are mutually exclusive at the top level "
+            "(both feed the single canonical objective seam). Use one:\n"
+            "    loss: { name: cross_entropy }                       # plain loss\n"
+            "    objective: { name: diffusion, ... }                 # non-standard objective\n"
+            "To let an objective wrap a specific loss, nest it instead:\n"
+            "    objective: { name: supervised, loss: { name: my_loss } }\n"
+            "    objective: { name: diffusion, aux_losses: [ ... ] }"
+        )
+    # Finding 2: the update rule lives under ``engine.update_rule``; a top-level
+    # ``update_rule:`` is silently ignored by the runtime.
+    if "update_rule" in plain:
+        raise ConfigError(
+            "top-level `update_rule:` is ignored by the runtime. Move it under "
+            "`engine:`:\n"
+            "    engine:\n"
+            "      name: standard\n"
+            "      update_rule: { name: mezo, ... }"
+        )
+
+
 def load_config(
     path: str | Path,
     *,
@@ -206,6 +237,8 @@ def load_config(
     plain = OmegaConf.to_container(cfg, resolve=True)
     if not isinstance(plain, dict):
         raise ConfigError(f"Resolved config is not a mapping: {type(plain).__name__}")
+
+    _check_top_level_structure(plain)
 
     try:
         root = RootConfig.model_validate(plain)

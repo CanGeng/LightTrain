@@ -12,6 +12,9 @@ seed: 42
 exp: r11_mezo
 run_root: runs
 
+# Demo-only toy dataset (sft_jsonl); not a core component.
+user_modules: [examples/lab_components.py]
+
 model: default
 model_profiles:
   default:
@@ -27,7 +30,7 @@ data:
   name: simple
   dataset:
     name: sft_jsonl
-    path: tests/fixtures/tiny_corpus.txt
+    path: tests/fixtures/tiny_sft.jsonl
     max_len: 128
   tokenizer:
     name: byte
@@ -52,11 +55,10 @@ scheduler:
 engine:
   name: standard
   mixed_precision: "no"
-
-update_rule:
-  name: mezo
-  eps: 1.0e-3
-  seed_per_step: true
+  update_rule:
+    name: mezo
+    eps: 1.0e-3
+    seed_per_step: true
 
 trainer:
   name: pretrain

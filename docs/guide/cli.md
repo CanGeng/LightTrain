@@ -35,8 +35,8 @@ Global options: `--version`, `--quiet`, `--verbose`.
 | `profile -c <cfg> [--steps N]` | `torch.profiler` chrome trace |
 | `lineage tag/untag/pin/invalidate/gc/prune-orphans/graph` | SQLite lineage operations |
 | `migrate config [--to-profiles] / artifact-header / checkpoint` | Schema migrations (writes `.pre-migration-bak`) |
-| `convert-checkpoint --input <ckpt> --output <out> --to <fmt>` | Convert `.pt` / `.safetensors` / HF |
-| `export --config <cfg> --out <dir> --to <fmt>` | Export weights; `gguf` needs llama.cpp on PATH |
+| `convert-checkpoint --from <fmt> --to <fmt> --path <ckpt> [--out <out>]` | Convert `.pt` / `.safetensors` / HF |
+| `export --to <fmt> --ckpt <step_dir> --out <out> [-c <cfg>]` | Export weights; `hf`/`gguf` need `-c`; `gguf` needs llama.cpp on PATH |
 
 ## Override syntax
 
