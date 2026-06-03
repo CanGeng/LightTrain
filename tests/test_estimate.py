@@ -166,7 +166,7 @@ def test_estimate_with_lora_reports_low_trainable_ratio():
 
 
 def test_estimate_layer_offload_attaches_offload_block():
-    # plugins/layer_offload registers `layer_offload` engine; if the
+    # builtin_plugins/layer_offload registers `layer_offload` engine; if the
     # plugin isn't importable yet (G stage hasn't landed), skip gracefully.
     from lighttrain.registry import contains as _has
 

@@ -252,7 +252,7 @@ def _offload_estimate(
     # Try to import the plugin to get accurate per-layer probing; fall back
     # to a coarse estimate if it isn't installed.
     try:
-        from lighttrain.plugins.layer_offload._io import (
+        from lighttrain.builtin_plugins.layer_offload._io import (
             probe_layer_bandwidth,
         )
 

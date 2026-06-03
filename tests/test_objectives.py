@@ -2,11 +2,11 @@
 import pytest
 import torch
 
-from lighttrain.plugins.objectives.diffusion import DiffusionObjective
-from lighttrain.plugins.objectives.flow_matching import FlowMatchingObjective
-from lighttrain.plugins.objectives.jepa import JEPAObjective
-from lighttrain.plugins.objectives.masked_denoising import MaskedDenoisingObjective
-from lighttrain.plugins.objectives.next_token import NextTokenObjective
+from lighttrain.builtin_plugins.objectives.diffusion import DiffusionObjective
+from lighttrain.builtin_plugins.objectives.flow_matching import FlowMatchingObjective
+from lighttrain.builtin_plugins.objectives.jepa import JEPAObjective
+from lighttrain.builtin_plugins.objectives.masked_denoising import MaskedDenoisingObjective
+from lighttrain.builtin_plugins.objectives.next_token import NextTokenObjective
 from lighttrain.protocols import LossContext, ModelOutput
 
 

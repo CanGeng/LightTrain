@@ -12,7 +12,7 @@ import torch.nn as nn
 # ---------------------------------------------------------------------------
 
 def test_r7_rwkv_smoke():
-    from lighttrain.plugins.architectures.rwkv import TinyRWKVConfig, TinyRWKVModel, rwkv_profile
+    from lighttrain.builtin_plugins.architectures.rwkv import TinyRWKVConfig, TinyRWKVModel, rwkv_profile
     cfg = TinyRWKVConfig(vocab_size=32, embed_dim=16, num_layers=2, chunk_size=8)
     model = TinyRWKVModel(cfg)
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
@@ -37,7 +37,7 @@ def test_r7_rwkv_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r8_diffusion_smoke():
-    from lighttrain.plugins.objectives.diffusion import DiffusionObjective
+    from lighttrain.builtin_plugins.objectives.diffusion import DiffusionObjective
     from lighttrain.protocols import LossContext, ModelOutput
 
     obj = DiffusionObjective(target="eps", noise_schedule="linear", timesteps=50)
@@ -67,10 +67,10 @@ def test_r8_diffusion_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r9_jepa_smoke():
-    from lighttrain.plugins.architectures.jepa import (
+    from lighttrain.builtin_plugins.architectures.jepa import (
         JEPAEncoder, JEPAModelConfig, EMATargetEncoder, JEPAPredictor,
     )
-    from lighttrain.plugins.objectives.jepa import JEPAObjective
+    from lighttrain.builtin_plugins.objectives.jepa import JEPAObjective
     from lighttrain.protocols import LossContext, ModelOutput
 
     cfg = JEPAModelConfig(patch_dim=16, embed_dim=32, num_heads=2, depth=2, predictor_depth=1)
@@ -110,7 +110,7 @@ def test_r9_jepa_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r10a_pcn_smoke():
-    from lighttrain.plugins.update_rules.pcn import PCNUpdateRule
+    from lighttrain.builtin_plugins.update_rules.pcn import PCNUpdateRule
     from lighttrain.engine._context import StepContext
 
     model = nn.Sequential(nn.Linear(8, 16), nn.Linear(16, 4))
@@ -143,7 +143,7 @@ def test_r10a_pcn_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r10b_ff_smoke():
-    from lighttrain.plugins.update_rules.forward_forward import ForwardForwardUpdateRule
+    from lighttrain.builtin_plugins.update_rules.forward_forward import ForwardForwardUpdateRule
     from lighttrain.engine._context import StepContext
 
     model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 4))

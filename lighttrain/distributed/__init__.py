@@ -4,7 +4,7 @@ Always importable: ``ParallelContext.single_gpu()`` and the three Protocol
 types work without ``torch.distributed`` or NCCL being installed/initialized.
 
 Concrete strategy implementations (DDP, FSDP, ZeRO, TP, PP, SP, EP) live
-in ``plugins/distributed/`` and are only imported when the user
+in ``builtin_plugins/distributed/`` and are only imported when the user
 selects them via config.
 """
 

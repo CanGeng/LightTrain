@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from lighttrain.config import _components
 from lighttrain.config._components import _safe_import
 
 
@@ -44,3 +45,23 @@ def test_missing_internal_lighttrain_module_propagates():
     """A missing ``lighttrain.*`` module is internal breakage — loud."""
     with pytest.raises(ImportError):
         _safe_import("lighttrain.this_submodule_does_not_exist_xyz")
+
+
+def test_first_party_top_level_breakage_is_loud(tmp_path, monkeypatch):
+    """A *first-party* package whose top-level ``__init__`` fails to import — even
+    from a missing third-party dep — is loud, never swallowed. Pins that promoting
+    ``lighttrain.builtin_plugins`` into ``_FIRST_PARTY_PACKAGES`` removed the old
+    optional top-level ``try/except ImportError: continue`` escape hatch (a broken
+    bundled package is a real bug, not an absent optional backend)."""
+    pkg = tmp_path / "lt_firstparty_boom"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text(
+        "import a_third_party_dep_that_is_absent_xyz\n", encoding="utf-8"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    # Replace the whole list so the walk hits only our deliberately-broken package;
+    # reset the _DONE idempotency guard. monkeypatch restores both on teardown.
+    monkeypatch.setattr(_components, "_FIRST_PARTY_PACKAGES", ("lt_firstparty_boom",))
+    monkeypatch.setattr(_components, "_DONE", False)
+    with pytest.raises(ImportError):
+        _components.import_all_components()

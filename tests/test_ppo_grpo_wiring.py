@@ -59,7 +59,7 @@ def test_ppo_trainer_accepts_val_every():
 def test_reward_fn_adapter_decodes_and_scores():
     """_reward_fn adapter: tensor decode → VerifierJudge.score() → list[float]."""
     from lighttrain.data.core.tokenizers import ByteTokenizer
-    from lighttrain.plugins.judges.judge import VerifierJudge
+    from lighttrain.builtin_plugins.judges.judge import VerifierJudge
 
     tok = ByteTokenizer()
     judge = VerifierJudge(verify_pattern=r"\d+")

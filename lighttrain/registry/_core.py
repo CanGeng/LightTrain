@@ -61,11 +61,11 @@ KNOWN_CATEGORIES: tuple[str, ...] = (
     # RL value/reward heads + judge->reward adapters
     "value_head",
     "reward_adapter",
-    # Distributed strategies (implementations live in plugins/distributed/)
+    # Distributed strategies (implementations live in builtin_plugins/distributed/)
     "grad_sync_strategy",
     "model_parallel_strategy",
     "pipeline_schedule",
-    # Hyperparameter sweep backends (implementations live in plugins/sweep_backends/)
+    # Hyperparameter sweep backends (implementations live in builtin_plugins/sweep_backends/)
     "sweep_backend",
 )
 

@@ -767,7 +767,7 @@ def setup_run_from_config(
             raise ConfigError(f"tensor-parallel apply failed: {exc}") from exc
 
     # Phase C: pipeline splitting (PP) — after TP surgery, before DP wrap.
-    # Requires plugins/distributed/. PP is fail-loud: a requested pp>1 that
+    # Requires builtin_plugins/distributed/. PP is fail-loud: a requested pp>1 that
     # cannot be applied raises ConfigError rather than silently no-op'ing.
     # ``pipeline_schedule`` was resolved in the Phase-A preflight above.
     if pipeline_schedule is not None:

@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.plugins.objectives.next_token."""
+"""Adversarial tests for lighttrain.builtin_plugins.objectives.next_token."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from lighttrain.losses.core import CrossEntropyLoss
-from lighttrain.plugins.objectives.next_token import NextTokenObjective
+from lighttrain.builtin_plugins.objectives.next_token import NextTokenObjective
 from lighttrain.protocols import LossContext, ModelOutput
 
 

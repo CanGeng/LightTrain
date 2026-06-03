@@ -23,8 +23,8 @@ from lighttrain.config._resolver import select_model_spec
 
 _ROOT = Path(__file__).resolve().parents[2]
 # Distributed/sweep overlays now live alongside the rest under recipes/ (they
-# were moved out of the old plugins/distributed/recipes/ when plugins became
-# lighttrain.plugins).
+# were moved out of the old distributed-recipes location back when the bundled
+# extensions package was renamed to lighttrain.builtin_plugins).
 _RECIPES = sorted((_ROOT / "recipes").glob("*.yaml"))
 
 

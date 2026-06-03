@@ -9,7 +9,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from lighttrain.plugins.layer_offload import NvmeStorage
+from lighttrain.builtin_plugins.layer_offload import NvmeStorage
 
 
 def test_nvme_storage_round_trip(tmp_path):

@@ -1,6 +1,6 @@
 """Architecture profiles + base infra.
 
-The JEPA architecture moved to ``lighttrain.plugins.architectures.jepa`` (DESIGN
+The JEPA architecture moved to ``lighttrain.builtin_plugins.architectures.jepa`` (DESIGN
 §3.3: specific architecture adapters are frontier). ``ArchitectureProfile`` /
 ``ObjectiveProfile`` base infra + the transformer profile stay here.
 """

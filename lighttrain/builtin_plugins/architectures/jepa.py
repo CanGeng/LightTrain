@@ -14,7 +14,7 @@ ArchitectureProfile is exported as ``jepa_profile()``.
 
 Usage::
 
-    from lighttrain.plugins.architectures.jepa import JEPAModel, JEPAModelConfig, jepa_profile
+    from lighttrain.builtin_plugins.architectures.jepa import JEPAModel, JEPAModelConfig, jepa_profile
 
     cfg = JEPAModelConfig(patch_dim=64, embed_dim=256, num_heads=4, depth=4)
     model = JEPAModel(cfg)

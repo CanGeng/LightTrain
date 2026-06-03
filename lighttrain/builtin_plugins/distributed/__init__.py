@@ -1,4 +1,4 @@
-"""plugins.distributed — concrete distributed strategy implementations.
+"""builtin_plugins.distributed — concrete distributed strategy implementations.
 
 Registers all strategies into the lighttrain registry so recipes can select
 them by name.  Heavy dependencies (torch.distributed, deepspeed, etc.) are

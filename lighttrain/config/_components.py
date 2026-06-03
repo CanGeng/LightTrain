@@ -40,16 +40,17 @@ _FIRST_PARTY_PACKAGES: tuple[str, ...] = (
     "lighttrain.logging.backends",  # console/jsonl/tb (tb optional)
     "lighttrain.callbacks",         # builtins + invariants + frozen_step
     "lighttrain.trainers",          # pretrain/preference/ppo/grpo/...
-    "lighttrain.eval",              # regression_gate invariant (judges are plugins)
+    "lighttrain.eval",              # regression_gate invariant (judges live in builtin_plugins)
     "lighttrain.artifacts",         # producer/store/joined_dataset/dynamic_producer
     "lighttrain.invariants",        # invariant registry
     "lighttrain.diagnostics",       # nan_hunter/dead_neuron/... (some optional)
     "lighttrain.realtime_control",  # file_signals
+    # Bundled first-party extension modules (architectures/objectives/judges/quant/
+    # layer_offload/distributed/sweep/generation backends/update_rules). Walked here
+    # so their @register calls land; a submodule whose third-party dep (bnb/optuna/
+    # vllm/peft) is absent is skipped by the per-module contract below.
+    "lighttrain.builtin_plugins",
 )
-# Bundled opt-in plugins (ship under the lighttrain namespace). Walked here so
-# their @register calls land; individual submodules whose third-party dep is
-# absent are skipped by the per-module contract below.
-_OPTIONAL_PACKAGES: tuple[str, ...] = ("lighttrain.plugins",)
 
 _DONE = False
 
@@ -57,8 +58,8 @@ _DONE = False
 def _missing_dep_is_internal(exc: ImportError) -> bool:
     """A failed import is a genuine *internal* bug iff the missing module is a
     ``lighttrain.*`` module (a typo'd sibling / broken internal import). A
-    missing third-party dep (tensorboard, peft, ...) or a missing external
-    ``plugins`` just means an optional backend isn't installed."""
+    missing third-party dep (tensorboard, peft, ...) just means an optional
+    backend isn't installed."""
     return (exc.name or "").split(".")[0] == "lighttrain"
 
 
@@ -100,21 +101,15 @@ def _walk_and_import(pkg: ModuleType) -> None:
 
 
 def import_all_components() -> None:
-    """Import every first-party ``@register``-bearing module (+ optional
-    plugins) so the registry is fully populated. Idempotent; cheap after the
-    first call (guarded by ``_DONE`` — note this only amortises within a single
-    process, so pure-parse CLI paths skip it via ``register_components=False``)."""
+    """Import every first-party ``@register``-bearing module so the registry is
+    fully populated. Idempotent; cheap after the first call (guarded by ``_DONE``
+    — note this only amortises within a single process, so pure-parse CLI paths
+    skip it via ``register_components=False``)."""
     global _DONE
     if _DONE:
         return
     for name in _FIRST_PARTY_PACKAGES:
         _walk_and_import(importlib.import_module(name))
-    for name in _OPTIONAL_PACKAGES:
-        try:
-            pkg = importlib.import_module(name)
-        except ImportError:
-            continue  # external package not installed
-        _walk_and_import(pkg)
     _DONE = True
 
 

@@ -247,11 +247,11 @@ class TinyCausalLM(nn.Module):
 | `lora` | LoRA PEFT 适配器（包装 base model） | [models/peft/_lora.py](../../lighttrain/models/peft/_lora.py) |
 | `ia3` | IA³ PEFT 适配器 | [models/peft/_ia3.py](../../lighttrain/models/peft/_ia3.py) |
 | `adalora` | AdaLoRA 自适应秩 PEFT | [models/peft/_adalora.py](../../lighttrain/models/peft/_adalora.py) |
-| `jepa` *(plugin)* | JEPA 架构（图像 / 语言 JEPA 训练） | [lighttrain/plugins/architectures/jepa.py](../../lighttrain/plugins/architectures/jepa.py) |
-| `qlora` *(plugin)* | QLoRA（4-bit 量化 base + LoRA）PEFT | [lighttrain/plugins/quant/_qlora.py](../../lighttrain/plugins/quant/_qlora.py) |
-| `tiny_rwkv` *(plugin)* | RWKV 时间混合架构 | [lighttrain/plugins/architectures/rwkv/](../../lighttrain/plugins/architectures/rwkv/__init__.py) |
-| `tiny_mamba` *(plugin)* | Mamba / SSM 架构 | [lighttrain/plugins/architectures/mamba/](../../lighttrain/plugins/architectures/mamba/__init__.py) |
-| `tiny_unet` *(plugin)* | Diffusion U-Net | [lighttrain/plugins/architectures/diffusion_unet/](../../lighttrain/plugins/architectures/diffusion_unet/__init__.py) |
+| `jepa` *(plugin)* | JEPA 架构（图像 / 语言 JEPA 训练） | [lighttrain/builtin_plugins/architectures/jepa.py](../../lighttrain/builtin_plugins/architectures/jepa.py) |
+| `qlora` *(plugin)* | QLoRA（4-bit 量化 base + LoRA）PEFT | [lighttrain/builtin_plugins/quant/_qlora.py](../../lighttrain/builtin_plugins/quant/_qlora.py) |
+| `tiny_rwkv` *(plugin)* | RWKV 时间混合架构 | [lighttrain/builtin_plugins/architectures/rwkv/](../../lighttrain/builtin_plugins/architectures/rwkv/__init__.py) |
+| `tiny_mamba` *(plugin)* | Mamba / SSM 架构 | [lighttrain/builtin_plugins/architectures/mamba/](../../lighttrain/builtin_plugins/architectures/mamba/__init__.py) |
+| `tiny_unet` *(plugin)* | Diffusion U-Net | [lighttrain/builtin_plugins/architectures/diffusion_unet/](../../lighttrain/builtin_plugins/architectures/diffusion_unet/__init__.py) |
 
 ---
 
@@ -409,7 +409,7 @@ optimizer:
 |------|------|------|
 | `adamw` | `torch.optim.AdamW` 包装 | [optim/wrappers.py](../../lighttrain/optim/wrappers.py) |
 | `lion` | Lion 优化器（纯 PyTorch 参考实现） | [optim/wrappers.py](../../lighttrain/optim/wrappers.py) |
-| `cpu_offload` *(plugin)* | 优化器状态 CPU offload 包装 | [lighttrain/plugins/layer_offload/_optim_offload.py](../../lighttrain/plugins/layer_offload/_optim_offload.py) |
+| `cpu_offload` *(plugin)* | 优化器状态 CPU offload 包装 | [lighttrain/builtin_plugins/layer_offload/_optim_offload.py](../../lighttrain/builtin_plugins/layer_offload/_optim_offload.py) |
 
 ---
 
@@ -741,9 +741,9 @@ class StandardUpdateRule:
 | `sam` | Sharpness-Aware Minimization（两次前向） | [update_rules/sam.py](../../lighttrain/update_rules/sam.py) |
 | `mezo` | Memory-Efficient Zeroth-Order Optimization | [update_rules/mezo.py](../../lighttrain/update_rules/mezo.py) |
 | `rl` | RL 更新规则（PPO/GRPO 内部用） | [update_rules/rl.py](../../lighttrain/update_rules/rl.py) |
-| `forward_forward` *(plugin)* | Forward-Forward 算法 | [plugins/update_rules/forward_forward/](../../lighttrain/plugins/update_rules/forward_forward/__init__.py) |
-| `pcn` *(plugin)* | 预测编码网络 | [plugins/update_rules/pcn/](../../lighttrain/plugins/update_rules/pcn/__init__.py) |
-| `dfa` *(plugin)* | Direct Feedback Alignment | [plugins/update_rules/dfa/](../../lighttrain/plugins/update_rules/dfa/__init__.py) |
+| `forward_forward` *(plugin)* | Forward-Forward 算法 | [builtin_plugins/update_rules/forward_forward/](../../lighttrain/builtin_plugins/update_rules/forward_forward/__init__.py) |
+| `pcn` *(plugin)* | 预测编码网络 | [builtin_plugins/update_rules/pcn/](../../lighttrain/builtin_plugins/update_rules/pcn/__init__.py) |
+| `dfa` *(plugin)* | Direct Feedback Alignment | [builtin_plugins/update_rules/dfa/](../../lighttrain/builtin_plugins/update_rules/dfa/__init__.py) |
 
 ---
 
@@ -842,7 +842,7 @@ def prepare_batch(self, batch: dict, *, step: int, device: Any) -> dict: ...
 def __call__(self, outputs: ModelOutput, batch: dict, ctx: LossContext) -> dict: ...
 ```
 
-**极简范例**：[lighttrain/plugins/objectives/next_token.py:16](../../lighttrain/plugins/objectives/next_token.py#L16)
+**极简范例**：[lighttrain/builtin_plugins/objectives/next_token.py:16](../../lighttrain/builtin_plugins/objectives/next_token.py#L16)
 
 ```python
 @register("objective", "next_token")
@@ -862,11 +862,11 @@ class NextTokenObjective:
 
 | name | loss_family | 文件 |
 |------|-------------|------|
-| `next_token` *(plugin)* | `next_token` | [lighttrain/plugins/objectives/next_token.py](../../lighttrain/plugins/objectives/next_token.py) |
-| `masked_denoising` *(plugin)* | `masked_denoising` | [lighttrain/plugins/objectives/masked_denoising.py](../../lighttrain/plugins/objectives/masked_denoising.py) |
-| `diffusion` *(plugin)* | `denoising` | [lighttrain/plugins/objectives/diffusion.py](../../lighttrain/plugins/objectives/diffusion.py) |
-| `flow_matching` *(plugin)* | `flow_matching` | [lighttrain/plugins/objectives/flow_matching.py](../../lighttrain/plugins/objectives/flow_matching.py) |
-| `jepa` *(plugin)* | `jepa` | [lighttrain/plugins/objectives/jepa.py](../../lighttrain/plugins/objectives/jepa.py) |
+| `next_token` *(plugin)* | `next_token` | [lighttrain/builtin_plugins/objectives/next_token.py](../../lighttrain/builtin_plugins/objectives/next_token.py) |
+| `masked_denoising` *(plugin)* | `masked_denoising` | [lighttrain/builtin_plugins/objectives/masked_denoising.py](../../lighttrain/builtin_plugins/objectives/masked_denoising.py) |
+| `diffusion` *(plugin)* | `denoising` | [lighttrain/builtin_plugins/objectives/diffusion.py](../../lighttrain/builtin_plugins/objectives/diffusion.py) |
+| `flow_matching` *(plugin)* | `flow_matching` | [lighttrain/builtin_plugins/objectives/flow_matching.py](../../lighttrain/builtin_plugins/objectives/flow_matching.py) |
+| `jepa` *(plugin)* | `jepa` | [lighttrain/builtin_plugins/objectives/jepa.py](../../lighttrain/builtin_plugins/objectives/jepa.py) |
 
 ---
 
@@ -879,7 +879,7 @@ class NextTokenObjective:
 | name | 说明 | 文件 |
 |------|------|------|
 | `transformer` | 标准 Transformer 架构 profile（core） | [architectures/transformer.py](../../lighttrain/architectures/transformer.py) |
-| `rwkv` *(plugin)* | RWKV 架构 profile | [plugins/architectures/rwkv/](../../lighttrain/plugins/architectures/rwkv/__init__.py) |
+| `rwkv` *(plugin)* | RWKV 架构 profile | [builtin_plugins/architectures/rwkv/](../../lighttrain/builtin_plugins/architectures/rwkv/__init__.py) |
 
 ---
 
@@ -895,8 +895,8 @@ def score(self, items: Iterable[Any], ctx: Any | None = None) -> list[Any]: ...
 
 | name | 说明 | `reward_kind` | 文件 |
 |------|------|---------------|------|
-| `verifier` *(plugin)* | 规则验证器（格式 / 数学正确性等） | `pointwise` | [lighttrain/plugins/judges/judge.py](../../lighttrain/plugins/judges/judge.py) |
-| `pairwise_llm` *(plugin)* | 基于 LLM 的成对打分 | `pairwise` | [lighttrain/plugins/judges/judge.py](../../lighttrain/plugins/judges/judge.py) |
+| `verifier` *(plugin)* | 规则验证器（格式 / 数学正确性等） | `pointwise` | [lighttrain/builtin_plugins/judges/judge.py](../../lighttrain/builtin_plugins/judges/judge.py) |
+| `pairwise_llm` *(plugin)* | 基于 LLM 的成对打分 | `pairwise` | [lighttrain/builtin_plugins/judges/judge.py](../../lighttrain/builtin_plugins/judges/judge.py) |
 
 作为 RL reward 用时，judge 的 `reward_kind` 决定用哪个 `reward_adapter`（§4.27c）。`pointwise`
 有内置适配器；`pairwise` 需自行注册一个 `pairwise` 适配器（把成对胜负折成 pointwise reward）。
@@ -1099,7 +1099,7 @@ def generate(self, model: Any, input_ids: torch.Tensor, **kwargs) -> torch.Tenso
 | name | 说明 | 文件 |
 |------|------|------|
 | `hf_generate` | 使用 HF `model.generate()` 采集 rollout（暴露 `temperature`/`top_p`/`do_sample`/`max_new_tokens`/`num_return_sequences`） | [rl/rollout.py](../../lighttrain/rl/rollout.py) |
-| `vllm` *(plugin)* | vLLM 高吞吐 rollout 后端（opt-in） | [lighttrain/plugins/generation_backends/vllm/](../../lighttrain/plugins/generation_backends/vllm/__init__.py) |
+| `vllm` *(plugin)* | vLLM 高吞吐 rollout 后端（opt-in） | [lighttrain/builtin_plugins/generation_backends/vllm/](../../lighttrain/builtin_plugins/generation_backends/vllm/__init__.py) |
 
 ppo/grpo 经 `rollout_backend:`（默认 `hf_generate`）从注册表解析后端并转发采样 knob，
 不再内联构造。
@@ -1165,9 +1165,9 @@ class GradSyncStrategy(Protocol):
 | name | 说明 | 文件 |
 |------|------|------|
 | `noop` | 单卡直通，无分布式开销 | [lighttrain/distributed/_noop.py](../../lighttrain/distributed/_noop.py) |
-| `ddp` | `torch.nn.parallel.DistributedDataParallel` | [lighttrain/plugins/distributed/strategies/ddp.py](../../lighttrain/plugins/distributed/strategies/ddp.py) |
-| `fsdp` | `torch.distributed.fsdp.FullyShardedDataParallel` | [lighttrain/plugins/distributed/strategies/fsdp.py](../../lighttrain/plugins/distributed/strategies/fsdp.py) |
-| `deepspeed` | DeepSpeed ZeRO-1/2/3 engine | [lighttrain/plugins/distributed/strategies/zero.py](../../lighttrain/plugins/distributed/strategies/zero.py) |
+| `ddp` | `torch.nn.parallel.DistributedDataParallel` | [lighttrain/builtin_plugins/distributed/strategies/ddp.py](../../lighttrain/builtin_plugins/distributed/strategies/ddp.py) |
+| `fsdp` | `torch.distributed.fsdp.FullyShardedDataParallel` | [lighttrain/builtin_plugins/distributed/strategies/fsdp.py](../../lighttrain/builtin_plugins/distributed/strategies/fsdp.py) |
+| `deepspeed` | DeepSpeed ZeRO-1/2/3 engine | [lighttrain/builtin_plugins/distributed/strategies/zero.py](../../lighttrain/builtin_plugins/distributed/strategies/zero.py) |
 
 ---
 
@@ -1193,10 +1193,10 @@ class ModelParallelStrategy(Protocol):
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `tensor_parallel` | ColWise/RowWise Linear 手术（llama / gpt2 / mistral 内置方案） | [lighttrain/plugins/distributed/model_parallel/tp_auto.py](../../lighttrain/plugins/distributed/model_parallel/tp_auto.py) |
-| `tp_aware` | 对已实现 `tp_plan()` 方法的模型做 TP 适配 | [lighttrain/plugins/distributed/model_parallel/tp_aware.py](../../lighttrain/plugins/distributed/model_parallel/tp_aware.py) |
-| `sequence_parallel` | 沿 seq 维度切分，与 TP 配合使用 | [lighttrain/plugins/distributed/model_parallel/sp.py](../../lighttrain/plugins/distributed/model_parallel/sp.py) |
-| `expert_parallel` | MoE 专家层 all-to-all dispatch | [lighttrain/plugins/distributed/model_parallel/ep.py](../../lighttrain/plugins/distributed/model_parallel/ep.py) |
+| `tensor_parallel` | ColWise/RowWise Linear 手术（llama / gpt2 / mistral 内置方案） | [lighttrain/builtin_plugins/distributed/model_parallel/tp_auto.py](../../lighttrain/builtin_plugins/distributed/model_parallel/tp_auto.py) |
+| `tp_aware` | 对已实现 `tp_plan()` 方法的模型做 TP 适配 | [lighttrain/builtin_plugins/distributed/model_parallel/tp_aware.py](../../lighttrain/builtin_plugins/distributed/model_parallel/tp_aware.py) |
+| `sequence_parallel` | 沿 seq 维度切分，与 TP 配合使用 | [lighttrain/builtin_plugins/distributed/model_parallel/sp.py](../../lighttrain/builtin_plugins/distributed/model_parallel/sp.py) |
+| `expert_parallel` | MoE 专家层 all-to-all dispatch | [lighttrain/builtin_plugins/distributed/model_parallel/ep.py](../../lighttrain/builtin_plugins/distributed/model_parallel/ep.py) |
 
 ---
 
@@ -1227,9 +1227,9 @@ class PipelineSchedule(Protocol):
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `1f1b` | One-Forward-One-Backward（均衡内存与效率） | [lighttrain/plugins/distributed/pipeline/schedules.py](../../lighttrain/plugins/distributed/pipeline/schedules.py) |
-| `gpipe` | GPipe 全前向后全后向（简单但峰值内存高） | [lighttrain/plugins/distributed/pipeline/schedules.py](../../lighttrain/plugins/distributed/pipeline/schedules.py) |
-| `interleaved_1f1b` | 交错 1F1B（多块 stage，进一步降低 bubble） | [lighttrain/plugins/distributed/pipeline/schedules.py](../../lighttrain/plugins/distributed/pipeline/schedules.py) |
+| `1f1b` | One-Forward-One-Backward（均衡内存与效率） | [lighttrain/builtin_plugins/distributed/pipeline/schedules.py](../../lighttrain/builtin_plugins/distributed/pipeline/schedules.py) |
+| `gpipe` | GPipe 全前向后全后向（简单但峰值内存高） | [lighttrain/builtin_plugins/distributed/pipeline/schedules.py](../../lighttrain/builtin_plugins/distributed/pipeline/schedules.py) |
+| `interleaved_1f1b` | 交错 1F1B（多块 stage，进一步降低 bubble） | [lighttrain/builtin_plugins/distributed/pipeline/schedules.py](../../lighttrain/builtin_plugins/distributed/pipeline/schedules.py) |
 
 ---
 

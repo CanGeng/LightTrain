@@ -5,7 +5,7 @@ and emit helpful error messages before torch.distributed initialises.
 
 Usage (in a training script, not usually needed with lighttrain CLI):
 
-    from lighttrain.plugins.distributed._launcher import validate_topology, launch_torchrun
+    from lighttrain.builtin_plugins.distributed._launcher import validate_topology, launch_torchrun
 
     validate_topology(dp=4, tp=2, pp=2, world_size=16)
     # → prints: "Topology OK: 4×2×2=16 GPUs"
