@@ -22,7 +22,6 @@ Registered as ``@register("update_rule", "sam")``.
 from __future__ import annotations
 
 import warnings
-from contextlib import nullcontext
 from typing import Any, Mapping
 
 import torch
@@ -30,6 +29,7 @@ import torch
 from lighttrain.callbacks.base import Signal
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
+from lighttrain.update_rules._primitives import make_autocast
 
 
 def _to_metric(value: Any) -> float:
@@ -141,16 +141,12 @@ class SAMUpdateRule:
         if bus is not None:
             bus.dispatch("on_step_begin", step=ctx.step, ctx=ctx, batch=batch)
 
-        autocast_ctx = (
-            accelerator.autocast()
-            if accelerator is not None and hasattr(accelerator, "autocast")
-            else nullcontext()
-        )
-
         ctx.extras["model"] = model
 
+        # SAM runs two forward passes per step; build a fresh autocast CM each
+        # pass (accelerator.autocast() is single-use — caching it crashes pass 2).
         def _forward_loss(b: Any) -> tuple[Any, torch.Tensor, dict]:
-            with autocast_ctx:
+            with make_autocast(accelerator):
                 _out = model(**b)
                 if not isinstance(_out, ModelOutput):
                     _out = ModelOutput(

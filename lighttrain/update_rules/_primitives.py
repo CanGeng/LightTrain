@@ -1,6 +1,6 @@
-"""Public, re-entrant training primitives — the backward half of a step.
+"""Public, re-entrant training primitives shared across update rules.
 
-``apply_update`` is the ``clip / step / scheduler / AMP / accumulation`` half
+``apply_update`` is the ``clip / step / scheduler / AMP / accumulation`` backward half
 lifted verbatim out of :meth:`StandardUpdateRule.step`. It is factored so that
 *any* custom forward (multi-model distillation, RL surrogate losses, a bare
 per-layer loop) can reuse the mature backward path — gradient accumulation,
@@ -19,6 +19,20 @@ from dataclasses import dataclass
 from typing import Any
 
 import torch
+
+
+def make_autocast(accelerator: Any):
+    """Return a *fresh* AMP autocast context manager for one forward pass.
+
+    ``accelerator.autocast()`` returns a single-use ``_GeneratorContextManager``
+    (re-entering the same object raises ``AttributeError: '_GeneratorContextManager'
+    object has no attribute 'args'``). Update rules that run multiple forwards per
+    step (RETRY_STEP replay, SAM two-pass, MeZO ±perturbation) must call this each
+    forward instead of caching the context object.
+    """
+    if accelerator is not None and hasattr(accelerator, "autocast"):
+        return accelerator.autocast()
+    return _nullcontext()
 
 
 def _current_lr(optimizer: Any) -> float:
@@ -171,4 +185,4 @@ def apply_update(
     return grad_norm
 
 
-__all__ = ["MicroState", "apply_update", "_current_lr", "_register_new_params"]
+__all__ = ["MicroState", "apply_update", "make_autocast", "_current_lr", "_register_new_params"]

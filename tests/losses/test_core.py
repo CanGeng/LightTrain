@@ -214,6 +214,27 @@ def test_regression_ce_shift_off_by_one(dummy_ctx):
     )
 
 
+def test_regression_ce_2d_logits_not_shifted(dummy_ctx):
+    """Regression: ``(B, V)`` classification logits must NOT be next-token shifted.
+
+    Bug: the shift guard ``logits.dim() >= 2 and ... and size(-2) == size(-1)``
+    fired for ``(B, V)`` logits + ``(B,)`` labels because ``size(-2) == size(-1)``
+    coincidentally holds (B == B). That silently dropped the first logit row and
+    last label, misaligning a classification head. The guard is now ``dim >= 3``.
+
+    Input: a plain classification head — ``(B, V)`` logits, ``(B,)`` labels.
+    Expected: equals ``F.cross_entropy(logits, labels)`` with NO shift.
+    """
+    B, V = 4, 10
+    torch.manual_seed(0)
+    logits = torch.randn(B, V)
+    labels = torch.tensor([1, 2, 3, 4])
+    mo = ModelOutput(outputs={"logits": logits})
+    actual = CrossEntropyLoss()(mo, {"labels": labels}, dummy_ctx)["loss"]
+    expected = F.cross_entropy(logits, labels)
+    torch.testing.assert_close(actual, expected, atol=1e-6, rtol=1e-5)
+
+
 # ---------------------------------------------------------------------------
 # MaskedLMLoss
 # ---------------------------------------------------------------------------

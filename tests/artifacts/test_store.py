@@ -46,19 +46,9 @@ from lighttrain.builtin_plugins.artifacts import (
 _BACKENDS = ["safetensors-shards", "memmap-fixed", "parquet-rows"]
 
 # Backends whose ``__init__`` reloads state from disk and thus support
-# ``open_artifact_store`` returning a populated store. ParquetRowStore
-# currently has no re-load path (its ``__init__`` always starts with empty
-# ``_rows``/``_index``) so any test that needs to read back via
-# ``open_artifact_store`` skips for that backend with a documented reason.
-_BACKENDS_WITH_RELOAD = ["safetensors-shards", "memmap-fixed"]
-
-
-def _skip_if_no_reload(backend: str) -> None:
-    if backend == "parquet-rows":
-        pytest.skip(
-            "ParquetRowStore.__init__ does not reload state from disk; "
-            "open_artifact_store returns an empty store for this backend."
-        )
+# ``open_artifact_store`` returning a populated store. All three backends now
+# reload, so this mirrors ``_BACKENDS``.
+_BACKENDS_WITH_RELOAD = ["safetensors-shards", "memmap-fixed", "parquet-rows"]
 
 
 def _make_store(backend: str, root: Path, *, shard_size: int = 1000):
@@ -119,9 +109,8 @@ def test_open_artifact_store_round_trip_via_reload(
 ) -> None:
     """``open_artifact_store`` on a finalized store returns identical tensors.
 
-    Cross-process round-trip: write, finalize, open fresh, read. Only the
-    backends with a reload path support this (parquet-rows is excluded —
-    see ``_skip_if_no_reload`` and the parametrize list).
+    Cross-process round-trip: write, finalize, open fresh, read. All backends
+    have a reload path (see ``_BACKENDS_WITH_RELOAD``).
     """
     torch.manual_seed(0)
     samples = [
@@ -302,15 +291,16 @@ def test_invariant_manifest_complete_atomic_via_tmp_replace(
 # --------------------------------------------------------------------------- #
 
 
-def test_put_after_finalize_raises_safetensors(tmp_path: Path) -> None:
-    """SafetensorsShardStore explicitly guards against post-finalize ``put``.
+@pytest.mark.parametrize("backend", _BACKENDS)
+def test_put_after_finalize_raises(backend: str, tmp_path: Path) -> None:
+    """Every backend guards against post-finalize ``put``.
 
-    Contract: ``store.py:199-200`` raises ``RuntimeError`` so an accidental
-    "one more sample" after the manifest landed is caught loudly.
-    (The other two backends lack this runtime guard; their post-finalize
-    behavior is unspecified by current code.)
+    Contract: ``put`` raises ``RuntimeError`` so an accidental "one more
+    sample" after the manifest landed is caught loudly. All three backends
+    carry this ``self._finalized`` guard (parquet/memmap gained it alongside
+    the parquet reload path).
     """
-    store = SafetensorsShardStore(tmp_path / "store")
+    store = _make_store(backend, tmp_path / "store")
     store.put("s1", {"logits": torch.tensor([[1.0]])})
     store.finalize()
     with pytest.raises(RuntimeError, match="finalized"):
@@ -436,11 +426,8 @@ def test_parquet_rows_append_order_preserved(tmp_path: Path) -> None:
     Pin: parquet-rows stores ``sample_id -> row_idx`` and iterating yields
     keys in their original insertion order.
 
-    Note: parquet-rows does not currently support post-open reload via
-    ``open_artifact_store`` (``ParquetRowStore.__init__`` starts with
-    empty in-memory state). The pin is therefore restricted to in-session
-    iteration; the row-order contract on disk still holds via the
-    sample_to_row index in ``manifest.json``.
+    The row-order contract on disk is held by the sample_to_row index in
+    ``manifest.json`` (which the reload path uses as the index source of truth).
     """
     store = ParquetRowStore(tmp_path / "store")
     for sid in ("alpha", "bravo", "charlie"):
@@ -452,3 +439,71 @@ def test_parquet_rows_append_order_preserved(tmp_path: Path) -> None:
         (tmp_path / "store" / "manifest.json").read_text(encoding="utf-8")
     )["sample_to_row"]
     assert idx == {"alpha": 0, "bravo": 1, "charlie": 2}
+
+
+def test_parquet_reopen_with_heterogeneous_fields(tmp_path: Path) -> None:
+    """Reload must strip the union-schema None columns, not crash or cross fields.
+
+    Two samples carry *different* tensor field sets, so ``finalize`` writes a
+    union schema where each row has ``None`` for the columns it lacks. On reopen
+    the reload path must drop those None triples; ``get`` then returns exactly
+    each sample's own fields.
+    """
+    root = tmp_path / "store"
+    store = ParquetRowStore(root)
+    store.put("s1", {"logits": torch.tensor([1.0, 2.0]), "mask": torch.tensor([1])})
+    store.put("s2", {"logits": torch.tensor([3.0, 4.0])})  # no "mask"
+    store.finalize()
+
+    re_store = open_artifact_store(root)
+    g1 = re_store.get("s1")
+    g2 = re_store.get("s2")
+    assert set(g1.keys()) == {"logits", "mask"}
+    assert set(g2.keys()) == {"logits"}  # the union-schema None "mask" was stripped
+    torch.testing.assert_close(g1["logits"], torch.tensor([1.0, 2.0]))
+    torch.testing.assert_close(g2["logits"], torch.tensor([3.0, 4.0]))
+
+
+def test_parquet_reopen_corrupt_partial_triple_fails_loud(tmp_path: Path) -> None:
+    """A row whose payload/shape/dtype triple is partially None is fail-loud.
+
+    Hand-build a finalized store whose ``rows.parquet`` has a payload byte
+    column but a missing (``None``) shape sidecar — reopening must raise rather
+    than silently mis-read or drop the field.
+    """
+    root = tmp_path / "store"
+    store = ParquetRowStore(root)
+    store.put("s1", {"logits": torch.tensor([1.0, 2.0])})
+    store.finalize()
+
+    # Corrupt rows.parquet: null out the logits__shape column for the only row.
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(str(root / "rows.parquet"))
+    cols = {name: table.column(name) for name in table.column_names}
+    cols["logits__shape"] = pa.array([None], type=table.schema.field("logits__shape").type)
+    corrupt = pa.table(cols)
+    pq.write_table(corrupt, str(root / "rows.parquet"))
+
+    with pytest.raises(ValueError, match="partially-None"):
+        open_artifact_store(root)
+
+
+def test_parquet_reopen_corrupt_manifest_missing_index_fails_loud(tmp_path: Path) -> None:
+    """A finalized store whose manifest.json lost ``sample_to_row`` is fail-loud.
+
+    Regression: ``payload.get("sample_to_row", {})`` used to treat a truncated
+    manifest (``{}``) as an empty store even though rows.parquet still held data,
+    silently returning zero samples. The reload now raises instead.
+    """
+    root = tmp_path / "store"
+    store = ParquetRowStore(root)
+    store.put("s1", {"logits": torch.tensor([1.0, 2.0])})
+    store.finalize()
+
+    # Drop sample_to_row entirely while rows.parquet / MANIFEST_COMPLETE remain.
+    (root / "manifest.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="sample_to_row"):
+        open_artifact_store(root)

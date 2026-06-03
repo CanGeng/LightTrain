@@ -34,9 +34,21 @@ class LineFileTextDataset:
         # Opt-in document chunking for stateful (RWKV/Mamba) streaming: a long
         # document is split into fixed-size chunks and the *first* chunk of each
         # document carries ``_doc_boundary=True`` (the recurrent-state reset
-        # point). Chunk first, then cap each chunk at ``max_len`` (keep
-        # chunk_size <= max_len). ``None`` keeps the one-line-per-sample default.
-        self.chunk_size = int(chunk_size) if chunk_size else None
+        # point). ``None`` keeps the one-line-per-sample default.
+        # ``chunk_size`` must be a positive int <= ``max_len``: a larger
+        # chunk_size would silently drop tokens past ``max_len`` (the per-chunk
+        # ``[: max_len]`` cap below), so we fail loud instead.
+        self.chunk_size = None if chunk_size is None else int(chunk_size)
+        if self.chunk_size is not None:
+            if self.chunk_size <= 0:
+                raise ValueError(
+                    f"chunk_size must be a positive int, got {self.chunk_size}."
+                )
+            if self.chunk_size > self.max_len:
+                raise ValueError(
+                    f"chunk_size ({self.chunk_size}) must be <= max_len ({self.max_len}); "
+                    "a larger chunk_size would silently drop tokens past max_len."
+                )
 
         text = self.path.read_text(encoding=encoding, errors="replace")
         self.samples: list[Sample] = []

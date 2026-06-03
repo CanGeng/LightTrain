@@ -202,6 +202,10 @@ class MemmapFixedStore(ArtifactStoreBase):
                 pass
 
     def put(self, sample_id: str, tensors: Mapping[str, torch.Tensor]) -> None:
+        if self._finalized:
+            raise RuntimeError(
+                f"store at {self.root} already finalized — cannot put more samples"
+            )
         if sample_id in self._index:
             return
         row = self._next_row
@@ -303,8 +307,107 @@ class ParquetRowStore(ArtifactStoreBase):
         super().__init__(root, header=header)
         self._rows: list[dict[str, Any]] = []
         self._index: dict[str, int] = {}
+        # Reload a finalized store from disk so ``open_artifact_store`` returns
+        # a populated (read-back) store across processes — mirrors
+        # ``MemmapFixedStore.__init__``. ``self._finalized`` is set by the base
+        # class from ``MANIFEST_COMPLETE.json``.
+        if self._finalized:
+            self._reload_from_disk()
+
+    def _finalized_count(self) -> int:
+        """Sample count recorded in ``MANIFEST_COMPLETE.json`` (0 if unreadable)."""
+        complete = self.root / "MANIFEST_COMPLETE.json"
+        if not complete.exists():
+            return 0
+        try:
+            return int(json.loads(complete.read_text(encoding="utf-8")).get("count", 0))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return 0
+
+    def _reload_from_disk(self) -> None:
+        """Rebuild ``_rows`` / ``_index`` from a finalized store on disk.
+
+        ``manifest.json`` (``sample_to_row``) is the index source of truth.
+        Unlike the safetensors/memmap reload paths, a corrupt or missing
+        manifest here is fail-loud, not a silent empty store.
+        """
+        idx_path = self.root / "manifest.json"
+        if not idx_path.exists():
+            raise FileNotFoundError(
+                f"finalized parquet store at {self.root} is missing manifest.json"
+            )
+        payload = json.loads(idx_path.read_text(encoding="utf-8"))
+        # ``sample_to_row`` must be present and a dict — a manifest that lost it
+        # (e.g. truncated to ``{}``) is corrupt, NOT an empty store, and must
+        # fail loud rather than silently return zero samples.
+        sample_to_row = payload.get("sample_to_row")
+        if not isinstance(sample_to_row, dict):
+            raise ValueError(
+                f"finalized parquet store at {self.root}: manifest.json is missing "
+                "a valid 'sample_to_row' index (corrupt manifest)"
+            )
+        rows_path = self.root / "rows.parquet"
+        if not sample_to_row:
+            # A genuinely empty store writes no rows.parquet and records
+            # count==0. An empty index alongside on-disk rows / a positive count
+            # is a corrupt or mismatched manifest.
+            count = self._finalized_count()
+            if rows_path.exists() or count:
+                raise ValueError(
+                    f"finalized parquet store at {self.root}: empty sample_to_row "
+                    f"but rows.parquet present={rows_path.exists()} / count={count} "
+                    "(corrupt manifest)"
+                )
+            return
+        if not rows_path.exists():
+            raise FileNotFoundError(
+                f"finalized parquet store at {self.root} declares "
+                f"{len(sample_to_row)} sample(s) but rows.parquet is missing"
+            )
+        table_rows = pq.read_table(str(rows_path)).to_pylist()
+        if len(table_rows) != len(sample_to_row):
+            raise ValueError(
+                f"parquet store at {self.root} inconsistent: rows.parquet has "
+                f"{len(table_rows)} row(s) but manifest lists {len(sample_to_row)}"
+            )
+        rebuilt: list[dict[str, Any]] = []
+        for i, raw in enumerate(table_rows):
+            sid = raw.get("sample_id")
+            if sample_to_row.get(sid) != i:
+                raise ValueError(
+                    f"parquet store at {self.root}: row {i} sample_id {sid!r} "
+                    "does not match manifest sample_to_row"
+                )
+            # Field set = columns that are not sample_id / a __shape/__dtype
+            # sidecar. The finalize union-schema gives absent fields a None
+            # triple; keep a field only when its whole triple is present, and
+            # fail loud on a partially-None (corrupt) triple.
+            clean: dict[str, Any] = {"sample_id": sid}
+            for col, val in raw.items():
+                if col == "sample_id" or col.endswith("__shape") or col.endswith("__dtype"):
+                    continue
+                shape_v = raw.get(f"{col}__shape")
+                dtype_v = raw.get(f"{col}__dtype")
+                present = [val is not None, shape_v is not None, dtype_v is not None]
+                if not any(present):
+                    continue  # field absent for this row (union-schema None columns)
+                if not all(present):
+                    raise ValueError(
+                        f"parquet store at {self.root}: corrupt row {sid!r} — field "
+                        f"{col!r} has a partially-None payload/shape/dtype triple"
+                    )
+                clean[col] = val
+                clean[f"{col}__shape"] = shape_v
+                clean[f"{col}__dtype"] = dtype_v
+            rebuilt.append(clean)
+        self._rows = rebuilt
+        self._index = dict(sample_to_row)
 
     def put(self, sample_id: str, tensors: Mapping[str, torch.Tensor]) -> None:
+        if self._finalized:
+            raise RuntimeError(
+                f"store at {self.root} already finalized — cannot put more samples"
+            )
         if sample_id in self._index:
             return
         row: dict[str, Any] = {"sample_id": sample_id}

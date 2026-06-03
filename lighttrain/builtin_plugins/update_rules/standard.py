@@ -36,6 +36,7 @@ from lighttrain.update_rules._primitives import (  # noqa: F401  (_register_new_
     _current_lr,
     _register_new_params,
     apply_update,
+    make_autocast,
 )
 
 
@@ -128,12 +129,8 @@ class StandardUpdateRule:
 
         # AMP autocast wraps forward + loss when an Accelerator is wired.
         # Backward stays outside autocast (per HF Accelerate convention).
-        if accelerator is not None and hasattr(accelerator, "autocast"):
-            autocast_ctx = accelerator.autocast()
-        else:
-            from contextlib import nullcontext
-
-            autocast_ctx = nullcontext()
+        # A fresh autocast CM is built per forward inside ``_run_forward_and_loss``
+        # (RETRY_STEP replays forward, and ``accelerator.autocast()`` is single-use).
 
         # Publish the model into ``ctx.extras`` so loss fns that need to
         # attach learned submodules (e.g. HiddenStatesMSELoss(project=True)
@@ -142,7 +139,7 @@ class StandardUpdateRule:
         ctx.extras["model"] = model
 
         def _run_forward_and_loss() -> tuple[Any, Any, dict[str, Any]]:
-            with autocast_ctx:
+            with make_autocast(accelerator):
                 _outputs = model(**batch)
                 if not isinstance(_outputs, ModelOutput):
                     _outputs = ModelOutput(

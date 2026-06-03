@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import torch
 
 from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
@@ -59,6 +60,58 @@ def test_line_file_dataset_drops_blank_lines(tmp_path: Path):
     p = tmp_path / "corpus.txt"
     p.write_text("first\n\nsecond\n\n", encoding="utf-8")
     ds = LineFileTextDataset(p, tokenizer=ByteTokenizer(), max_len=128)
+    assert len(ds) == 2
+
+
+class _FixedTokenizer:
+    """Encodes any line to a fixed list of ``n`` distinct token ids."""
+
+    def __init__(self, n: int) -> None:
+        self._ids = list(range(n))
+
+    def encode(self, _line: str) -> list[int]:
+        return list(self._ids)
+
+
+def test_chunk_size_larger_than_max_len_fails_loud(tmp_path: Path):
+    """chunk_size > max_len would silently drop tokens past max_len → ValueError."""
+    p = tmp_path / "corpus.txt"
+    p.write_text("anything\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="must be <= max_len"):
+        LineFileTextDataset(
+            p, tokenizer=_FixedTokenizer(100), max_len=20, chunk_size=50
+        )
+
+
+@pytest.mark.parametrize("bad", [0, -1])
+def test_chunk_size_non_positive_fails_loud(tmp_path: Path, bad: int):
+    """chunk_size of 0 or negative is rejected (0 used to silently disable)."""
+    p = tmp_path / "corpus.txt"
+    p.write_text("anything\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="positive int"):
+        LineFileTextDataset(
+            p, tokenizer=_FixedTokenizer(100), max_len=20, chunk_size=bad
+        )
+
+
+def test_chunk_size_within_max_len_covers_all_tokens(tmp_path: Path):
+    """chunk_size <= max_len chunks a long doc without dropping any token."""
+    p = tmp_path / "corpus.txt"
+    p.write_text("anything\n", encoding="utf-8")
+    ds = LineFileTextDataset(
+        p, tokenizer=_FixedTokenizer(100), max_len=50, chunk_size=20
+    )
+    covered: set[int] = set()
+    for s in ds.samples:
+        covered.update(s["input_ids"])
+    assert covered == set(range(100))
+
+
+def test_chunk_size_none_keeps_one_sample_per_line(tmp_path: Path):
+    """chunk_size=None keeps the one-line-per-sample default (no chunking)."""
+    p = tmp_path / "corpus.txt"
+    p.write_text("a\nb\n", encoding="utf-8")
+    ds = LineFileTextDataset(p, tokenizer=ByteTokenizer(), max_len=64, chunk_size=None)
     assert len(ds) == 2
 
 

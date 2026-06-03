@@ -23,6 +23,7 @@ htmlcov/
 docs/deprecated
 acceptance/
 scripts/check_core_size.py
+.mypy_cache/
 
 # Run artifacts
 runs/

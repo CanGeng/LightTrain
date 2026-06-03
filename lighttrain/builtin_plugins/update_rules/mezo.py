@@ -28,6 +28,7 @@ import torch
 
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
+from lighttrain.update_rules._primitives import make_autocast
 
 
 def _to_metric(value: Any) -> float:
@@ -130,17 +131,12 @@ class MeZOUpdateRule:
         seed = self._seed()
         self._step_count += 1
 
-        # autocast context (AMP) — wraps both forward passes consistently
-        if accelerator is not None and hasattr(accelerator, "autocast"):
-            autocast_ctx = accelerator.autocast()
-        else:
-            from contextlib import nullcontext
-            autocast_ctx = nullcontext()
-
         ctx.extras["model"] = model
 
+        # MeZO runs two forward passes (L+ / L-) per step; build a fresh autocast
+        # CM each pass (accelerator.autocast() is single-use — caching crashes L-).
         def _forward(b: Any) -> tuple[Any, torch.Tensor, dict]:
-            with autocast_ctx:
+            with make_autocast(accelerator):
                 _out = model(**b)
                 if not isinstance(_out, ModelOutput):
                     _out = ModelOutput(outputs={"logits": _out} if not isinstance(_out, Mapping) else dict(_out))

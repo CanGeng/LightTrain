@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import shutil
 from pathlib import Path
 from typing import Any, Mapping
@@ -32,8 +33,21 @@ import torch
 _STEP_RE = re.compile(r"^step_(\d+)$")
 
 
+def _tmp_path(path: Path) -> Path:
+    """A per-write-unique temp sibling of ``path``.
+
+    The ``.tmp`` marker stays in the name (callers/tests match on it) but a
+    ``<pid>.<token>`` suffix makes it unique so two concurrent writers sharing a
+    run_dir never collide on the same temp file and race ``os.replace`` (which
+    previously surfaced as ``FileNotFoundError`` on the loser). This does NOT
+    add multi-writer support — the manager is still single-writer (rank-0); it
+    only removes the crash.
+    """
+    return path.with_suffix(path.suffix + f".tmp.{os.getpid()}.{secrets.token_hex(4)}")
+
+
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = _tmp_path(path)
     with open(tmp, "wb") as f:
         f.write(data)
         f.flush()
@@ -46,7 +60,7 @@ def _atomic_write_text(path: Path, text: str) -> None:
 
 
 def _torch_save_atomic(obj: Any, path: Path) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = _tmp_path(path)
     torch.save(obj, str(tmp))
     os.replace(tmp, path)
 
@@ -55,7 +69,7 @@ def _save_safetensors(state_dict: Mapping[str, torch.Tensor], path: Path) -> Non
     try:
         from safetensors.torch import save_file
 
-        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp = _tmp_path(path)
         save_file({k: v.detach().cpu().clone() for k, v in state_dict.items()},
                   str(tmp))
         os.replace(tmp, path)
@@ -99,10 +113,19 @@ class CheckpointManager:
         ``state`` may include keys ``model`` (state_dict), ``optimizer``,
         ``scheduler``, ``rng``, ``trainer``. Manifest is the LAST file
         written, so a partial dir without ``manifest.json`` is recognized
-        as incomplete and skipped on resume.
+        as incomplete and skipped on resume. ``load()`` reads components
+        strictly by ``manifest["files"]``, so re-saving a step with fewer
+        components correctly drops the removed ones (stale files are ignored).
 
         In distributed runs, pass ``parallel_ctx`` so that only rank-0
         writes to disk.  Non-rank-0 processes return ``None`` immediately.
+
+        Note: re-saving an existing step directory is not crash-atomic.
+        ``save()`` overwrites fixed filenames in place, so a crash mid-write
+        on a same-step overwrite can leave a mixed file set behind a stale
+        manifest. Completed (non-crashed) re-saves are consistent. Callers
+        needing crash atomicity across same-step overwrites would require a
+        generation-specific on-disk layout (future work).
         """
         if parallel_ctx is not None and not parallel_ctx.is_main_process:
             return None
@@ -165,15 +188,14 @@ class CheckpointManager:
                                "manifest": manifest}
         if "model" in manifest["files"]:
             out["model"] = _load_safetensors(p / manifest["files"]["model"])
-        for key, name in (
-            ("optimizer", "optimizer.pt"),
-            ("scheduler", "scheduler.pt"),
-            ("rng", "rng.pt"),
-            ("trainer", "trainer.pt"),
-            ("data_module", "data_module.pt"),
-        ):
-            f = p / name
-            if f.exists():
+        # Load strictly by ``manifest["files"]`` — the manifest is the sole
+        # source of truth. A component absent from the manifest is NOT loaded
+        # even if a stale file from a previous same-step save lingers on disk
+        # (re-saving a step with a smaller state set must not resurrect old
+        # optimizer/scheduler/rng state).
+        for key in ("optimizer", "scheduler", "rng", "trainer", "data_module"):
+            if key in manifest["files"]:
+                f = p / manifest["files"][key]
                 out[key] = torch.load(str(f), map_location="cpu", weights_only=False)
         return out
 

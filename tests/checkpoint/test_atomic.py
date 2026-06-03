@@ -105,7 +105,9 @@ def test_invariant_atomic_write_via_tmp_replace(tmp_run_dir, monkeypatch) -> Non
     inside = [(s, d) for s, d in calls if "step_7" in d]
     assert inside, "no replaces landed inside step_7"
     for src, dst in inside:
-        assert src.endswith(".tmp"), f"non-atomic write {src} → {dst}"
+        # tmp names carry a unique ``.tmp.<pid>.<token>`` suffix (so concurrent
+        # writers don't collide); match the ``.tmp.`` marker, not a literal suffix.
+        assert ".tmp." in src, f"non-atomic write {src} → {dst}"
 
 
 def test_io_error_during_optimizer_save_leaves_no_manifest(
@@ -358,7 +360,7 @@ def test_invariant_pointer_json_written_atomic_via_tmp(
     pointer_replaces = [c for c in calls if c[1].endswith("last.json")]
     assert pointer_replaces, "no last.json os.replace recorded"
     for src, _dst in pointer_replaces:
-        assert src.endswith(".tmp")
+        assert ".tmp." in src  # unique ``.tmp.<pid>.<token>`` marker
 
 
 def test_symlink_resolves_to_step_dir(tmp_run_dir) -> None:
@@ -443,9 +445,11 @@ def test_invariant_atomic_writes_no_partial_bytes_under_concurrency(tmp_path) ->
 
     Setup: spawn two processes, **each writing into its own run dir** (not
     the same dir). This is NOT a test of CheckpointManager's race protection
-    — the manager is designed for single-rank-0 use and does not protect
-    against concurrent writers sharing one dir (they would race on
-    ``last.json.tmp``, see test_pin_checkpoint_manager_is_single_writer).
+    — the manager is designed for single-rank-0 use. Concurrent writers
+    sharing one dir no longer crash (temp files now carry a unique
+    ``.tmp.<pid>.<token>`` suffix), but last/best *ordering* is still
+    undefined under multiple writers; see
+    ``test_concurrent_writers_same_run_dir_do_not_crash``.
     What this test pins is that the OS-level atomic-rename primitive is
     safe under genuine parallel scheduling stress.
     """
@@ -472,6 +476,40 @@ def test_invariant_atomic_writes_no_partial_bytes_under_concurrency(tmp_path) ->
         assert data["step"] == step
 
 
+def test_concurrent_writers_same_run_dir_do_not_crash(tmp_path) -> None:
+    """Two writers sharing ONE run dir (different steps) must not crash.
+
+    Regression for the L3 race: previously both writers raced on the shared
+    ``last.json.tmp`` and the loser's ``os.replace`` raised ``FileNotFoundError``
+    (subprocess exitcode 1). Unique per-write temp names remove that crash.
+
+    This pins the *no-crash* property only — last/best ordering remains
+    undefined under multiple writers (single-writer contract). We use distinct
+    steps + a large ``keep_last_n`` so neither step dir is pruned.
+    """
+    shared = tmp_path / "shared_run"
+    shared.mkdir()
+    ctx = mp.get_context("spawn")
+    procs = []
+    for step, seed in ((5, 1), (6, 2)):
+        p = ctx.Process(
+            target=_parallel_writer_proc, args=(str(shared), step, seed)
+        )
+        p.start()
+        procs.append(p)
+    for p in procs:
+        p.join(timeout=30)
+        assert p.exitcode == 0, f"writer exited with {p.exitcode} (FileNotFoundError race?)"
+
+    ckpt_dir = shared / "checkpoints"
+    for step in (5, 6):
+        assert (ckpt_dir / f"step_{step}" / "manifest.json").exists()
+    # last.json was written and points at an existing step dir with a manifest.
+    last = json.loads((ckpt_dir / "last.json").read_text(encoding="utf-8"))
+    target = ckpt_dir / last["target"]
+    assert (target / "manifest.json").exists()
+
+
 # --------------------------------------------------------------------------- #
 # Single-writer contract — make the implicit assumption explicit              #
 # --------------------------------------------------------------------------- #
@@ -481,14 +519,13 @@ def test_pin_checkpoint_manager_is_single_writer() -> None:
     """Pin the implicit single-writer contract: ``CheckpointManager.save``
     expects only rank-0 to write to disk.
 
-    Currently this contract lives only as a comment in ``save()``'s docstring
-    ("In distributed runs, pass ``parallel_ctx`` so that only rank-0 writes
-    to disk."). It is not enforced by code — two writers sharing one run dir
-    will race on ``last.json.tmp`` (see exitcode-1 failure observed when
-    initially drafting test_invariant_atomic_writes_no_partial_bytes_under_concurrency
-    against a shared dir). This test makes the contract a hard requirement
-    of the code base, so anyone adding multi-writer support has to
-    consciously update the docstring at the same time.
+    This contract lives as a comment in ``save()``'s docstring ("In
+    distributed runs, pass ``parallel_ctx`` so that only rank-0 writes to
+    disk."). Two writers sharing one run dir no longer *crash* (temp files
+    carry a unique ``.tmp.<pid>.<token>`` suffix), but last/best ordering is
+    still undefined — the single-writer contract stands. This test makes that
+    contract a hard requirement so anyone adding real multi-writer support has
+    to consciously update the docstring at the same time.
 
     If this behavior is intentionally changed (e.g. adding fcntl-based
     locking for multi-writer support), update this test AND document the

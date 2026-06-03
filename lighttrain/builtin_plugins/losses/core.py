@@ -43,6 +43,13 @@ class CrossEntropyLoss:
     ``(B, T)`` mirroring ``input_ids`` (padding marked with ``-100``).
     The shift ``logits[:, :-1, :]`` vs ``labels[:, 1:]`` is performed here,
     so the collator does not need to anticipate the loss target.
+
+    The next-token shift fires only for rank>=3 logits (``(..., T, V)`` —
+    a real sequence dimension). Rank-2 ``(B, V)`` logits (a classification
+    head) are NOT shifted; they go straight to ``F.cross_entropy``. This
+    keeps a classification-shaped input from being silently misaligned, but
+    note ``loss_family`` is still ``"next_token"`` — this is a guard, not a
+    full classification objective.
     """
 
     # Paradigm tag so ``LossOnlyObjective`` inherits a meaningful loss_family
@@ -61,7 +68,10 @@ class CrossEntropyLoss:
     ) -> dict[str, Any]:
         logits = _logits(model_output)
         labels = _labels(batch)
-        if logits.dim() >= 2 and labels.dim() >= 1 and logits.size(-2) == labels.size(-1):
+        # Next-token shift only for rank>=3 logits ``(..., T, V)``. Rank-2
+        # ``(B, V)`` (classification head) must NOT shift — ``size(-2) ==
+        # size(-1)`` would coincidentally hold (B == B) and silently misalign.
+        if logits.dim() >= 3 and labels.dim() >= 1 and logits.size(-2) == labels.size(-1):
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
         else:
