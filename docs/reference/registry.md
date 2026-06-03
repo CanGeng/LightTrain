@@ -28,7 +28,7 @@ register_category("my_plugin_category")      # add a category beyond the built-i
 
 Source: [lighttrain/registry/_core.py](../../lighttrain/registry/_core.py).
 
-## Categories (32 `KNOWN_CATEGORIES`)
+## Categories (35 `KNOWN_CATEGORIES`)
 
 | Group | Categories (YAML mount) |
 | ----- | ----------------------- |
@@ -38,6 +38,7 @@ Source: [lighttrain/registry/_core.py](../../lighttrain/registry/_core.py).
 | Artifact & data | `artifact_producer`, `artifact_store`, `prep_node` (list), `data_module` (`data:`), `tokenizer` |
 | Failure-first & RL | `invariant` (list), `rl_backend`, `value_head`, `reward_adapter` |
 | Distributed | `grad_sync_strategy`, `model_parallel_strategy`, `pipeline_schedule` |
+| Sweep | `sweep_backend` (`sweep --strategy optuna`) |
 
 ## Shared dataclasses (`lighttrain/protocols.py`)
 
@@ -82,7 +83,7 @@ class StepOutput:
 | `trainer` | flat `Trainer`; override seams `produce_batch` / `forward_loss` / `before_step`, or a registered `fit()` |
 | `engine` | `step(batch, ctx) -> dict` |
 | `update_rule` | `setup(model, sample)`, `step(model, batch, ctx) -> dict` (with `"loss"`), `state_dict`, `load_state_dict` |
-| `callback` | any of 39 `CALLBACK_EVENTS` hooks; may return a `Signal` |
+| `callback` | any of 46 `CALLBACK_EVENTS` hooks; may return a `Signal` |
 | `logger` | `log_scalars`, `log_histograms`, `log_text`, `log_artifact`, `flush` |
 | `judge` | `score(items, ctx=None) -> list` (declares `reward_kind`) |
 | `rl_backend` | `generate(model, input_ids, **kw) -> Tensor` |
@@ -107,6 +108,7 @@ class StepOutput:
 - **loggers**: `console`, `jsonl`, `tensorboard`/`tb` · **judges**: plugin `verifier`, `pairwise_llm` · **rl_backend**: `hf_generate`, and plugin `vllm`
 - **grad_sync**: `noop`, `ddp`, `fsdp`, `deepspeed` · **model_parallel**: `tensor_parallel`, `tp_aware`, `sequence_parallel`*, `expert_parallel`* · **pipeline**: `1f1b`, `gpipe`, `interleaved_1f1b`
   - *`sequence_parallel` / `expert_parallel` are registered but **not yet wired into the train runtime** (the selector only picks `tensor_parallel`; EP is a skeleton). See the v0.2.3 changelog "Known issues".*
+- **sweep_backend**: plugin `optuna` (requires `pip install -e '.[sweep]'`)
 
 ## Exceptions
 

@@ -3,7 +3,7 @@
 Orchestrates grid, random, and median-stop strategies.  Each trial runs as a
 ``lighttrain train`` subprocess so the registry and GPU state are fully
 isolated.  Optuna is available as an opt-in plugin at
-``plugins.sweep_backends.optuna``.
+``lighttrain.plugins.sweep_backends.optuna``.
 
 Sweep spec YAML schema::
 
@@ -267,8 +267,13 @@ class SweepRunner:
 
     def _optuna_configs(self) -> list[dict[str, Any]]:
         try:
+            from lighttrain.config._components import import_all_components
+            from lighttrain.registry import RegistryError
             from lighttrain.registry import get as _get
 
+            # The sweep CLI does not call load_config(), so the optuna plugin
+            # may not be registered yet — populate the registry before lookup.
+            import_all_components()
             searcher_cls = _get("sweep_backend", "optuna")
             searcher = searcher_cls(
                 params=self.params,
@@ -277,11 +282,11 @@ class SweepRunner:
                 seed=self.seed,
             )
             return searcher.all_suggestions()
-        except (ImportError, KeyError) as exc:
+        except (ImportError, RegistryError) as exc:
             raise RuntimeError(
                 f"Optuna sweep backend unavailable: {exc}. "
                 "Install with: pip install -e '.[sweep]' and ensure "
-                "plugins.sweep_backends.optuna is importable."
+                "lighttrain.plugins.sweep_backends.optuna is importable."
             ) from exc
 
     # ---------------------------------------------------------------- trial execution

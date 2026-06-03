@@ -26,7 +26,7 @@ try:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 except ImportError as _import_err:
     raise ImportError(
-        "plugins.sweep_backends.optuna requires optuna. "
+        "lighttrain.plugins.sweep_backends.optuna requires optuna. "
         "Install with: pip install -e '.[sweep]'"
     ) from _import_err
 

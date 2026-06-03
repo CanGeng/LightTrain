@@ -3,8 +3,9 @@
 > [中文版](recipes.zh-CN.md) · [Docs index](../README.md)
 
 The fastest way to start: copy a bundled recipe from
-[`recipes/`](../../recipes/) and edit it. Run any of them with
-`lighttrain train -c recipes/<name>.yaml`.
+[`recipes/`](../../recipes/) and edit it. Most run with
+`lighttrain train -c recipes/<name>.yaml`; the distributed overlays (below) are
+the exception — they layer onto a full recipe and need a multi-process launcher.
 
 ## Pretraining & SFT
 
@@ -57,6 +58,23 @@ The fastest way to start: copy a bundled recipe from
 | `sweep_lr` | Learning-rate sweep |
 | `sweep_demo` | General sweep config |
 | `sweep_r15` | Sweep with early-stopping rules |
+
+## Distributed
+
+These demonstrate parallel topologies. **`ddp` / `fsdp` / `zero2` / `tp_ddp` /
+`3d_parallel` are overlays** — they carry only the `parallel:` / `engine:` /
+`trainer:` topology (no `model:` / `data:`), so they must be layered onto a
+complete recipe (e.g. `pretrain_causal`) and launched with a multi-process
+launcher (`torchrun` / `deepspeed`), not a single-process `lighttrain train`.
+
+| Recipe | Demonstrates |
+| ------ | ------------ |
+| `ddp` | Single-node 4-GPU DDP data parallelism (overlay) |
+| `fsdp` | FSDP full sharding (overlay) |
+| `zero2` | ZeRO-2 optimizer sharding (overlay) |
+| `tp_ddp` | Tensor parallel × DDP (overlay) |
+| `3d_parallel` | TP × PP × DP 3-D parallelism (overlay) |
+| `nano_model` | gloo + CPU multi-process smoke test (complete recipe; `torchrun --nproc_per_node 4`) |
 
 ## See also
 

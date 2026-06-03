@@ -8,13 +8,16 @@ interpolation → Pydantic validation**.
 
 ## Required sections
 
-Missing any of these errors out immediately:
+The training/build path must be able to resolve a **model declaration**, a
+**data declaration**, and an **optimizer for every trainable model**:
 
-| Section | Error |
-| ------- | ----- |
-| `model:` | `recipe is missing 'model:' section` |
-| `data:` | `recipe is missing 'data:' section` |
-| `optim:` | `recipe is missing 'optim:' section` |
+| Requirement | May be written as |
+| ----------- | ----------------- |
+| model declaration | `model:`, or `models:` / `model_profiles:` |
+| data declaration | `data:` |
+| optimizer | `optim:`, or `optimizers:` (one per trainable model) |
+
+A missing piece errors out at build time (e.g. `recipe is missing 'data:' section`).
 
 ## Root fields
 

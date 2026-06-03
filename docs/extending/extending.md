@@ -66,7 +66,7 @@ class MyCB:
             return Signal.SKIP_STEP
 ```
 
-Only implement the hooks you need — `getattr` dispatch handles the rest (39
+Only implement the hooks you need — `getattr` dispatch handles the rest (46
 events in `CALLBACK_EVENTS`).
 
 ## Custom trainer (new paradigm)
@@ -75,9 +75,13 @@ Override the two seams on the flat `Trainer` — `produce_batch` (what a batch i
 and `forward_loss` (forward + loss) — or write a short registered `fit()` calling
 the public primitives (`run_train_loop`, `apply_update`,
 `forward_with_activations`). Multi-model paradigms read `self.models["..."]` /
-`self.optimizers["..."]` — **declare `models=` / `optimizers=` on `__init__`** to
-receive the set (see [Training § multi-model](../concepts/training.md#multi-model)). Full
-worked example: [examples/online_distill.py](../../examples/online_distill.py).
+`self.optimizers["..."]` — to receive the set your `__init__` must either
+**declare `models=` / `optimizers=` explicitly**, or take **`**kwargs` and
+forward them to `Trainer.__init__`** (see
+[Training § multi-model](../concepts/training.md#multi-model)). The built-in
+`preference` / `reward_model` / `ppo` / `grpo` trainers take a single `model=` /
+`optimizer=` and do **not** accept the model set. Full worked example:
+[examples/online_distill.py](../../examples/online_distill.py).
 
 ## Custom PrepGraph node
 

@@ -12,7 +12,7 @@
 | ---- | ---- |
 | `init <path> [--force]` | 脚手架：带注释的 `cfg.yaml` + README + `runs/` + `artifacts/` |
 | `dry-run -c <cfg> [--build]` | 解析并打印配置；`--build` 还会构造模型（校验 `model_profiles` 选择器） |
-| `train -c <cfg> [OVERRIDES…] [--eval] [--output-summary f.json]` | 完整训练循环；设了 `prep_graph:` 会自动跑 PrepGraph |
+| `train -c <cfg> [OVERRIDES…] [--eval] [--output-summary f.json]` | 完整训练循环；当训练数据引用 PrepGraph 输出（`data.source: prep_graph:<terminal>` 或 `data.name: prep_graph`）时自动跑 PrepGraph |
 | `resume --run <dir> [-c cfg] [--mode functional\|exact]` | 从 run 目录恢复（默认用其 `config.snapshot.yaml`） |
 | `resume-verify -c <cfg> --phase1-steps N --phase2-steps M [--tol 1e-2]` | 逐步对比 loss，校验 resume == 单趟训练 |
 | `overfit -c <cfg> --n N` | 在 N 个 batch 上过拟合（冒烟测试） |
@@ -35,8 +35,8 @@
 | `profile -c <cfg> [--steps N]` | `torch.profiler` chrome trace |
 | `lineage tag/untag/pin/invalidate/gc/prune-orphans/graph` | SQLite lineage 操作 |
 | `migrate config [--to-profiles] / artifact-header / checkpoint` | schema 迁移（写 `.pre-migration-bak` 备份） |
-| `convert-checkpoint --input <ckpt> --output <out> --to <fmt>` | `.pt` / `.safetensors` / HF 互转 |
-| `export --config <cfg> --out <dir> --to <fmt>` | 导出权重；`gguf` 需 PATH 上有 llama.cpp |
+| `convert-checkpoint --from <fmt> --to <fmt> --path <ckpt> [--out <out>]` | `.pt` / `.safetensors` / HF 互转 |
+| `export --to <fmt> --ckpt <step_dir> --out <out> [-c <cfg>]` | 导出权重；`hf`/`gguf` 路径需 `-c`；`gguf` 还需 PATH 上有 llama.cpp |
 
 ## Override 语法
 

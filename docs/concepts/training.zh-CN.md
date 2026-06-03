@@ -80,7 +80,7 @@ optimizers:
 
 ## PEFT 与显存效率
 
-每个适配器是一个 model profile（`lora` / `adalora` / `qlora`）；`LayerOffload`
+每个适配器是一个 model profile（`lora` / `ia3` / `adalora` / `qlora`）；`LayerOffload`
 engine + `cpu_offload` 优化器让大模型跑在消费级 GPU 上。配方：`qlora`、
 `offload_fullparam`、`mezo_sft`。
 

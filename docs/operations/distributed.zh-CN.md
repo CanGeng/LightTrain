@@ -2,8 +2,18 @@
 
 > [English](distributed.md) · [文档索引](../README.md)
 
-> **状态：** DDP/FSDP/ZeRO/TP/PP/SP/EP 已实现，并通过基于 CPU 多进程（gloo）的
-> spawn 测试。**尚未**在多机 GPU 集群上做规模验证。生产环境请自行评估风险。
+> **状态：** DDP/FSDP/ZeRO/TP/PP 已实现，并通过基于 CPU 多进程（gloo）的 spawn 单测。
+> **尚未**在多机 GPU 集群上做规模验证。生产环境请自行评估风险。
+>
+> **已知限制（SP/EP）：** `sequence_parallel` / `expert_parallel` 已注册，但训练
+> runtime 的策略选择器只接 `tensor_parallel`，且 EP 仍是 skeleton（无 all-to-all）。
+> 它们**无法从 recipe 使用**：请求 `parallel.sp: true` 或 `parallel.ep > 1` 会
+> **抛 `ConfigError`**（而非静默 no-op）。后续接入时需改动的文件清单记录在
+> v0.2.3 changelog “Known issues”。
+>
+> **失败模式：** 请求了并行但无法生效——缺 `tensor_parallel:` 块、策略未注册、未知
+> pipeline `schedule`、尚未接入的 `parallel.sp` / `parallel.ep`、或 TP apply /
+> PP prepare 失败——都会 **fail loud 抛 `ConfigError`**，不会静默回落到单卡。
 
 `parallel:` 块让一次 run 从单卡扩到多卡，**无需改动模型或 trainer 代码**。
 不写它等同于 `dp=tp=pp=ep=1`。

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.2.3"
+version = "0.2.4"
 description = "PyTorch LM training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -40,7 +40,7 @@ peft = ["peft>=0.7"]
 quant = ["bitsandbytes>=0.43; platform_system == 'Linux'"]
 offload = []
 vllm = []
-optuna = []
+sweep = ["optuna>=3.0"]
 
 [project.scripts]
 lighttrain = "lighttrain.cli._app:app"

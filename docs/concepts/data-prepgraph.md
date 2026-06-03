@@ -29,14 +29,19 @@ Built-ins (see [reference/registry.md](../reference/registry.md) for the full li
 ## PrepGraph — content-addressed data prep
 
 PrepGraph is a DAG of preparation nodes. Each node's fingerprint is
-`sha256(canonical_config + code_version + schema_version + sorted upstream_fps)`;
-results land atomically under `runs/<exp>/prep/<kind>/<name>/<fp>/` with
-`MANIFEST_COMPLETE.json` written last. A node whose inputs and config are
+`sha256(node.kind + node.schema_kind + SCHEMA_VERSION[schema_kind] +
+code_version + canonical_config + sorted upstream_fps)`; results land atomically
+with `MANIFEST_COMPLETE.json` written last. A node whose inputs and config are
 unchanged is reused from cache; change anything upstream and only the affected
 subtree recomputes.
 
-`lighttrain train` auto-runs PrepGraph when `prep_graph:` is set, so explicit
-`prep` is rarely needed.
+The cache root differs by entry point: a standalone `lighttrain prep` defaults
+to `runs/<exp>/prep/<kind>/<name>/<fp>/`, while a `prep_graph` DataModule
+embedded in training defaults to `<run_dir>/prep/...`.
+
+`lighttrain train` auto-runs PrepGraph when the training data references its
+output (`data.source: prep_graph:<terminal>` or `data.name: prep_graph`), so
+explicit `prep` is rarely needed.
 
 Node kinds: `load`, `tokenize`, `chunk`, `pack`, `mix`, `join`, `index`,
 `validate`, `materialize`.
@@ -62,9 +67,14 @@ lighttrain inspect-data -c cfg.yaml --n 4 --decoded
 
 ## Resume & data position
 
-Checkpoints save sampler state and the consumed-batch count, so resume seeks the
-sampler step-exactly mid-epoch (independent of DataLoader prefetch depth). See
-[Diagnostics](../operations/diagnostics.md) and `resume-verify` in [CLI](../guide/cli.md).
+Checkpoints save sampler state and the consumed-batch count. With the `simple`
+DataModule and a seek-capable sampler (`sequential` / `shuffle` /
+`stateful_resumable`), resume seeks the sampler step-exactly mid-epoch
+(independent of DataLoader prefetch depth). `PrepGraphDataModule` and the
+`length_grouped` / `curriculum` samplers do **not** implement consumed-index
+`seek()`, so resume there is *functional* (state restored) rather than
+step-exact. See [Diagnostics](../operations/diagnostics.md) and `resume-verify`
+in [CLI](../guide/cli.md).
 
 ## See also
 

@@ -87,7 +87,7 @@ teacher — [examples/online_distill.py](../../examples/online_distill.py)
 
 ## PEFT & memory efficiency
 
-Each adapter is a model profile (`lora` / `adalora` / `qlora`); `LayerOffload`
+Each adapter is a model profile (`lora` / `ia3` / `adalora` / `qlora`); `LayerOffload`
 engine + `cpu_offload` optimizer fit large models on consumer GPUs. Recipes:
 `qlora`, `offload_fullparam`, `mezo_sft`.
 

@@ -2,8 +2,9 @@
 
 > [English](recipes.md) · [文档索引](../README.md)
 
-最快的起步方式：从 [`recipes/`](../../recipes/) 拷一个内置 recipe 改。任意一个都用
-`lighttrain train -c recipes/<名字>.yaml` 运行。
+最快的起步方式：从 [`recipes/`](../../recipes/) 拷一个内置 recipe 改。多数 recipe 用
+`lighttrain train -c recipes/<名字>.yaml` 运行；分布式 overlay（见下）是例外——
+需叠加到完整 recipe 之上，并用多进程启动器。
 
 ## 预训练与 SFT
 
@@ -56,6 +57,22 @@
 | `sweep_lr` | 学习率扫描 |
 | `sweep_demo` | 通用扫描配置 |
 | `sweep_r15` | 带早停规则的扫描 |
+
+## 分布式
+
+这些演示并行拓扑。**`ddp` / `fsdp` / `zero2` / `tp_ddp` / `3d_parallel` 是 overlay**
+——只含 `parallel:` / `engine:` / `trainer:` 拓扑，没有 `model:` / `data:`，需叠加到
+一个完整 recipe（如 `pretrain_causal`）之上；且要用多进程启动器（`torchrun` /
+`deepspeed`），不能用单进程 `lighttrain train` 直接跑。
+
+| Recipe | 演示 |
+| ------ | ---- |
+| `ddp` | 单机 4 卡 DDP 数据并行（overlay） |
+| `fsdp` | FSDP 全分片（overlay） |
+| `zero2` | ZeRO-2 优化器分片（overlay） |
+| `tp_ddp` | 张量并行 × DDP（overlay） |
+| `3d_parallel` | TP × PP × DP 3D 并行（overlay） |
+| `nano_model` | gloo + CPU 多进程冒烟测试（完整 recipe，`torchrun --nproc_per_node 4`） |
 
 ## 相关
 

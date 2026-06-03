@@ -7,10 +7,18 @@
 > scale on multi-node GPU clusters. Use at your own risk for production.
 >
 > **Known limitation (SP/EP):** the `sequence_parallel` / `expert_parallel`
-> strategies are registered, but the train runtime's strategy selector only wires
-> `tensor_parallel` — `parallel.sp` / `parallel.ep` do **not** yet select them,
-> and EP is still a skeleton (no all-to-all). They are not usable from a recipe
-> at present. See the v0.2.3 changelog "Known issues".
+> strategies are registered, but the train runtime's strategy selector only
+> wires `tensor_parallel`, and EP is still a skeleton (no all-to-all). They are
+> **not usable from a recipe**: requesting `parallel.sp: true` or
+> `parallel.ep > 1` raises a `ConfigError` (rather than silently no-op'ing). The
+> full list of files to touch when wiring them is tracked in the v0.2.3 changelog
+> "Known issues".
+>
+> **Fail mode:** parallelism that is requested but cannot be applied — a missing
+> `tensor_parallel:` block, an unregistered strategy, an unknown pipeline
+> `schedule`, the not-yet-wired `parallel.sp` / `parallel.ep`, or a TP-apply /
+> PP-prepare failure — raises `ConfigError` rather than silently falling back to
+> single-GPU.
 
 The `parallel:` block scales a run from single-GPU to multi-GPU **without
 changing model or trainer code**. Omitting it is equivalent to `dp=tp=pp=ep=1`.

@@ -25,14 +25,15 @@ lighttrain dry-run -c cfg.yaml    # 解析并打印配置，不训练
 lighttrain train   -c cfg.yaml ++trainer.max_steps=50   # 50 步冒烟
 ```
 
-生成的 `cfg.yaml` 开箱即可跑（tiny_lm + byte 分词器），并带有大量教程式注释——
+生成的 `cfg.yaml` 在旁边放一个 `corpus.txt`（每行一条样本）后即可跑——`lighttrain
+init` 只生成 recipe，不生成语料。它用 tiny_lm + byte 分词器，并带有大量教程式注释——
 取消注释里面的可选块（`models:`、`parallel:`、`prep_graph:`、PEFT 等）即可逐步扩展。
 
 ## 你需要准备什么
 
 | 文件 | 必须 | 说明 |
 | ---- | ---- | ---- |
-| YAML recipe | **是** | 必须含 `model:`、`data:`、`optim:` |
+| YAML recipe | **是** | 必须声明模型、数据、优化器（见 [配置](configuration.zh-CN.md#必填节点)） |
 | 训练数据 | **是** | 格式取决于 dataset（见下） |
 | 预训练权重 | 可选 | 仅 `hf_causal` 需要（HF 名称或本地路径） |
 

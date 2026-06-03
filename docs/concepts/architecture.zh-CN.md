@@ -26,7 +26,7 @@ lighttrain 定义五个清晰的缝，其余部分保持直白。
    `forward_loss`（可选 `before_step`），或写一个短的注册 `fit()`。见
    [训练](training.zh-CN.md)、[扩展](../extending/extending.zh-CN.md)。
 
-4. **EventBus** ([callbacks/base.py](../../lighttrain/callbacks/base.py)) —— 39 个
+4. **EventBus** ([callbacks/base.py](../../lighttrain/callbacks/base.py)) —— 46 个
    生命周期事件经 `getattr` 分发；单 callback 异常隔离；结果聚合为 `Signal`
    （`STOP_TRAINING > RETRY_STEP > SKIP_STEP > CONTINUE`）。见
    [诊断](../operations/diagnostics.zh-CN.md)。
@@ -45,7 +45,8 @@ lighttrain 定义五个清晰的缝，其余部分保持直白。
    写 `config.snapshot.yaml` + `env.json`。
 3. **组件（严格顺序）**
    - **A — 拓扑**：`parallel_ctx`（单卡退化或进程组 + DeviceMesh）；`device` 由它得出。
-   - **B — 模型 + TP/SP/EP 手术**（必须先于 FSDP/DDP 包装——sharding 需要手术后形状）。
+   - **B — 模型 + TP 手术**（必须先于 FSDP/DDP 包装——sharding 需要手术后形状；
+     SP/EP 接入后也在这里，目前会被 `ConfigError` 拒绝）。
    - **C — pipeline 切分**（`pp > 1` 时）。
    - **D — grad-sync 包装**（`noop`/`ddp`/`fsdp`/`deepspeed`；FSDP 经
      `optimizer_factory` 在包装*之后*建优化器）。
@@ -55,8 +56,9 @@ lighttrain 定义五个清晰的缝，其余部分保持直白。
    trainer；lab 模式诊断 callback 自动挂载。
 6. **训练循环** —— `trainer.fit()` 跑 epoch/信号/log/ckpt 循环。
 
-关键不变量：拓扑先于一切；TP/SP/EP 先于 FSDP/DDP；FSDP 优化器后置；rank-0 门控所有
-IO；`loss_fn` 是独立组件（经 `loss:` 替换）；`manifest.json` 最后写。
+关键不变量：拓扑先于一切；TP/SP/EP 先于 FSDP/DDP；FSDP 优化器后置；rank-0 门控
+checkpoint 与日志 IO（run 元数据初始化与 PrepGraph 尚未完全按 rank-0 协调）；
+`loss_fn` 是独立组件（经 `loss:` 替换）；`manifest.json` 最后写。
 
 ## 相关
 

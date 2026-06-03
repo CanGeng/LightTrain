@@ -73,7 +73,7 @@ exists = contains("model", "hf_causal") # → True
 
 ### 新增自定义类别
 
-预声明 31 个 `KNOWN_CATEGORIES`（见第 2 节）以外的类别需先注册：
+预声明 35 个 `KNOWN_CATEGORIES`（见第 2 节）以外的类别需先注册：
 
 ```python
 register_category("my_plugin_category")
@@ -87,7 +87,7 @@ class MyImpl:
 
 ## 2. 注册类别清单
 
-共 **32 个** `KNOWN_CATEGORIES`（另有 `metric` / `architecture` 供扩展，当前无内置实现）。
+共 **35 个** `KNOWN_CATEGORIES`（`metric` 暂无内置实现；`architecture` 已注册 `transformer` / `rwkv`）。
 
 ### Core 8
 
@@ -150,8 +150,16 @@ class MyImpl:
 | 类别 | 已注册名称 | 对应 Protocol | YAML 挂载节点 |
 |------|-----------|--------------|--------------|
 | `grad_sync_strategy` | `noop` · `ddp` · `fsdp` · `deepspeed` | `GradSyncStrategy` | `parallel.grad_sync.name:` |
-| `model_parallel_strategy` | `tensor_parallel` · `tp_aware` · `sequence_parallel` · `expert_parallel` | `ModelParallelStrategy` | `parallel.tensor_parallel:` |
+| `model_parallel_strategy` | `tensor_parallel` · `tp_aware` · `sequence_parallel`\* · `expert_parallel`\* | `ModelParallelStrategy` | `parallel.tensor_parallel:` |
 | `pipeline_schedule` | `1f1b` · `gpipe` · `interleaved_1f1b` | `PipelineSchedule` | `parallel.pipeline.schedule:` |
+
+> \* `sequence_parallel` / `expert_parallel` 已注册但**尚未接入训练 runtime**（选择器只接 `tensor_parallel`，EP 仍是 skeleton）。
+
+### Sweep
+
+| 类别 | 已注册名称 | YAML 挂载节点 |
+|------|-----------|--------------|
+| `sweep_backend` | `optuna`（plugin，需 `pip install -e '.[sweep]'`） | `sweep --strategy optuna` |
 
 ---
 
@@ -577,6 +585,9 @@ class ShuffleSampler:
 |------|------|
 | `sequential` | 顺序采样，支持 state_dict | [data/core/samplers.py](../../lighttrain/data/core/samplers.py) |
 | `shuffle` | 每 epoch 确定性随机打乱（seed + epoch） | [data/core/samplers.py](../../lighttrain/data/core/samplers.py) |
+| `length_grouped` | 按长度分桶以减少 padding | [data/samplers/length_grouped.py](../../lighttrain/data/samplers/length_grouped.py) |
+| `curriculum` | 课程学习采样（按 step 调难度带） | [data/samplers/curriculum.py](../../lighttrain/data/samplers/curriculum.py) |
+| `stateful_resumable` | 可精确恢复的有状态采样 | [data/samplers/stateful_resumable.py](../../lighttrain/data/samplers/stateful_resumable.py) |
 
 ---
 
@@ -729,6 +740,10 @@ class StandardUpdateRule:
 | `standard` | 前向+反向+clip grad+optimizer step，支持梯度累积 | [update_rules/standard.py](../../lighttrain/update_rules/standard.py) |
 | `sam` | Sharpness-Aware Minimization（两次前向） | [update_rules/sam.py](../../lighttrain/update_rules/sam.py) |
 | `mezo` | Memory-Efficient Zeroth-Order Optimization | [update_rules/mezo.py](../../lighttrain/update_rules/mezo.py) |
+| `rl` | RL 更新规则（PPO/GRPO 内部用） | [update_rules/rl.py](../../lighttrain/update_rules/rl.py) |
+| `forward_forward` *(plugin)* | Forward-Forward 算法 | [plugins/update_rules/forward_forward/](../../lighttrain/plugins/update_rules/forward_forward/__init__.py) |
+| `pcn` *(plugin)* | 预测编码网络 | [plugins/update_rules/pcn/](../../lighttrain/plugins/update_rules/pcn/__init__.py) |
+| `dfa` *(plugin)* | Direct Feedback Alignment | [plugins/update_rules/dfa/](../../lighttrain/plugins/update_rules/dfa/__init__.py) |
 
 ---
 
@@ -736,7 +751,7 @@ class StandardUpdateRule:
 
 **Protocol**：`CallbackProtocol`（[lighttrain/protocols.py:311](../../lighttrain/protocols.py#L311)）
 
-**所有事件方法均为可选**（`EventBus` 通过 `getattr` 检查）。完整事件列表见 `CALLBACK_EVENTS`（39 个）。
+**所有事件方法均为可选**（`EventBus` 通过 `getattr` 检查）。完整事件列表见 `CALLBACK_EVENTS`（46 个）。
 
 **常用事件**
 
@@ -852,6 +867,19 @@ class NextTokenObjective:
 | `diffusion` *(plugin)* | `denoising` | [lighttrain/plugins/objectives/diffusion.py](../../lighttrain/plugins/objectives/diffusion.py) |
 | `flow_matching` *(plugin)* | `flow_matching` | [lighttrain/plugins/objectives/flow_matching.py](../../lighttrain/plugins/objectives/flow_matching.py) |
 | `jepa` *(plugin)* | `jepa` | [lighttrain/plugins/objectives/jepa.py](../../lighttrain/plugins/objectives/jepa.py) |
+
+---
+
+### 4.16b `architecture`
+
+把 `trainer.arch_profile` 字符串解析为 `ArchitectureProfile`（block / embedding / head 缝 + 有状态 reset）。
+
+**内置注册项**
+
+| name | 说明 | 文件 |
+|------|------|------|
+| `transformer` | 标准 Transformer 架构 profile（core） | [architectures/transformer.py](../../lighttrain/architectures/transformer.py) |
+| `rwkv` *(plugin)* | RWKV 架构 profile | [plugins/architectures/rwkv/](../../lighttrain/plugins/architectures/rwkv/__init__.py) |
 
 ---
 

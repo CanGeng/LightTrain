@@ -7,6 +7,7 @@ Keeps ``cli/_app.py`` thin: every train-style command boils down to
 from __future__ import annotations
 
 import inspect
+import warnings
 from pathlib import Path
 from typing import Any, Mapping, get_args
 
@@ -389,25 +390,82 @@ def _build_grad_sync_strategy(cfg: RootConfig) -> Any | None:
 
 
 def _build_model_parallel_strategy(cfg: RootConfig) -> Any | None:
-    """Build a ModelParallelStrategy from cfg.parallel.tensor_parallel, or None."""
+    """Build a ModelParallelStrategy from cfg.parallel.tensor_parallel, or None.
+
+    Fails loud (``ConfigError``) when parallelism is requested but cannot be
+    applied — a missing ``tensor_parallel:`` block, an unregistered strategy, or
+    the not-yet-wired ``sp`` / ``ep`` degrees would otherwise silently fall back
+    to single-GPU (the user would think they were parallel when they weren't).
+    """
     par = getattr(cfg, "parallel", None)
     if par is None:
         return None
-    tp_cfg = getattr(par, "tensor_parallel", None)
-    if tp_cfg is None:
-        return None
+    # SP / EP are registered but not wired into the runtime selector (only
+    # `tensor_parallel` is applied) — fail loud rather than silently no-op.
+    if bool(getattr(par, "sp", False)):
+        raise ConfigError(
+            "parallel.sp (sequence parallelism) is registered but not yet wired "
+            "into the train runtime; remove it (see operations/distributed)."
+        )
+    if int(getattr(par, "ep", 1)) > 1:
+        raise ConfigError(
+            "parallel.ep (expert parallelism) is a skeleton not yet wired into "
+            "the train runtime; set ep=1 (see operations/distributed)."
+        )
     tp = int(getattr(par, "tp", 1))
     if tp <= 1:
         return None
-    name = str(getattr(tp_cfg, "auto_plan_for", None) or "tensor_parallel")
+    tp_cfg = getattr(par, "tensor_parallel", None)
+    if tp_cfg is None:
+        raise ConfigError(
+            f"parallel.tp={tp} requests tensor parallelism but no "
+            "`parallel.tensor_parallel:` block is configured."
+        )
     try:
         strategy_cls = _registry_get("model_parallel_strategy", "tensor_parallel")
-    except Exception:  # strategy not yet registered (plugins not loaded)
-        return None
+    except Exception as exc:  # strategy not registered (plugins not loaded)
+        raise ConfigError(
+            f"parallel.tp={tp} requested but the `tensor_parallel` "
+            "model_parallel_strategy is not registered "
+            "(distributed plugins not loaded?)."
+        ) from exc
     kwargs: dict[str, Any] = {}
     if hasattr(tp_cfg, "model_dump"):
         kwargs = {k: v for k, v in tp_cfg.model_dump().items() if v is not None}
     return strategy_cls(**kwargs)
+
+
+def _build_pipeline_schedule(cfg: RootConfig) -> Any | None:
+    """Build a PipelineSchedule from cfg.parallel.pipeline, or None when pp<=1.
+
+    Mirrors ``_build_model_parallel_strategy``: fails loud (``ConfigError``) when
+    ``parallel.pp > 1`` but the configured schedule can't be resolved or
+    constructed. The ``schedule`` key selects the implementation and is dropped
+    from the constructor kwargs (it is not a ctor arg for every schedule, e.g.
+    ``gpipe``).
+    """
+    par = getattr(cfg, "parallel", None)
+    if par is None or int(getattr(par, "pp", 1)) <= 1:
+        return None
+    pipeline_cfg = getattr(par, "pipeline", None)
+    schedule = str(getattr(pipeline_cfg, "schedule", "1f1b") or "1f1b")
+    try:
+        ps_cls = _registry_get("pipeline_schedule", schedule)
+    except Exception as exc:  # unknown schedule / plugins not loaded
+        raise ConfigError(
+            f"pipeline schedule {schedule!r} is not registered "
+            "(unknown schedule, or distributed plugins not loaded)."
+        ) from exc
+    ps_kwargs: dict[str, Any] = {}
+    if pipeline_cfg is not None and hasattr(pipeline_cfg, "model_dump"):
+        ps_kwargs = {k: v for k, v in pipeline_cfg.model_dump().items() if v is not None}
+    ps_kwargs.pop("schedule", None)  # selector key, not a ctor arg
+    try:
+        return ps_cls(**ps_kwargs)
+    except Exception as exc:
+        raise ConfigError(
+            f"pipeline schedule {schedule!r} failed to construct: {exc}"
+        ) from exc
 
 
 def _build_optimizer_factory(cfg: RootConfig):
@@ -446,8 +504,10 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
     *class name* isn't already on the existing callback list — so a user who
     declared ``- {name: frozen_step}`` keeps full control over its config.
 
-    All auto-attached callbacks import lazily, no-op when their config block
-    is empty/missing, and never raise during construction.
+    All auto-attached callbacks import lazily and no-op when their config block
+    is empty/missing. Construction failures are surfaced, not swallowed: the
+    critical ``InvariantsCallback`` fails loud (re-raises); non-critical
+    diagnostics emit a warning and are skipped.
     """
     mode = str(getattr(cfg, "mode", "lab") or "lab")
     bus = getattr(trainer, "bus", None)
@@ -468,8 +528,10 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
             cb = InvariantsCallback(specs=list(specs) if specs else None)
             bus.add(cb)
             trainer.callbacks.append(cb)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # critical diagnostic — fail loud
+            raise ConfigError(
+                f"failed to construct the default InvariantsCallback: {exc}"
+            ) from exc
 
     # FrozenStepCallback — scheduled snapshots in lab mode.
     every = int(_diag_field(cfg, "frozen_step_every", 1000 if mode == "lab" else 0))
@@ -480,8 +542,11 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
             cb = FrozenStepCallback(every=every)
             bus.add(cb)
             trainer.callbacks.append(cb)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 — non-critical, warn & skip
+            warnings.warn(
+                f"auto-attach FrozenStepCallback failed, skipping: {exc}",
+                stacklevel=2,
+            )
 
     # FileSignalsCallback — file-based runtime knobs in lab.
     rt = getattr(cfg, "realtime_control", None)
@@ -501,8 +566,11 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
                 poll_every = int(getattr(rt, "poll_every") or poll_every)
             bus.add(FileSignalsCallback(poll_every=poll_every))
             trainer.callbacks.append(bus.callbacks[-1])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 — non-critical, warn & skip
+            warnings.warn(
+                f"auto-attach FileSignalsCallback failed, skipping: {exc}",
+                stacklevel=2,
+            )
 
     # CallbackIsolationSink — writes callback_failures.jsonl.
     if "CallbackIsolationSink" not in have:
@@ -511,8 +579,11 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
 
             bus.add(CallbackIsolationSink())
             trainer.callbacks.append(bus.callbacks[-1])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 — non-critical, warn & skip
+            warnings.warn(
+                f"auto-attach CallbackIsolationSink failed, skipping: {exc}",
+                stacklevel=2,
+            )
 
 
 def _validate_mode_override(mode: str) -> str:
@@ -602,6 +673,15 @@ def setup_run_from_config(
     if print_config_only:
         return {"cfg": cfg, "resolved_yaml": resolved_yaml}
 
+    # Parallel-config preflight — validate before any run-dir / snapshot side
+    # effects so a pure-config error (sp/ep not wired, a missing TP block, or an
+    # unknown pipeline schedule) fails cleanly without polluting ``runs/``.
+    # Resolving here (rather than at apply time) also means the precise
+    # ConfigError beats _init_parallel's generic "RANK expected" when running
+    # without a launcher.
+    mp_strategy = _build_model_parallel_strategy(cfg)
+    pipeline_schedule = _build_pipeline_schedule(cfg)
+
     if existing_run_dir is not None:
         run_dir = Path(existing_run_dir)
         if not run_dir.exists():
@@ -635,7 +715,8 @@ def setup_run_from_config(
 
             warnings.warn("code snapshot failed (see logs); continuing without it")
 
-    # Phase A: distributed topology.
+    # Phase A: distributed topology. The parallel-config preflight (mp_strategy /
+    # pipeline_schedule) already ran above, before the run dir was created.
     # _init_parallel returns single_gpu() when cfg.parallel is absent,
     # so all downstream code is topology-agnostic.
     parallel_ctx = _init_parallel(cfg)
@@ -675,27 +756,30 @@ def setup_run_from_config(
         return spec
 
     # Phase B: model surgery (TP/SP/EP) — must run on bare model before FSDP/DDP.
+    # ``mp_strategy`` was resolved in the Phase-A preflight above.
     model = _resolve(_primary_entry["spec"], category="model")
-    mp_strategy = _build_model_parallel_strategy(cfg)
     if mp_strategy is not None:
-        model = mp_strategy.apply(model, parallel_ctx)
+        try:
+            model = mp_strategy.apply(model, parallel_ctx)
+        except ConfigError:
+            raise
+        except Exception as exc:  # apply failed (e.g. missing device_mesh)
+            raise ConfigError(f"tensor-parallel apply failed: {exc}") from exc
 
     # Phase C: pipeline splitting (PP) — after TP surgery, before DP wrap.
-    # PP support requires plugins/distributed/; skip for now when
-    # the PipelineSchedule implementation is not yet registered.
-    pipeline_schedule = None
-    par = getattr(cfg, "parallel", None)
-    if par is not None and int(getattr(par, "pp", 1)) > 1:
+    # Requires plugins/distributed/. PP is fail-loud: a requested pp>1 that
+    # cannot be applied raises ConfigError rather than silently no-op'ing.
+    # ``pipeline_schedule`` was resolved in the Phase-A preflight above.
+    if pipeline_schedule is not None:
         try:
-            ps_cls = _registry_get("pipeline_schedule", "1f1b")
-            pipeline_cfg = getattr(par, "pipeline", None)
-            ps_kwargs: dict[str, Any] = {}
-            if pipeline_cfg is not None and hasattr(pipeline_cfg, "model_dump"):
-                ps_kwargs = {k: v for k, v in pipeline_cfg.model_dump().items() if v is not None}
-            pipeline_schedule = ps_cls(**ps_kwargs)
             model = pipeline_schedule.prepare(model, parallel_ctx)
-        except Exception:  # PP strategy not yet registered
-            pass
+        except ConfigError:
+            raise
+        except Exception as exc:  # prepare failed
+            raise ConfigError(
+                f"pipeline parallel (pp={int(getattr(cfg.parallel, 'pp', 1))}) "
+                f"failed to prepare: {exc}"
+            ) from exc
 
     # Phase D: gradient-sync wrap (DDP/FSDP/ZeRO).
     # When grad_sync is None (single-GPU / noop), fall back to the plain path.

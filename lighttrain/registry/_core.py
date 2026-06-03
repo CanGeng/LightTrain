@@ -65,6 +65,8 @@ KNOWN_CATEGORIES: tuple[str, ...] = (
     "grad_sync_strategy",
     "model_parallel_strategy",
     "pipeline_schedule",
+    # Hyperparameter sweep backends (implementations live in plugins/sweep_backends/)
+    "sweep_backend",
 )
 
 

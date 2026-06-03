@@ -63,16 +63,18 @@ class MyCB:
             return Signal.SKIP_STEP
 ```
 
-只实现需要的 hook —— `getattr` 分发其余（`CALLBACK_EVENTS` 共 39 个事件）。
+只实现需要的 hook —— `getattr` 分发其余（`CALLBACK_EVENTS` 共 46 个事件）。
 
 ## 自定义 trainer（新范式）
 
 重写扁平 `Trainer` 的两个缝 —— `produce_batch`（batch 是什么）与 `forward_loss`
 （前向 + loss）—— 或写一个调公共原语（`run_train_loop`、`apply_update`、
 `forward_with_activations`）的短 `fit()`。多模型范式经 `self.models["..."]` /
-`self.optimizers["..."]` 取用 —— **在 `__init__` 上声明 `models=` / `optimizers=`**
-才能收到这套（见 [训练 § 多模型](../concepts/training.zh-CN.md#多模型)）。完整范例：
-[examples/online_distill.py](../../examples/online_distill.py)。
+`self.optimizers["..."]` 取用 —— 要收到这套，`__init__` 需**显式声明
+`models=` / `optimizers=`**，或带 **`**kwargs` 并转发给 `Trainer.__init__`**
+（见 [训练 § 多模型](../concepts/training.zh-CN.md#多模型)）。内置 `preference` /
+`reward_model` / `ppo` / `grpo` 只接收单个 `model=` / `optimizer=`，并不接收模型集。
+完整范例：[examples/online_distill.py](../../examples/online_distill.py)。
 
 ## 自定义 PrepGraph 节点
 

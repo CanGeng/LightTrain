@@ -9,8 +9,9 @@
 设计目标：**registry-first**、**failure-first**、**plugin-clean**、
 **lab-friendly**、**audit-ready**。
 
-> 状态：测试阶段。分布式（DDP/FSDP/TP/PP/EP）已实现并通过 CPU 多进程 spawn 单测，
-> **未**在多机 GPU 集群验证——生产环境自行评估风险。测试套件约 33K 行 / 1900+ 测试，
+> 状态：测试阶段。分布式（DDP/FSDP/TP/PP）已实现并通过 CPU 多进程 spawn 单测
+> （SP/EP 已注册但尚未接入训练 runtime，EP 仍是 skeleton），**未**在多机 GPU 集群
+> 验证——生产环境自行评估风险。测试套件约 33K 行 / 1900+ 测试，
 > 含经变异测试验证的对抗性回归测试。
 
 ## 安装
@@ -31,8 +32,8 @@ lighttrain dry-run -c cfg.yaml    # 解析并打印配置（不训练）
 lighttrain train   -c cfg.yaml ++trainer.max_steps=50   # 50 步冒烟
 ```
 
-生成的 `cfg.yaml` 开箱即跑，并带大量教程式注释——取消注释可选块（`models:`、
-`parallel:`、`prep_graph:`、PEFT 等）即可扩展。→ [快速开始](docs/guide/getting-started.zh-CN.md)
+生成的 `cfg.yaml` 放一个 `corpus.txt`（每行一条样本）后即可跑，并带大量教程式注释——
+取消注释可选块（`models:`、`parallel:`、`prep_graph:`、PEFT 等）即可扩展。→ [快速开始](docs/guide/getting-started.zh-CN.md)
 
 ## 架构
 
@@ -43,7 +44,7 @@ lighttrain train   -c cfg.yaml ++trainer.max_steps=50   # 50 步冒烟
    （前向/反向/clip/step）下放给可替换的 `UpdateRule`，于是改训练数学无需动循环。
    扁平 `Trainer` 组合公共原语（`run_train_loop`、`apply_update`、
    `forward_with_activations`）。
-4. **EventBus** —— 39 个生命周期事件；单 callback 异常隔离；结果聚合为 `Signal`
+4. **EventBus** —— 46 个生命周期事件；单 callback 异常隔离；结果聚合为 `Signal`
    （`STOP_TRAINING > RETRY_STEP > SKIP_STEP > CONTINUE`）。
 5. **PrepGraph** —— 内容寻址的数据预处理 DAG；按 config + 代码 + schema + 上游的
    fingerprint 缓存。

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,24 @@ import torch.nn as nn
 
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import get_registry
+
+
+@pytest.fixture(autouse=True)
+def _isolate_os_environ():
+    """Snapshot ``os.environ`` and restore it after every test.
+
+    CLI tests run ``lighttrain`` in-process (via ``CliRunner``), and the CLI
+    loads a repo-local ``.env`` into ``os.environ`` *permanently*
+    (``load_dotenv_if_present``). Vars such as
+    ``LIGHTTRAIN_CODE_SNAPSHOT_MODE`` would otherwise leak into later tests and
+    cause order-dependent failures (e.g. the code-snapshot cas/archive flip).
+    """
+    snapshot = dict(os.environ)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(snapshot)
 
 
 def pytest_configure(config: pytest.Config) -> None:

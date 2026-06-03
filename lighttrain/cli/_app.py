@@ -529,7 +529,11 @@ def sweep_cmd(
         runner = SweepRunner(config, sweep, strategy=strategy)
         report = runner.run()
     except Exception as exc:
-        console.print(f"[red]sweep failed:[/] {exc}")
+        # escape so bracketed hints (e.g. ``pip install -e '.[sweep]'``) aren't
+        # eaten by Rich markup.
+        from rich.markup import escape
+
+        console.print(f"[red]sweep failed:[/] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
     # Summary table
@@ -2231,7 +2235,7 @@ logger:
 #   nodes:
 #     - { name: load,     kind: load,     config: { source: "jsonl:data/chat.jsonl" } }
 #     - { name: tok,      kind: tokenize, inputs: [load] }
-#     - { name: packed,   kind: pack,     inputs: [tok], config: { strategy: best_fit, max_len: 256 } }
+#     - { name: packed,   kind: pack,     inputs: [tok], config: { strategy: best_fit, seq_len: 256 } }
 '''
 
 _INIT_README = """\

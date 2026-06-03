@@ -25,15 +25,17 @@ lighttrain dry-run -c cfg.yaml    # resolve & print the config, no training
 lighttrain train   -c cfg.yaml ++trainer.max_steps=50   # 50-step smoke run
 ```
 
-The generated `cfg.yaml` is fully runnable out of the box (tiny_lm + byte
-tokenizer) and is heavily commented as a living tutorial — uncomment the
-optional blocks (`models:`, `parallel:`, `prep_graph:`, PEFT, …) to grow it.
+The generated `cfg.yaml` is ready to run once you drop a `corpus.txt` (one
+example per line) next to it — `lighttrain init` scaffolds the recipe but not
+the corpus. It uses tiny_lm + a byte tokenizer and is heavily commented as a
+living tutorial — uncomment the optional blocks (`models:`, `parallel:`,
+`prep_graph:`, PEFT, …) to grow it.
 
 ## What you provide
 
 | File | Required | Notes |
 | ---- | -------- | ----- |
-| YAML recipe | **yes** | must contain `model:`, `data:`, `optim:` |
+| YAML recipe | **yes** | must declare a model, data, and an optimizer (see [Configuration](configuration.md#required-sections)) |
 | training data | **yes** | format depends on the dataset (below) |
 | pretrained weights | optional | only for `hf_causal` (HF name or local path) |
 

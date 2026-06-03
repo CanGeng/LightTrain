@@ -11,9 +11,10 @@ architectures, sweeps, distributed) are opt-in.
 Design goals: **registry-first**, **failure-first**, **plugin-clean**,
 **lab-friendly**, **audit-ready**.
 
-> Status: testing phase. Distributed (DDP/FSDP/TP/PP/EP) is implemented and
-> unit-tested via CPU multiprocess spawn, **not** validated on multi-node GPU
-> clusters — use at your own risk for production. The test suite is ~33K lines /
+> Status: testing phase. Distributed (DDP/FSDP/TP/PP) is implemented and
+> unit-tested via CPU multiprocess spawn (SP/EP are registered but not yet wired
+> into the train runtime, and EP is still a skeleton), **not** validated on
+> multi-node GPU clusters — use at your own risk for production. The test suite is ~33K lines /
 > 1900+ tests with adversarial regression tests verified by mutation testing.
 
 ## Install
@@ -34,9 +35,9 @@ lighttrain dry-run -c cfg.yaml    # resolve & print the config (no training)
 lighttrain train   -c cfg.yaml ++trainer.max_steps=50   # 50-step smoke run
 ```
 
-The generated `cfg.yaml` runs out of the box and is heavily commented as a living
-tutorial — uncomment the optional blocks (`models:`, `parallel:`, `prep_graph:`,
-PEFT…) to grow it. → [Getting started](docs/guide/getting-started.md)
+The generated `cfg.yaml` runs once you add a `corpus.txt` (one example per line)
+and is heavily commented as a living tutorial — uncomment the optional blocks
+(`models:`, `parallel:`, `prep_graph:`, PEFT…) to grow it. → [Getting started](docs/guide/getting-started.md)
 
 ## Architecture
 
@@ -48,7 +49,7 @@ PEFT…) to grow it. → [Getting started](docs/guide/getting-started.md)
    can change the training math without touching the loop. The flat `Trainer`
    composes public primitives (`run_train_loop`, `apply_update`,
    `forward_with_activations`).
-4. **EventBus** — 39 lifecycle events; isolated per-callback exceptions; results
+4. **EventBus** — 46 lifecycle events; isolated per-callback exceptions; results
    aggregate to a `Signal` (`STOP_TRAINING > RETRY_STEP > SKIP_STEP > CONTINUE`).
 5. **PrepGraph** — content-addressed DAG of data-prep nodes; cached by a
    fingerprint over config + code + schema + upstream.

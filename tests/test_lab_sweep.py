@@ -287,3 +287,44 @@ def test_sweep_report_has_sensitivity(tmp_path: Path):
         report = runner.run()
 
     assert "optim.lr" in report.sensitivity
+
+
+# ---------------------------------------------------------------------------
+# Optuna sweep backend wiring (sweep_backend category + .[sweep] extra)
+# ---------------------------------------------------------------------------
+
+
+def _optuna_installed() -> bool:
+    try:
+        import optuna  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+def test_sweep_backend_is_known_category():
+    """The optuna plugin registers under ``sweep_backend``; the category must
+    be declared in KNOWN_CATEGORIES so ``get(...)`` resolves it."""
+    from lighttrain.registry._core import KNOWN_CATEGORIES
+
+    assert "sweep_backend" in KNOWN_CATEGORIES
+
+
+@pytest.mark.skipif(
+    _optuna_installed(), reason="optuna installed; this exercises the missing-dep path"
+)
+def test_sweep_optuna_missing_dep_friendly_error(tmp_path: Path):
+    """With optuna absent, an optuna sweep must raise a friendly RuntimeError
+    pointing at ``pip install -e '.[sweep]'`` — not a bare registry exception
+    (the previous ``except (ImportError, KeyError)`` missed RegistryError)."""
+    base_cfg = tmp_path / "base.yaml"
+    sweep_cfg = tmp_path / "sweep.yaml"
+    run_root = tmp_path / "runs"
+    run_root.mkdir()
+    _write_base_yaml(base_cfg, str(run_root))
+    _write_sweep_yaml(sweep_cfg, {"optim.lr": [1e-4, 3e-4]})
+
+    runner = SweepRunner(base_cfg, sweep_cfg, strategy="optuna")
+    with pytest.raises(RuntimeError, match=r"\.\[sweep\]"):
+        runner._generate_configs()

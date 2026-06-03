@@ -12,7 +12,7 @@ Global options: `--version`, `--quiet`, `--verbose`.
 | ------- | ----------- |
 | `init <path> [--force]` | Scaffold a project: commented `cfg.yaml` + README + `runs/` + `artifacts/` |
 | `dry-run -c <cfg> [--build]` | Resolve & print the config; `--build` also constructs the model (verifies the `model_profiles` selector) |
-| `train -c <cfg> [OVERRIDES…] [--eval] [--output-summary f.json]` | Full training loop; auto-runs PrepGraph if `prep_graph:` is set |
+| `train -c <cfg> [OVERRIDES…] [--eval] [--output-summary f.json]` | Full training loop; auto-runs PrepGraph when the training data references its output (`data.source: prep_graph:<terminal>` or `data.name: prep_graph`) |
 | `resume --run <dir> [-c cfg] [--mode functional\|exact]` | Resume from a run dir (defaults to its `config.snapshot.yaml`) |
 | `resume-verify -c <cfg> --phase1-steps N --phase2-steps M [--tol 1e-2]` | Verify resume == single pass by comparing step-aligned losses |
 | `overfit -c <cfg> --n N` | Overfit on N batches (smoke test) |

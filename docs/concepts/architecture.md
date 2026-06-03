@@ -28,7 +28,7 @@ lighttrain defines five clean seams; everything else stays straightforward.
    optionally `before_step`) or writes a short registered `fit()`. See
    [Training](training.md) and [Extending](../extending/extending.md).
 
-4. **EventBus** ([callbacks/base.py](../../lighttrain/callbacks/base.py)) — 39
+4. **EventBus** ([callbacks/base.py](../../lighttrain/callbacks/base.py)) — 46
    lifecycle events dispatched via `getattr`; per-callback exceptions isolated;
    results aggregate to a `Signal` (`STOP_TRAINING > RETRY_STEP > SKIP_STEP >
    CONTINUE`). See [Diagnostics](../operations/diagnostics.md).
@@ -49,8 +49,9 @@ lighttrain defines five clean seams; everything else stays straightforward.
 3. **Components (strict order)**
    - **A — topology**: `parallel_ctx` (single-GPU fallback or process group +
      DeviceMesh); `device` derived from it.
-   - **B — model + TP/SP/EP surgery** (must precede FSDP/DDP wrapping — sharding
-     needs the post-surgery shapes).
+   - **B — model + TP surgery** (must precede FSDP/DDP wrapping — sharding
+     needs the post-surgery shapes; SP/EP would slot in here once wired —
+     today they are rejected with a `ConfigError`).
    - **C — pipeline split** (when `pp > 1`).
    - **D — grad-sync wrap** (`noop`/`ddp`/`fsdp`/`deepspeed`; FSDP builds the
      optimizer *after* wrapping via an `optimizer_factory`).
@@ -61,7 +62,8 @@ lighttrain defines five clean seams; everything else stays straightforward.
 6. **Training loop** — `trainer.fit()` runs the epoch/signal/log/ckpt loop.
 
 Key invariants: topology before everything; TP/SP/EP before FSDP/DDP; FSDP
-optimizer built post-wrap; rank-0 gates all IO; `loss_fn` is a separate
+optimizer built post-wrap; rank-0 gates checkpoint and logging IO (run-metadata
+init and PrepGraph are not yet fully rank-0-coordinated); `loss_fn` is a separate
 component (swappable via `loss:`); `manifest.json` written last.
 
 ## See also

@@ -19,6 +19,31 @@ lighttrain train -c recipes/mezo_sft.yaml        # MeZO 零阶 SFT
 `forward_forward`、`pcn`、`dfa`（设 `engine.update_rule.name`——顶层
 `update_rule:` 会被明确报错）。
 
+## 写自定义 trainer（objective-seam 契约）
+
+trainer 通过三个类属性声明它与规范 `objective` 缝的关系（运行时在构造后读取并强制校验）：
+
+```python
+class MyTrainer(Trainer):
+    consumes_objective = True          # 用 objective.__call__ 当 loss（ctx.loss_fn）
+    consumes_objective_prepare = True  # 前向前先跑 objective.prepare_batch
+    requires_objective = False         # True ⇒ recipe 必须指定 loss/objective（无默认）
+    def default_objective(self): ...   # 在 consume 且 recipe 省略 loss/objective 时使用
+```
+
+- **内联算法**型 trainer（自己算 loss，如 reward-model 的 Bradley-Terry、online-distill
+  的 REINFORCE）**必须**设 `consumes_objective = False`；此时若 recipe 传入
+  `loss:`/`objective:`，运行时会报错。
+- 用 objective 当 loss 但自带 batch（RL / preference）的 trainer 设
+  `consumes_objective_prepare = False`；此时运行时会拒绝一个*真正的* `objective:`
+  （带非平凡 `prepare_batch`）——纯 `loss:` 始终可用。
+
+## 写自定义 engine
+
+engine 在构造时收到 `loss_fn`，但它可能是 `None`：默认 objective 在 trainer 构建*之后*
+才解析，运行时随后回填 `engine.loss_fn = trainer.objective`。所以 engine 的 `__init__`
+**必须容忍 `loss_fn=None`**（在 step 时读 `ctx.loss_fn`，如 `StandardEngine` 那样）。
+
 ## 写模型适配器（两条规则）
 
 包装第三方架构（SSM、FLA 等）时，两条都重要。

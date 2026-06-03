@@ -7,13 +7,15 @@ recipe 是 OmegaConf YAML，经 Pydantic v2 schema（`RootConfig`）校验。
 
 ## 必填节点
 
-缺任一立即报错：
+训练/构建路径必须能解析出**模型声明**、**数据声明**，并且每个 trainable model 都有 optimizer：
 
-| 节点 | 报错 |
+| 需要 | 可写成 |
 | ---- | ---- |
-| `model:` | `recipe is missing 'model:' section` |
-| `data:` | `recipe is missing 'data:' section` |
-| `optim:` | `recipe is missing 'optim:' section` |
+| 模型声明 | `model:`，或 `models:` / `model_profiles:` |
+| 数据声明 | `data:` |
+| 优化器 | `optim:`，或 `optimizers:`（每个 trainable model 一个） |
+
+缺失时在构建期报错（如 `recipe is missing 'data:' section`）。
 
 ## 根字段
 

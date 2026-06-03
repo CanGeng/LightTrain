@@ -29,11 +29,17 @@ data:
 ## PrepGraph —— 内容寻址的数据预处理
 
 PrepGraph 是预处理节点的 DAG。每个节点 fingerprint =
-`sha256(规范化 config + code_version + schema_version + 排序后的 upstream_fps)`；
-结果原子落盘到 `runs/<exp>/prep/<kind>/<name>/<fp>/`，`MANIFEST_COMPLETE.json`
-最后写。输入与 config 不变的节点直接复用缓存；改动上游只重算受影响的子树。
+`sha256(node.kind + node.schema_kind + SCHEMA_VERSION[schema_kind] +
+code_version + 规范化 config + 排序后的 upstream_fps)`；结果原子落盘，
+`MANIFEST_COMPLETE.json` 最后写。输入与 config 不变的节点直接复用缓存；改动上游
+只重算受影响的子树。
 
-设了 `prep_graph:` 时 `lighttrain train` 会自动跑 PrepGraph，很少需要单独 `prep`。
+缓存根目录因入口而异：独立 `lighttrain prep` 默认落到
+`runs/<exp>/prep/<kind>/<name>/<fp>/`；训练内嵌的 `prep_graph` DataModule 默认落到
+`<run_dir>/prep/...`。
+
+训练数据引用 PrepGraph 输出（`data.source: prep_graph:<terminal>` 或
+`data.name: prep_graph`）时 `lighttrain train` 会自动跑 PrepGraph，很少需要单独 `prep`。
 
 节点种类：`load`、`tokenize`、`chunk`、`pack`、`mix`、`join`、`index`、
 `validate`、`materialize`。
@@ -59,9 +65,12 @@ lighttrain inspect-data -c cfg.yaml --n 4 --decoded
 
 ## 恢复与数据位置
 
-checkpoint 保存 sampler 状态与已消费 batch 数，因此 resume 能在 epoch 中途逐步精确
-定位 sampler（不受 DataLoader 预取深度影响）。见 [诊断](../operations/diagnostics.zh-CN.md) 与
-[CLI](../guide/cli.zh-CN.md) 里的 `resume-verify`。
+checkpoint 保存 sampler 状态与已消费 batch 数。用 `simple` DataModule 且 sampler 支持
+seek（`sequential` / `shuffle` / `stateful_resumable`）时，resume 能在 epoch 中途逐步
+精确定位 sampler（不受 DataLoader 预取深度影响）。`PrepGraphDataModule` 与
+`length_grouped` / `curriculum` sampler **未**实现按 consumed-index 的 `seek()`，那里的
+resume 是*功能性*恢复（状态已恢复）而非逐步精确。见
+[诊断](../operations/diagnostics.zh-CN.md) 与 [CLI](../guide/cli.zh-CN.md) 里的 `resume-verify`。
 
 ## 相关
 

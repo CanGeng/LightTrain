@@ -3,7 +3,10 @@
 > [中文版](diagnostics.zh-CN.md) · [Docs index](../README.md)
 
 The failure-first subsystem ensures a crashed run answers "what failed?" and
-"what next?" before manual inspection. Most of it auto-attaches in `lab` mode.
+"what next?" before manual inspection. In `lab` mode the runtime auto-attaches
+only `invariants`, `frozen_step`, `file_signals`, and `CallbackIsolationSink`.
+The other diagnostics (`nan_hunter`, `loss_attribution`, `dead_neuron`, …) are
+only registered — enable them by listing them under `callbacks:`.
 
 ## Building blocks
 
@@ -48,6 +51,6 @@ class MyOOMGuard:
 
 ## See also
 
-- [Architecture § EventBus](../concepts/architecture.md) — the 39 lifecycle events
+- [Architecture § EventBus](../concepts/architecture.md) — the 46 lifecycle events
 - [Extending](../extending/extending.md) — write custom callbacks / invariants
 - [CLI](../guide/cli.md) — `doctor` / `replay` / `freeze-step`
