@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from lighttrain.data import processors as _processors  # noqa: F401 — register processors
-from lighttrain.prepgraph import nodes  # noqa: F401 — registers prep_node entries
+from lighttrain.builtin_plugins.data import processors as _processors  # noqa: F401 — register processors
+from lighttrain.builtin_plugins.prepgraph import nodes  # noqa: F401 — registers prep_node entries
 from lighttrain.prepgraph.dag import PrepGraph
 from lighttrain.prepgraph.runner import PrepRunner
 
@@ -41,7 +41,7 @@ def _spec(jsonl_path: Path) -> dict:
                 "processor": {
                     "name": "chat_template",
                     "tokenizer": {
-                        "_target_": "lighttrain.data.core.tokenizers.ByteTokenizer"
+                        "name": "byte"
                     },
                 },
             },

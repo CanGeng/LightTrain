@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.models.extras import (
     ExtraOutputSpec,
     ExtrasHookManager,

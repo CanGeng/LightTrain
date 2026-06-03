@@ -20,7 +20,7 @@ from lighttrain.diagnostics.frozen_step import (  # noqa: E402
     read_frozen_step_bundle,
 )
 from lighttrain.minimal import build_minimal_model  # noqa: E402
-from lighttrain.models.peft import LoRAAdapter  # noqa: E402
+from lighttrain.builtin_plugins.models.peft import LoRAAdapter  # noqa: E402
 
 
 def _spec_for_tiny() -> dict:

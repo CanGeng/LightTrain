@@ -12,10 +12,10 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from lighttrain.losses.preference import DPOLoss, IPOLoss, KTOLoss, ORPOLoss, SimPOLoss
+from lighttrain.builtin_plugins.losses.preference import DPOLoss, IPOLoss, KTOLoss, ORPOLoss, SimPOLoss
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers._preference_base import PreferenceTrainer
-from lighttrain.trainers.rm import RewardModelTrainer
+from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
+from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
 
 # ---- preference golden (captured pre-migration) ---------------------------
 

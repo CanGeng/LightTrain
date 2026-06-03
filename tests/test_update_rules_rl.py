@@ -8,7 +8,7 @@ import torch.nn as nn
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.engine._context import StepContext
 from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.update_rules.rl import RLUpdateRule
+from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
 
 
 # ---- helpers ----------------------------------------------------------------

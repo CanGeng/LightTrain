@@ -13,8 +13,8 @@ import pytest
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from lighttrain.data.core.samplers import SequentialSampler, ShuffleSampler
-from lighttrain.data.samplers.stateful_resumable import StatefulResumableSampler
+from lighttrain.builtin_plugins.data.core.samplers import SequentialSampler, ShuffleSampler
+from lighttrain.builtin_plugins.data.samplers.stateful_resumable import StatefulResumableSampler
 
 
 def _samplers(n: int):

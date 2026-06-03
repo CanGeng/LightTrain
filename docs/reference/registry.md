@@ -73,8 +73,8 @@ class StepOutput:
 | -------- | ------------------ |
 | `model` | `forward(**batch) -> ModelOutput`; for RL also `generate(input_ids, **kw) -> Tensor` |
 | `loss` | `__call__(model_output, batch, ctx) -> dict` (must contain `"loss"`) |
-| `optimizer` | `build(model)`, `step`, `zero_grad`, `state_dict`, `load_state_dict` (+ optional `optim_state_bytes`); subclass `_BaseWrapper` for all but `build` |
-| `scheduler` | `step_per_batch: bool`, `step`, `state_dict`, `load_state_dict`; subclass `_SchedulerBase`, implement `_factor(step)` |
+| `optimizer` | `build(model)`, `step`, `zero_grad`, `state_dict`, `load_state_dict` (+ optional `optim_state_bytes`); subclass `OptimizerWrapperBase` for all but `build` |
+| `scheduler` | `step_per_batch: bool`, `step`, `state_dict`, `load_state_dict`; subclass `SchedulerBase`, implement `_factor(step)` |
 | `dataset` | duck-typed `__len__`, `__getitem__(idx)` |
 | `collator` | `__call__(samples) -> dict[str, Tensor]` |
 | `sampler` | `__iter__`, `__len__`, `state_dict`, `load_state_dict` |

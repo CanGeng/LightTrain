@@ -6,11 +6,11 @@ import json
 
 import torch
 
-from lighttrain.callbacks.builtins.lineage_recorder import LineageRecorderCallback
+from lighttrain.builtin_plugins.callbacks.builtins.lineage_recorder import LineageRecorderCallback
 from lighttrain.diagnostics.crash_bundle import write_crash_bundle
 from lighttrain.engine._context import StepContext
 from lighttrain.lineage.store import LineageStore
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
 
 def test_crash_bundle_contents(tmp_path):

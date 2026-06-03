@@ -1,7 +1,7 @@
 """Adversarial tests for StandardUpdateRule — lifecycle, branches, signals,
 accumulation, lazy param registration.
 
-Targets [lighttrain/update_rules/standard.py](../../lighttrain/update_rules/standard.py).
+Targets [lighttrain/builtin_plugins/update_rules/standard.py](../../lighttrain/builtin_plugins/update_rules/standard.py).
 
 Six sections (matching plan groups C1–C6):
   - C1: STRICT ordered list of lifecycle events
@@ -24,7 +24,7 @@ import torch.nn as nn
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.engine._context import StepContext
 from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.update_rules.standard import StandardUpdateRule, _register_new_params
+from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule, _register_new_params
 
 
 # ---------------------------------------------------------------------------
@@ -436,7 +436,7 @@ def test_stop_training_surfaces_strongest_signal_via_ctx_extras():
 
     Catches a refactor that surfaces a string ("stop") or doesn't surface
     at all — trainer's outer loop relies on the int comparison at
-    [lighttrain/trainers/pretrain.py:154-156](../../lighttrain/trainers/pretrain.py#L154).
+    [lighttrain/builtin_plugins/trainers/pretrain.py:154-156](../../lighttrain/builtin_plugins/trainers/pretrain.py#L154).
     """
 
     class _Stopper:

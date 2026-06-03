@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.losses.preference (BT / DPO / IPO / SimPO / ORPO / KTO)."""
+"""Adversarial tests for lighttrain.builtin_plugins.losses.preference (BT / DPO / IPO / SimPO / ORPO / KTO)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
-from lighttrain.losses.preference import (
+from lighttrain.builtin_plugins.losses.preference import (
     BradleyTerryLoss,
     DPOLoss,
     IPOLoss,

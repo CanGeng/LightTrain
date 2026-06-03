@@ -6,7 +6,8 @@ import warnings
 
 import pytest
 
-from lighttrain.eval.suite import EvalReport, EvalTask, Evaluator, RegressionGate
+from lighttrain.eval.suite import EvalReport, EvalTask, Evaluator
+from lighttrain.builtin_plugins.eval.regression_gate import RegressionGate
 
 
 # ---- Helpers ---------------------------------------------------------------

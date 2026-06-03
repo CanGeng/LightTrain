@@ -6,7 +6,7 @@ writes, layer-parallel execution, and per-shard resume. The public surface is::
     from lighttrain.prepgraph import PrepGraph, PrepRunner, PrepNode
 
 Concrete node implementations register through ``@register("prep_node", ...)``
-and live under ``lighttrain.prepgraph.nodes``.
+and live under ``lighttrain.builtin_plugins.prepgraph.nodes``.
 """
 
 from ._banner import PlanEntry, format_plan, print_plan

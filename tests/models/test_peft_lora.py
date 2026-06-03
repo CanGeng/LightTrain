@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.models.peft._lora.LoRAAdapter``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.models.peft._lora.LoRAAdapter``.
 
 Layered on top of the flat ``tests/test_peft_lora.py`` smoke checks (param
 ratio, shape, allclose round-trip). This file adds:
@@ -26,8 +26,8 @@ import pytest
 torch = pytest.importorskip("torch")
 peft = pytest.importorskip("peft")  # whole file requires peft
 
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM  # noqa: E402
-from lighttrain.models.peft import LoRAAdapter  # noqa: E402
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM  # noqa: E402
+from lighttrain.builtin_plugins.models.peft import LoRAAdapter  # noqa: E402
 
 
 # Tiny base parameters chosen for fast tests AND deterministic shape math.

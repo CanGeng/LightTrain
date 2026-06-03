@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.artifacts import ModelForwardProducer
+from lighttrain.builtin_plugins.artifacts import ModelForwardProducer
 from lighttrain.lineage.store import LineageStore
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
 
 def test_finalize_uses_explicit_run_node_id(tmp_path):

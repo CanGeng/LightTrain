@@ -22,8 +22,8 @@ import pytest
 
 # Ensure prep_node kinds are registered so PrepGraph.from_config can resolve
 # the real node classes used by the partial-cache reproducer.
-from lighttrain.data import processors as _processors  # noqa: F401 — registry side-effect
-from lighttrain.prepgraph import nodes as _nodes  # noqa: F401 — registry side-effect
+from lighttrain.builtin_plugins.data import processors as _processors  # noqa: F401 — registry side-effect
+from lighttrain.builtin_plugins.prepgraph import nodes as _nodes  # noqa: F401 — registry side-effect
 from lighttrain.prepgraph._fp import SCHEMA_VERSION
 from lighttrain.prepgraph.dag import PrepGraph
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
@@ -157,7 +157,7 @@ def _partial_cache_spec(jsonl: Path, p99_max: int) -> dict:
                 "processor": {
                     "name": "chat_template",
                     "tokenizer": {
-                        "_target_": "lighttrain.data.core.tokenizers.ByteTokenizer"
+                        "name": "byte"
                     },
                 },
             },
@@ -295,7 +295,7 @@ def test_invariant_partial_cache_only_demotes_non_materialize(
                     "processor": {
                         "name": "chat_template",
                         "tokenizer": {
-                            "_target_": "lighttrain.data.core.tokenizers.ByteTokenizer"
+                            "name": "byte"
                         },
                     },
                 },

@@ -10,8 +10,8 @@ from lighttrain.diagnostics.frozen_step import (
     replay_step_bundle,
 )
 from lighttrain.engine._context import StepContext
-from lighttrain.losses.core import CrossEntropyLoss
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
 
 def _make_bundle(tmp_path):

@@ -12,10 +12,10 @@ import torch
 
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.engine._context import StepContext
-from lighttrain.engine.standard import StandardEngine
-from lighttrain.losses.core import CrossEntropyLoss
+from lighttrain.builtin_plugins.engine.standard import StandardEngine
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.protocols import ModelOutput
-from lighttrain.update_rules.standard import StandardUpdateRule
+from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
 
 
 class _TinyLM(torch.nn.Module):
@@ -81,7 +81,7 @@ def test_skip_step_does_not_set_stop_signal():
 def test_pretrain_trainer_stops_on_loss_computed_stop_signal():
     """End-to-end: a 3-step fit() with a STOP_TRAINING-from-on_loss_computed
     callback must stop after 1 step, not run to completion."""
-    from lighttrain.trainers.pretrain import PretrainTrainer
+    from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
 
     model = _TinyLM()
     opt = torch.optim.SGD(model.parameters(), lr=1e-3)

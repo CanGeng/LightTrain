@@ -7,7 +7,7 @@ import math
 import pytest
 import torch
 
-from lighttrain.losses.core import CrossEntropyLoss
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.objectives.next_token import NextTokenObjective
 from lighttrain.protocols import LossContext, ModelOutput
 

@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 
 from lighttrain.logging._bus import LoggerBus
-from lighttrain.logging.backends.console import ConsoleLogger
-from lighttrain.logging.backends.jsonl import JSONLLogger
+from lighttrain.builtin_plugins.logging_backends.console import ConsoleLogger
+from lighttrain.builtin_plugins.logging_backends.jsonl import JSONLLogger
 
 
 class _Recorder:

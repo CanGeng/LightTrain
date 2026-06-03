@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.losses.aux (InfoNCE / MoEBalance)."""
+"""Adversarial tests for lighttrain.builtin_plugins.losses.aux (InfoNCE / MoEBalance)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
-from lighttrain.losses.aux import InfoNCELoss, MoEBalanceLoss
+from lighttrain.builtin_plugins.losses.aux import InfoNCELoss, MoEBalanceLoss
 from lighttrain.protocols import LossContext, ModelOutput
 
 

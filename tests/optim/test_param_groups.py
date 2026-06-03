@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.optim.wrappers`` param-group DSL.
+"""Adversarial tests for ``lighttrain.builtin_plugins.optim.wrappers`` param-group DSL.
 
 Layered on top of ``tests/test_optim_param_groups.py``. New coverage:
 
@@ -17,12 +17,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.optim.wrappers import (
-    AdamWWrapper,
-    LionWrapper,
-    ParamGroupSpec,
-    _split_param_groups,
-)
+from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper, LionWrapper
+from lighttrain.optim.base import ParamGroupSpec, _split_param_groups
 
 
 def _toy_model() -> torch.nn.Module:
@@ -381,7 +377,7 @@ def test_lion_wrapper_builds_to_lion_optimizer():
     """``LionWrapper.build`` returns an instance of the internal ``_Lion``
     class (registered as ``optimizer/lion``).
     """
-    from lighttrain.optim.wrappers import _Lion
+    from lighttrain.builtin_plugins.optim.wrappers import _Lion
 
     model = _toy_model()
     w = LionWrapper(lr=1e-4)

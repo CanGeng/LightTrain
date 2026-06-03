@@ -177,7 +177,7 @@ def test_r10b_ff_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r11_mezo_smoke():
-    from lighttrain.update_rules.mezo import MeZOUpdateRule
+    from lighttrain.builtin_plugins.update_rules.mezo import MeZOUpdateRule
     from lighttrain.engine._context import StepContext
     from lighttrain.protocols import ModelOutput
 

@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from lighttrain.artifacts import (
+from lighttrain.builtin_plugins.artifacts import (
     ArtifactHeader,
     ArtifactJoinedDataset,
     SafetensorsShardStore,

@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.rl.gae (compute_gae / normalize_advantages)."""
+"""Adversarial tests for lighttrain.builtin_plugins.rl.gae (compute_gae / normalize_advantages)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import math
 import pytest
 import torch
 
-from lighttrain.rl.gae import compute_gae, normalize_advantages
+from lighttrain.builtin_plugins.rl.gae import compute_gae, normalize_advantages
 
 
 # ---------------------------------------------------------------------------

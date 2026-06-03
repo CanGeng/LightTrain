@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.rl.buffers import Episode, RolloutBuffer
+from lighttrain.builtin_plugins.rl.buffers import Episode, RolloutBuffer
 
 
 def _ep(reward: float = 1.0, T: int = 4, group_id: int = 0) -> Episode:

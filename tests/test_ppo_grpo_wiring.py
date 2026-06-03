@@ -33,7 +33,7 @@ def _stub_engine():
 
 
 def test_grpo_trainer_accepts_val_every():
-    from lighttrain.trainers.grpo import GRPOTrainer
+    from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
     trainer = GRPOTrainer(
         val_every=0,
         engine=_stub_engine(),
@@ -45,7 +45,7 @@ def test_grpo_trainer_accepts_val_every():
 
 
 def test_ppo_trainer_accepts_val_every():
-    from lighttrain.trainers.ppo import PPOTrainer
+    from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
     trainer = PPOTrainer(
         val_every=0,
         engine=_stub_engine(),
@@ -58,7 +58,7 @@ def test_ppo_trainer_accepts_val_every():
 
 def test_reward_fn_adapter_decodes_and_scores():
     """_reward_fn adapter: tensor decode → VerifierJudge.score() → list[float]."""
-    from lighttrain.data.core.tokenizers import ByteTokenizer
+    from lighttrain.builtin_plugins.data.core.tokenizers import ByteTokenizer
     from lighttrain.builtin_plugins.judges.judge import VerifierJudge
 
     tok = ByteTokenizer()

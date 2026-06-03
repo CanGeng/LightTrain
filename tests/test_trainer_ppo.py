@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers.ppo import PPOTrainer
+from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
 
 
 class _TinyLM(nn.Module):
@@ -82,7 +82,7 @@ def test_ppo_step_returns_finite_loss():
 
 def test_ppo_ref_policy_frozen_after_freeze():
     trainer = _make_ppo()
-    trainer._ref_policy = __import__("lighttrain.rl.ref_policy", fromlist=["freeze_as_ref"]).freeze_as_ref(trainer.model)
+    trainer._ref_policy = __import__("lighttrain.builtin_plugins.rl.ref_policy", fromlist=["freeze_as_ref"]).freeze_as_ref(trainer.model)
     for p in trainer._ref_policy.model.parameters():
         assert not p.requires_grad
 

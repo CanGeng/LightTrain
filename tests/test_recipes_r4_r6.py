@@ -36,7 +36,7 @@ def test_r4_recipe_parses():
 
 def test_r4_preference_trainer_registered():
     from lighttrain.registry import get as resolve
-    from lighttrain.trainers._preference_base import PreferenceTrainer
+    from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
     assert resolve("trainer", "preference") is PreferenceTrainer
 
 
@@ -50,7 +50,7 @@ def test_r5_recipe_parses():
 
 def test_r5_ppo_trainer_registered():
     from lighttrain.registry import get as resolve
-    from lighttrain.trainers.ppo import PPOTrainer
+    from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
     assert resolve("trainer", "ppo") is PPOTrainer
 
 
@@ -64,5 +64,5 @@ def test_r6_recipe_parses():
 
 def test_r6_grpo_trainer_registered():
     from lighttrain.registry import get as resolve
-    from lighttrain.trainers.grpo import GRPOTrainer
+    from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
     assert resolve("trainer", "grpo") is GRPOTrainer

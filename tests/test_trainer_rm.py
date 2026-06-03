@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers.rm import LinearValueHead, RewardModelTrainer
+from lighttrain.builtin_plugins.trainers.rm import LinearValueHead, RewardModelTrainer
 
 
 # ---- Minimal helpers ------------------------------------------------------

@@ -33,7 +33,7 @@ class NextTokenObjective:
 
     def _get_loss_fn(self) -> Any:
         if self._loss_fn is None:
-            from lighttrain.losses.core import CrossEntropyLoss
+            from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
             self._loss_fn = CrossEntropyLoss(ignore_index=self.ignore_index)
         return self._loss_fn
 

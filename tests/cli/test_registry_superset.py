@@ -60,7 +60,7 @@ def test_auto_discovery_loses_no_baseline_registration():
 
 
 def test_aux_losses_now_registered():
-    """#5b — the drift this fixes: info_nce / moe_balance (lighttrain/losses/aux.py)
+    """#5b — the drift this fixes: info_nce / moe_balance (lighttrain/builtin_plugins/losses/aux.py)
     were never eagerly imported by the hand list; auto-discovery picks them up."""
     live = _registry_in_clean_process()
     assert {"info_nce", "moe_balance"} <= set(live.get("loss", []))

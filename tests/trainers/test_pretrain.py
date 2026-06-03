@@ -17,7 +17,7 @@ import torch.nn as nn
 
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers.pretrain import PretrainTrainer
+from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
 
 
 class _TinyLM(nn.Module):

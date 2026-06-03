@@ -118,7 +118,7 @@ def test_prune_preserves_last_pointer(tmp_path: Path):
 
 def test_save_load_tied_weights(tmp_path: Path):
     """CheckpointManager must not crash on tied weights and must preserve values."""
-    from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
     model = TinyCausalLM(vocab_size=64, d_model=32, n_layers=1, n_heads=2,
                          max_seq_len=32, tie_weights=True)

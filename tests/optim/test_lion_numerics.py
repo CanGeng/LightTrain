@@ -1,4 +1,4 @@
-"""Adversarial tests for the Lion optimizer (``lighttrain.optim.wrappers._Lion``).
+"""Adversarial tests for the Lion optimizer (``lighttrain.builtin_plugins.optim.wrappers._Lion``).
 
 The legacy suite has NO Lion-specific tests. This file pins:
 
@@ -18,7 +18,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.optim.wrappers import _Lion
+from lighttrain.builtin_plugins.optim.wrappers import _Lion
 
 
 def _make_param(values: list[float]) -> torch.nn.Parameter:

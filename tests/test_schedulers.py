@@ -6,7 +6,7 @@ import math
 
 import torch
 
-from lighttrain.optim.schedulers import (
+from lighttrain.builtin_plugins.optim.schedulers import (
     ConstantScheduler,
     LinearScheduler,
     WarmupCosineScheduler,

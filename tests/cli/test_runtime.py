@@ -213,7 +213,7 @@ def test_auto_attach_default_config_constructs(tmp_path: Path):
 def test_auto_attach_invariants_failure_fails_loud(tmp_path: Path, monkeypatch):
     """The critical InvariantsCallback failing to construct must raise, not
     silently leave the run without invariants."""
-    import lighttrain.callbacks.invariants as inv_mod
+    import lighttrain.builtin_plugins.callbacks.invariants as inv_mod
 
     class _Boom:
         def __init__(self, *a, **k):
@@ -227,7 +227,7 @@ def test_auto_attach_invariants_failure_fails_loud(tmp_path: Path, monkeypatch):
 def test_auto_attach_noncritical_failure_warns(tmp_path: Path, monkeypatch):
     """A non-critical diagnostic (FrozenStepCallback) failing to construct
     must warn and continue, not raise and not silently pass."""
-    import lighttrain.callbacks.builtins.frozen_step as fs_mod
+    import lighttrain.builtin_plugins.callbacks.builtins.frozen_step as fs_mod
 
     class _Boom:
         def __init__(self, *a, **k):

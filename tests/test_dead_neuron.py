@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from lighttrain.diagnostics.dead_neuron import DeadNeuronCallback
+from lighttrain.builtin_plugins.diagnostics.dead_neuron import DeadNeuronCallback
 from lighttrain.engine._context import StepContext
 
 

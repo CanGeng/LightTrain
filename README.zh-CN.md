@@ -92,7 +92,7 @@ judge:   { name: verifier, verify_pattern: "\\d+" }   # → reward_fn
 | 数据 | dataset、collator、sampler、byte 分词器、PrepGraph 节点 |
 | 诊断 | invariant、nan_hunter、frozen_step、loss_attribution、`doctor` |
 
-完整表：[注册表与协议](docs/reference/registry.zh-CN.md)。
+以上均为具体 `@register` 实现，统一位于 `lighttrain.builtin_plugins`（核心层只保留协议与框架），按短名解析、与代码位置无关。完整表：[注册表与协议](docs/reference/registry.zh-CN.md)。
 
 ## 文档
 

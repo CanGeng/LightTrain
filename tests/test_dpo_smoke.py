@@ -12,9 +12,9 @@ from unittest.mock import MagicMock
 import torch
 import pytest
 
-from lighttrain.data.core.collators import PreferenceCollator
-from lighttrain.losses.preference import DPOLoss
-from lighttrain.trainers._preference_base import PreferenceTrainer
+from lighttrain.builtin_plugins.data.core.collators import PreferenceCollator
+from lighttrain.builtin_plugins.losses.preference import DPOLoss
+from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
 
 
 def _make_engine():
@@ -50,7 +50,7 @@ def test_collator_preserves_aux_keys():
 @pytest.mark.filterwarnings("ignore::UserWarning")
 def test_dpo_step_with_aux_logprobs():
     """Full chain: collator → _preference_base._step() → DPOLoss must not raise KeyError."""
-    from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
     vocab_size = 64
     model = TinyCausalLM(vocab_size=vocab_size, d_model=32, n_layers=1, n_heads=2,

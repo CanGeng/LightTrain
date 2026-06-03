@@ -1,7 +1,8 @@
-"""Model adapters / surgery / PEFT / extras."""
+"""Model plumbing kept in core: extras (extra-output hooks) + surgery.
 
-from __future__ import annotations
-
-from .adapters import HFCausalLM, TinyCausalLM
-
-__all__ = ["HFCausalLM", "TinyCausalLM"]
+Concrete model adapters (``tiny_lm`` / ``hf_causal``) and PEFT adapters
+(``lora`` / ``adalora`` / ``ia3``) are registered implementations and now live in
+``lighttrain.builtin_plugins.models`` (DESIGN §3.3: protocol in core, impls in
+builtin_plugins). ``extras`` (public ``ExtraOutputSpec`` / ``ExtrasHookManager``)
+and ``surgery`` stay here as framework plumbing.
+"""

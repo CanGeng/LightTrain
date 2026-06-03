@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.artifacts import ArtifactJoinedDataset, SafetensorsShardStore
+from lighttrain.builtin_plugins.artifacts import ArtifactJoinedDataset, SafetensorsShardStore
 
 
 def _make_store(root, ids, *, dim=4):

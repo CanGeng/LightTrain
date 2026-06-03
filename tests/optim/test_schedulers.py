@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.optim.schedulers``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.optim.schedulers``.
 
 The legacy suite has no scheduler-specific tests. This file pins
 closed-form values for:
@@ -23,7 +23,7 @@ import math
 import pytest
 import torch
 
-from lighttrain.optim.schedulers import (
+from lighttrain.builtin_plugins.optim.schedulers import (
     ConstantScheduler,
     LinearScheduler,
     WSDScheduler,

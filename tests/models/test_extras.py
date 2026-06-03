@@ -24,7 +24,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.models.extras import (
     ExtraOutputSpec,
     ExtrasHookManager,

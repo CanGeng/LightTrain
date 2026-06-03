@@ -209,8 +209,8 @@ def test_component_spec_short_name_only():
 
 
 def test_component_spec_target_only():
-    cs = ComponentSpec(_target_="lighttrain.optim.AdamW", params={"lr": 1e-4})
-    assert cs.target == "lighttrain.optim.AdamW"
+    cs = ComponentSpec(_target_="lighttrain.builtin_plugins.optim.AdamW", params={"lr": 1e-4})
+    assert cs.target == "lighttrain.builtin_plugins.optim.AdamW"
 
 
 def test_resolve_short_name(clean_registry):

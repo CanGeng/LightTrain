@@ -30,16 +30,16 @@ class MyLoss:
 ## 自定义优化器
 
 wrapper 必须提供 `build`、`step`、`zero_grad`，**以及 `state_dict` /
-`load_state_dict`**（checkpoint 管理器在 *wrapper* 上调后两者）。继承 `_BaseWrapper`
+`load_state_dict`**（checkpoint 管理器在 *wrapper* 上调后两者）。继承 `OptimizerWrapperBase`
 可免费获得这四个 + 默认 `optim_state_bytes`，只需写 `build()`：
 
 ```python
 import torch
 from lighttrain import register
-from lighttrain.optim.wrappers import _BaseWrapper, _split_param_groups
+from lighttrain.optim.base import OptimizerWrapperBase, _split_param_groups
 
 @register("optimizer", "my_adamw")
-class MyAdamW(_BaseWrapper):
+class MyAdamW(OptimizerWrapperBase):
     def build(self, model):
         self._check_unbuilt()
         self.optimizer = torch.optim.AdamW(_split_param_groups(model, self.param_groups, self._kwargs))

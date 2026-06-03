@@ -8,7 +8,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.models.surgery import (
     add_named_module,
     count_trainable,

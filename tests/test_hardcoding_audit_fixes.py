@@ -12,8 +12,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-import lighttrain.rl.reward_adapters  # noqa: F401 — registers reward_adapter/pointwise
-import lighttrain.rl.value_heads  # noqa: F401 — registers value_head/linear
+import lighttrain.builtin_plugins.rl.reward_adapters  # noqa: F401 — registers reward_adapter/pointwise
+import lighttrain.builtin_plugins.rl.value_heads  # noqa: F401 — registers value_head/linear
 from lighttrain.protocols import ModelOutput
 
 
@@ -47,7 +47,7 @@ def _reward(ids, batch):
 # --------------------------------------------------------------------------- #
 
 def _make_ppo(**over):
-    from lighttrain.trainers.ppo import PPOTrainer
+    from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
     m = _TinyLM()
     return PPOTrainer(engine=_FakeEngine(), data_module=_FakeDM(),
                       optimizer=torch.optim.SGD(m.parameters(), lr=1e-2), model=m,
@@ -56,7 +56,7 @@ def _make_ppo(**over):
 
 
 def _make_grpo(**over):
-    from lighttrain.trainers.grpo import GRPOTrainer
+    from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
     m = _TinyLM()
     return GRPOTrainer(engine=_FakeEngine(), data_module=_FakeDM(),
                        optimizer=torch.optim.SGD(m.parameters(), lr=1e-2), model=m,
@@ -65,7 +65,7 @@ def _make_grpo(**over):
 
 
 def test_f1_sampling_knobs_reach_backend():
-    from lighttrain.rl.rollout import HFGenerateBackend
+    from lighttrain.builtin_plugins.rl.rollout import HFGenerateBackend
     for make in (_make_ppo, _make_grpo):
         t = make(temperature=0.7, top_p=0.9, do_sample=True)
         be = t._rollout_engine.backend
@@ -139,7 +139,7 @@ def test_f2_pairwise_adapter_is_deferred_seam_open_not_implemented():
 # --------------------------------------------------------------------------- #
 
 def test_f3_rm_grad_clip_knob():
-    from lighttrain.trainers.rm import RewardModelTrainer
+    from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
     m = _TinyLM()
     base = dict(engine=_FakeEngine(), data_module=_FakeDM(),
                 optimizer=torch.optim.SGD(m.parameters(), lr=1e-2), model=m, max_steps=1)
@@ -159,7 +159,7 @@ def test_f4_value_head_registered_and_resolvable():
 
 
 def test_f4_ppo_default_head_is_zero_init():
-    from lighttrain.rl.value_heads import LinearValueHead
+    from lighttrain.builtin_plugins.rl.value_heads import LinearValueHead
     h = LinearValueHead(8, bias=True, zero_init=True, reduction="per_token")
     assert torch.allclose(h.linear.weight, torch.zeros_like(h.linear.weight))
     assert torch.allclose(h.linear.bias, torch.zeros_like(h.linear.bias))
@@ -167,7 +167,7 @@ def test_f4_ppo_default_head_is_zero_init():
 
 def test_f4_rm_default_head_is_default_init_not_zero():
     # The watch-point: rm's head must keep DEFAULT init (not zero) and no bias.
-    from lighttrain.rl.value_heads import LinearValueHead
+    from lighttrain.builtin_plugins.rl.value_heads import LinearValueHead
     torch.manual_seed(0)
     h = LinearValueHead(8, bias=False, zero_init=False, reduction="last")
     assert h.linear.bias is None

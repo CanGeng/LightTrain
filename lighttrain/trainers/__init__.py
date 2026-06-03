@@ -1,19 +1,13 @@
-"""Trainers — base + per-paradigm subclasses."""
+"""Trainers — the abstract ``Trainer`` base + shared plumbing.
+
+Concrete per-paradigm trainers (pretrain / preference / ppo / grpo /
+reward_model) are registered impls and live in
+``lighttrain.builtin_plugins.trainers`` (DESIGN §3.3). The base class + the
+shared ``_primitives`` / ``_utils`` helpers stay here as core framework.
+"""
 
 from __future__ import annotations
 
-from ._preference_base import PreferenceTrainer
 from .base import Trainer
-from .grpo import GRPOTrainer
-from .ppo import PPOTrainer
-from .pretrain import PretrainTrainer
-from .rm import RewardModelTrainer
 
-__all__ = [
-    "GRPOTrainer",
-    "PPOTrainer",
-    "PreferenceTrainer",
-    "PretrainTrainer",
-    "RewardModelTrainer",
-    "Trainer",
-]
+__all__ = ["Trainer"]

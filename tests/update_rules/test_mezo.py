@@ -25,7 +25,7 @@ import torch.nn as nn
 from lighttrain.callbacks.base import EventBus
 from lighttrain.engine._context import StepContext
 from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.update_rules.mezo import MeZOUpdateRule
+from lighttrain.builtin_plugins.update_rules.mezo import MeZOUpdateRule
 
 
 # ---------------------------------------------------------------------------

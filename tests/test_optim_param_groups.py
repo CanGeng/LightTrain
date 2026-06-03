@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.optim.wrappers import AdamWWrapper, ParamGroupSpec, _split_param_groups
+from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper
+from lighttrain.optim.base import ParamGroupSpec, _split_param_groups
 
 
 def _toy_model() -> torch.nn.Module:

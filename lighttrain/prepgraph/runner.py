@@ -287,7 +287,7 @@ class PrepRunner:
         if node.kind == "materialize":
             if (rfp.final_dir / "shards.json").exists() or read_manifest(rfp.final_dir):
                 # Lazy import to avoid runner ↔ nodes circular import at top-level.
-                from .nodes.materialize import _RowsDataset
+                from ..data.cache._rows import _RowsDataset
 
                 store = _RowsDataset(rfp.final_dir)
                 rows = list(iter_rows(rfp.final_dir))

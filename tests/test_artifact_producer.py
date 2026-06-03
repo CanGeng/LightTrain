@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.artifacts import ModelForwardProducer, open_artifact_store
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.artifacts import ModelForwardProducer, open_artifact_store
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.models.extras import ExtraOutputSpec
 
 

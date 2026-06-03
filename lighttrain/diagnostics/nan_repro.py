@@ -60,7 +60,7 @@ import torch
 
 # Re-populate the registry — pull in adapters for whatever model the parent
 # run used. Adjust the import below if you used a model outside tiny_lm.
-import lighttrain.models.adapters  # noqa: F401
+import lighttrain.builtin_plugins.models.adapters  # noqa: F401
 
 from lighttrain.minimal import build_minimal_model, load_state
 

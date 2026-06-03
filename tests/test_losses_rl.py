@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.losses.rl import GRPOLoss, PPOSurrogateLoss
+from lighttrain.builtin_plugins.losses.rl import GRPOLoss, PPOSurrogateLoss
 from lighttrain.protocols import LossContext, ModelOutput
 
 _DUMMY = ModelOutput(outputs={})

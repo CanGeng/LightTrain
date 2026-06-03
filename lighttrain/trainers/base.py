@@ -74,13 +74,14 @@ class Trainer:
         """The objective used when a consuming trainer's recipe omits loss/obj.
 
         Called by the runtime *after* construction (so subclasses can wrap a
-        surrogate loss they built in ``__init__``). The base default is
-        next-token cross-entropy.
+        surrogate loss they built in ``__init__``). The abstract base supplies
+        **no** concrete default — core does not know any specific loss (DESIGN
+        §3.3). A consuming trainer that has a sensible default (e.g.
+        ``PretrainTrainer`` → next-token cross-entropy) overrides this; a trainer
+        that requires an explicit objective sets ``requires_objective = True`` so
+        the runtime errors loudly instead of falling back to ``None``.
         """
-        from ..architectures.profile import LossOnlyObjective
-        from ..losses.core import CrossEntropyLoss
-
-        return LossOnlyObjective(CrossEntropyLoss(), loss_family="next_token")
+        return None
 
     def __init__(
         self,

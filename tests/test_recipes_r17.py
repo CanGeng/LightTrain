@@ -14,11 +14,11 @@ from lighttrain.diagnostics.frozen_step import (
     read_frozen_step_bundle,
     replay_step_bundle,
 )
-from lighttrain.diagnostics.nan_hunter import NanHunterCallback
+from lighttrain.builtin_plugins.diagnostics.nan_hunter import NanHunterCallback
 from lighttrain.diagnostics.nan_repro import write_nan_repro
 from lighttrain.engine._context import StepContext
-from lighttrain.losses.core import CrossEntropyLoss
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
 
 pytestmark = pytest.mark.heavy

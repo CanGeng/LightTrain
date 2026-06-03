@@ -26,8 +26,8 @@ def test_three_level_import():
 
 
 def test_four_level_import():
-    from lighttrain.data.core.collators import CausalLMCollator
-    result = _import_target("lighttrain.data.core.collators.CausalLMCollator")
+    from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
+    result = _import_target("lighttrain.builtin_plugins.data.core.collators.CausalLMCollator")
     assert result is CausalLMCollator
 
 

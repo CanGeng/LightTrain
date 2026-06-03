@@ -6,7 +6,7 @@ and the runtime resolves judges via the ``judge`` registry category).
 """
 
 from .generation_eval import GenerationEvalResult, GenerationEvalTask
-from .suite import EvalReport, EvalTask, Evaluator, RegressionGate
+from .suite import EvalReport, EvalTask, Evaluator
 
 __all__ = [
     "EvalReport",
@@ -14,5 +14,4 @@ __all__ = [
     "Evaluator",
     "GenerationEvalResult",
     "GenerationEvalTask",
-    "RegressionGate",
 ]

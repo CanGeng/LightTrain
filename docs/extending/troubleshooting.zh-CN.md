@@ -7,7 +7,7 @@
 | 现象 | 可能原因 / 修法 |
 | ---- | --------------- |
 | `recipe is missing 'model:'/'data:'/'optim:' section` | 补上必填节点 —— 见 [配置](../guide/configuration.zh-CN.md)。 |
-| 自定义优化器在首次 `ckpt_every` 报 `AttributeError` | wrapper 缺 `state_dict` / `load_state_dict`；继承 `_BaseWrapper` —— 见 [扩展](extending.zh-CN.md)。 |
+| 自定义优化器在首次 `ckpt_every` 报 `AttributeError` | wrapper 缺 `state_dict` / `load_state_dict`；继承 `OptimizerWrapperBase` —— 见 [扩展](extending.zh-CN.md)。 |
 | 自定义 trainer 收不到 teacher / 第二个模型 | `__init__` 必须声明 `models=` / `optimizers=` 才能收到这套 —— 见 [训练 § 多模型](../concepts/training.zh-CN.md#多模型)。 |
 | 模型上出现 `UserWarning: dropped recipe key …` | 跨架构杂键；有显式签名时是预期行为 —— 见 [其他架构](architectures.zh-CN.md)。 |
 | epoch 中途 resume 没过 `resume-verify` | bit-exact 校验用 fp32 + 单 worker；否则传 `--tol`。 |

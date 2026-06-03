@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers.grpo import GRPOTrainer
+from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
 
 
 class _TinyLM(nn.Module):

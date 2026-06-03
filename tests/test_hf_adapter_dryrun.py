@@ -9,7 +9,7 @@ import pytest
 
 def _import_class():
     """Import HFCausalLM once; subsequent calls are cheap."""
-    from lighttrain.models.adapters.hf_causal import HFCausalLM
+    from lighttrain.builtin_plugins.models.adapters.hf_causal import HFCausalLM
 
     return HFCausalLM
 

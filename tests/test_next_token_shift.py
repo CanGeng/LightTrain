@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
-from lighttrain.losses.core import CrossEntropyLoss
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.protocols import LossContext, ModelOutput
 
 

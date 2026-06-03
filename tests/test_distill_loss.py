@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
-from lighttrain.losses.distill import (
+from lighttrain.builtin_plugins.losses.distill import (
     AttentionTransferLoss,
     HiddenStatesCosineLoss,
     HiddenStatesMSELoss,

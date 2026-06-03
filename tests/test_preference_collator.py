@@ -7,8 +7,8 @@ import json
 import pytest
 import torch
 
-from lighttrain.data.core.collators import PreferenceCollator
-from lighttrain.data.core.datasets import PreferenceJsonlDataset
+from lighttrain.builtin_plugins.data.core.collators import PreferenceCollator
+from lighttrain.builtin_plugins.data.core.datasets import PreferenceJsonlDataset
 from lighttrain.registry import get as registry_get
 
 

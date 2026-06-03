@@ -8,12 +8,12 @@ import torch.nn as nn
 from unittest.mock import MagicMock
 
 from lighttrain.exceptions import BatchValidationError, LightTrainError
-from lighttrain.losses.preference import DPOLoss
+from lighttrain.builtin_plugins.losses.preference import DPOLoss
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers._preference_base import PreferenceTrainer
-from lighttrain.trainers.grpo import GRPOTrainer
-from lighttrain.trainers.ppo import PPOTrainer
-from lighttrain.trainers.rm import RewardModelTrainer
+from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
+from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
+from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
+from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
 
 
 # ---------------------------------------------------------------------------

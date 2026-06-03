@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.losses.rl (PPOSurrogateLoss / GRPOLoss).
+"""Adversarial tests for lighttrain.builtin_plugins.losses.rl (PPOSurrogateLoss / GRPOLoss).
 
 Attack focus
 ------------
@@ -16,7 +16,7 @@ import math
 import pytest
 import torch
 
-from lighttrain.losses.rl import GRPOLoss, PPOSurrogateLoss
+from lighttrain.builtin_plugins.losses.rl import GRPOLoss, PPOSurrogateLoss
 from lighttrain.protocols import LossContext, ModelOutput
 
 

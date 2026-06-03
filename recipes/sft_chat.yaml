@@ -33,7 +33,7 @@ prep_graph:
       inputs: [raw]
       processor:
         name: chat_template
-        tokenizer: { _target_: lighttrain.data.core.tokenizers.ByteTokenizer }
+        tokenizer: { name: byte }
         response_only_mask: true
 
     - name: validated

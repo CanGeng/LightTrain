@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 import lighttrain.builtin_plugins.layer_offload  # noqa: F401 — register cpu_offload
-import lighttrain.optim.wrappers  # noqa: F401 — register adamw / lion
+import lighttrain.builtin_plugins.optim.wrappers  # noqa: F401 — register adamw / lion
 
 from lighttrain.registry import get as _registry_get
 

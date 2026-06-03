@@ -7,7 +7,7 @@ Equivalent CLI:
 from lighttrain.config import load_config
 from lighttrain.cli._runtime import setup_run_from_config
 
-import lighttrain.builtin_plugins.update_rules  # registers PCN update rule  # noqa: F401
+import lighttrain.builtin_plugins.update_rules.pcn  # noqa: F401 — registers the PCN update rule
 
 cfg = load_config("recipes/pcn_demo.yaml")
 bundle = setup_run_from_config(cfg)

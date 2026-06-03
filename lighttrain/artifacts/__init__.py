@@ -1,43 +1,26 @@
-"""Artifact subsystem.
+"""Artifact-store abstraction (core).
 
-Re-exports the producer / store / joined-dataset / dynamic-producer surfaces.
-Concrete classes register against the ``artifact_producer`` / ``artifact_store``
-/ ``dataset`` / ``callback`` registry categories on import.
+Header / errors / base class live in :mod:`lighttrain.artifacts.base`; the
+structural protocol is in :mod:`lighttrain.protocols`. Concrete store backends
++ producers + the joined dataset are registered impls in
+``lighttrain.builtin_plugins.artifacts`` (DESIGN §3.3).
 """
 
 from __future__ import annotations
 
-from .dynamic_producer import DynamicArtifactCallback
-from .joined_dataset import ArtifactJoinedDataset, drop_none_collator
-from .producer import (
-    ArtifactProducerProtocol,
-    ModelForwardProducer,
-    run_artifact_production,
-)
-from .store import (
+from lighttrain.protocols import ArtifactStoreProtocol
+
+from .base import (
     ArtifactHeader,
     ArtifactIncompleteError,
-    ArtifactStoreProtocol,
-    MemmapFixedStore,
-    ParquetRowStore,
-    SafetensorsShardStore,
+    ArtifactStoreBase,
     StaleArtifactError,
-    open_artifact_store,
 )
 
 __all__ = [
     "ArtifactHeader",
     "ArtifactIncompleteError",
-    "ArtifactJoinedDataset",
-    "ArtifactProducerProtocol",
+    "ArtifactStoreBase",
     "ArtifactStoreProtocol",
-    "DynamicArtifactCallback",
-    "MemmapFixedStore",
-    "ModelForwardProducer",
-    "ParquetRowStore",
-    "SafetensorsShardStore",
     "StaleArtifactError",
-    "drop_none_collator",
-    "open_artifact_store",
-    "run_artifact_production",
 ]

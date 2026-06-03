@@ -29,10 +29,10 @@ from ..config._resolver import _as_plain_dict as _to_dict
 from ..config._resolver import resolve as _resolve
 from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
-from ..engine.standard import StandardEngine
+from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from ..logging._bus import LoggerBus
 from ..registry import get as _registry_get
-from ..update_rules.standard import StandardUpdateRule
+from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
 from ..utils.accelerate import build_accelerator
 from ..utils.run_dir import make_run_dir, slugify
 from ..utils.seed import seed_everything
@@ -520,7 +520,7 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
     # invariants and falls back to the default set.
     if "InvariantsCallback" not in have:
         try:
-            from ..callbacks.invariants import InvariantsCallback
+            from ..builtin_plugins.callbacks.invariants import InvariantsCallback
 
             specs = getattr(cfg, "invariants", None)
             if isinstance(specs, Mapping):
@@ -537,7 +537,7 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
     every = int(_diag_field(cfg, "frozen_step_every", 1000 if mode == "lab" else 0))
     if every > 0 and "FrozenStepCallback" not in have:
         try:
-            from ..callbacks.builtins.frozen_step import FrozenStepCallback
+            from ..builtin_plugins.callbacks.builtins.frozen_step import FrozenStepCallback
 
             cb = FrozenStepCallback(every=every)
             bus.add(cb)
@@ -557,7 +557,7 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
         rt_enabled = bool(getattr(rt, "enabled"))
     if rt_enabled and "FileSignalsCallback" not in have:
         try:
-            from ..realtime_control.file_signals import FileSignalsCallback
+            from ..builtin_plugins.realtime_control.file_signals import FileSignalsCallback
 
             poll_every = 10
             if isinstance(rt, Mapping):
@@ -968,7 +968,7 @@ def setup_run_from_config(
                 f"(reward_kind={reward_kind!r}): {exc}. Register a "
                 f"'{reward_kind}' reward_adapter, or set `reward_adapter:` in the "
                 f"recipe. (A 'pairwise' adapter is a deferred feature — see "
-                f"lighttrain/rl/reward_adapters.py.)"
+                f"lighttrain/builtin_plugins/rl/reward_adapters.py.)"
             ) from exc
         trainer_kwargs["reward_fn"] = adapter
 

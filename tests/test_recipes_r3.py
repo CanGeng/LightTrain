@@ -14,17 +14,17 @@ from pathlib import Path
 import pytest
 import torch
 
-from lighttrain.artifacts import ArtifactJoinedDataset, ModelForwardProducer, open_artifact_store
-from lighttrain.data.core.collators import CausalLMCollator
-from lighttrain.data.core.tokenizers import PAD_ID
+from lighttrain.builtin_plugins.artifacts import ArtifactJoinedDataset, ModelForwardProducer, open_artifact_store
+from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
+from lighttrain.builtin_plugins.data.core.tokenizers import PAD_ID
 from lighttrain.engine._context import StepContext
-from lighttrain.engine.standard import StandardEngine
-from lighttrain.losses.core import CompositeLoss
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.engine.standard import StandardEngine
+from lighttrain.builtin_plugins.losses.core import CompositeLoss
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.models.extras import ExtraOutputSpec
-from lighttrain.optim.wrappers import AdamWWrapper
+from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper
 from lighttrain.protocols import LossContext
-from lighttrain.update_rules.standard import StandardUpdateRule
+from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
 from lighttrain.callbacks.base import EventBus
 
 

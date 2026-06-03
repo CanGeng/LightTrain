@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.2.4"
+version = "0.2.5"
 description = "PyTorch LM training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -61,18 +61,19 @@ addopts = '-v -m "not heavy and not gpu"'
 #   pytest --cov=lighttrain --cov-report=term-missing --cov-fail-under=75
 [tool.coverage.run]
 source = [
+    # core seams/plumbing (concrete impls now live in builtin_plugins, below)
     "lighttrain.callbacks",
     "lighttrain.checkpoint",
     "lighttrain.config",
     "lighttrain.data.core",
     "lighttrain.engine",
     "lighttrain.logging",
-    "lighttrain.losses",
-    "lighttrain.optim",
     "lighttrain.registry",
     "lighttrain.trainers",
     "lighttrain.update_rules",
     "lighttrain.utils",
+    # all relocated concrete implementations (losses/optim/models/data/rl/...)
+    "lighttrain.builtin_plugins",
 ]
 omit = ["**/_exceptions.py", "**/protocols.py"]
 

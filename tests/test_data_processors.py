@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lighttrain.data.processors.audio import MelSpectrogramProcessor
-from lighttrain.data.processors.image import SimpleImageProcessor
-from lighttrain.data.processors.text import ChatTemplateProcessor
-from lighttrain.data.core.tokenizers import ByteTokenizer
+from lighttrain.builtin_plugins.data.processors.audio import MelSpectrogramProcessor
+from lighttrain.builtin_plugins.data.processors.image import SimpleImageProcessor
+from lighttrain.builtin_plugins.data.processors.text import ChatTemplateProcessor
+from lighttrain.builtin_plugins.data.core.tokenizers import ByteTokenizer
 
 
 def test_simple_image_single_array():

@@ -19,9 +19,9 @@ import torch
 import torch.nn as nn
 
 from lighttrain.callbacks.base import EventBus, Signal
-from lighttrain.losses.preference import DPOLoss
+from lighttrain.builtin_plugins.losses.preference import DPOLoss
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers._preference_base import PreferenceTrainer
+from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
 
 
 class _TinyLM(nn.Module):

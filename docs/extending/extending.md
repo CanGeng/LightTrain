@@ -32,16 +32,16 @@ class MyLoss:
 
 The wrapper must supply `build`, `step`, `zero_grad`, **and `state_dict` /
 `load_state_dict`** (the checkpoint manager calls the last two on the *wrapper*).
-Subclass `_BaseWrapper` to get all four plus a default `optim_state_bytes` for
+Subclass `OptimizerWrapperBase` to get all four plus a default `optim_state_bytes` for
 free; you only write `build()`:
 
 ```python
 import torch
 from lighttrain import register
-from lighttrain.optim.wrappers import _BaseWrapper, _split_param_groups
+from lighttrain.optim.base import OptimizerWrapperBase, _split_param_groups
 
 @register("optimizer", "my_adamw")
-class MyAdamW(_BaseWrapper):
+class MyAdamW(OptimizerWrapperBase):
     def build(self, model):
         self._check_unbuilt()
         self.optimizer = torch.optim.AdamW(_split_param_groups(model, self.param_groups, self._kwargs))

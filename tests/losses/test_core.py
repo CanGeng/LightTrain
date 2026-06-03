@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.losses.core.
+"""Adversarial tests for lighttrain.builtin_plugins.losses.core.
 
 Each test verifies a closed-form mathematical property (not just shape/finite),
 or pins a known/possible bug via a regression test.
@@ -12,7 +12,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
-from lighttrain.losses.core import (
+from lighttrain.builtin_plugins.losses.core import (
     CompositeLoss,
     CrossEntropyLoss,
     MaskedLMLoss,

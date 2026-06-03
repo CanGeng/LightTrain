@@ -24,7 +24,7 @@ from lighttrain.cli._runtime import (
     _wire_objective,
 )
 from lighttrain.config import ConfigError, load_config
-from lighttrain.losses.core import CrossEntropyLoss
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.protocols import ModelOutput
 
 
@@ -180,8 +180,8 @@ def test_arch_profile_object_passthrough_and_none():
 # ---------------------------------------------------------------------------
 
 def test_chunk_size_emits_doc_boundary():
-    from lighttrain.data.core.datasets import LineFileTextDataset
-    from lighttrain.data.core.tokenizers import ByteTokenizer
+    from lighttrain.builtin_plugins.data.core.datasets import LineFileTextDataset
+    from lighttrain.builtin_plugins.data.core.tokenizers import ByteTokenizer
 
     d = tempfile.mkdtemp()
     p = os.path.join(d, "corpus.txt")
@@ -196,7 +196,7 @@ def test_chunk_size_emits_doc_boundary():
 
 
 def test_causal_lm_collator_doc_boundary_passthrough_and_batch_guard():
-    from lighttrain.data.core.collators import CausalLMCollator
+    from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
 
     coll = CausalLMCollator(pad_id=0, max_len=16)
     out = coll([{"input_ids": [1, 2, 3], "labels": [1, 2, 3], "_doc_boundary": True}])
@@ -220,9 +220,9 @@ def test_rwkv_doc_boundary_resets_only_at_boundaries():
     import torch.nn as nn
     from torch.utils.data import DataLoader, SequentialSampler
 
-    from lighttrain.data.core.collators import CausalLMCollator
-    from lighttrain.data.core.datasets import LineFileTextDataset
-    from lighttrain.data.core.tokenizers import ByteTokenizer
+    from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
+    from lighttrain.builtin_plugins.data.core.datasets import LineFileTextDataset
+    from lighttrain.builtin_plugins.data.core.tokenizers import ByteTokenizer
     from lighttrain.trainers.base import Trainer
 
     tok = ByteTokenizer()
@@ -299,7 +299,7 @@ def test_eval_strips_doc_boundary_before_model_forward():
 
 
 def test_target_ema_calls_update_ema_only_when_present():
-    from lighttrain.callbacks.builtins.target_ema import TargetEMACallback
+    from lighttrain.builtin_plugins.callbacks.builtins.target_ema import TargetEMACallback
 
     cb = TargetEMACallback()
     hits = {"n": 0}

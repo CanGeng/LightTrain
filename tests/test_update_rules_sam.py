@@ -3,7 +3,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.update_rules.sam import SAMUpdateRule
+from lighttrain.builtin_plugins.update_rules.sam import SAMUpdateRule
 
 
 def _make_ctx(model, loss_fn, opt):

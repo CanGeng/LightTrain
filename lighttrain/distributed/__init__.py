@@ -9,13 +9,11 @@ selects them via config.
 """
 
 from ._context import ParallelContext
-from ._noop import NoopGradSyncStrategy
 from ._protocols import GradSyncStrategy, ModelParallelStrategy, PipelineSchedule
 
 __all__ = [
     "GradSyncStrategy",
     "ModelParallelStrategy",
-    "NoopGradSyncStrategy",
     "ParallelContext",
     "PipelineSchedule",
 ]

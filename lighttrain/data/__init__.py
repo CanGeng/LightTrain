@@ -1,35 +1,9 @@
-"""Data system root. Core surface lives in :mod:`.core`."""
+"""Data system core: the ``Sample`` schema (``core``) plus cache / mixing /
+packing plumbing consumed by the PrepGraph framework.
+
+Concrete datasets / collators / samplers / tokenizers / processors / data
+modules are registered impls and live in ``lighttrain.builtin_plugins.data``
+(DESIGN §3.3). Import the schema from :mod:`lighttrain.data.core`.
+"""
 
 from __future__ import annotations
-
-from .core import (
-    BOS_ID,
-    ByteTokenizer,
-    CausalLMCollator,
-    EOS_ID,
-    LineFileTextDataset,
-    PAD_ID,
-    PreferenceJsonlDataset,
-    Sample,
-    SequentialSampler,
-    ShuffleSampler,
-    SimpleDataModule,
-    UNK_ID,
-    VOCAB_SIZE,
-)
-
-__all__ = [
-    "BOS_ID",
-    "ByteTokenizer",
-    "CausalLMCollator",
-    "EOS_ID",
-    "LineFileTextDataset",
-    "PAD_ID",
-    "PreferenceJsonlDataset",
-    "Sample",
-    "SequentialSampler",
-    "ShuffleSampler",
-    "SimpleDataModule",
-    "UNK_ID",
-    "VOCAB_SIZE",
-]

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.losses.preference import (
+from lighttrain.builtin_plugins.losses.preference import (
     BradleyTerryLoss,
     DPOLoss,
     IPOLoss,

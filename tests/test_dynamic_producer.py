@@ -7,9 +7,9 @@ import types
 
 import torch
 
-from lighttrain.artifacts import DynamicArtifactCallback
+from lighttrain.builtin_plugins.artifacts import DynamicArtifactCallback
 from lighttrain.engine._context import StepContext
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
 
 def _make_ctx(model):

@@ -58,8 +58,8 @@ class QLoRAAdapter:
         compute_dtype: Any = None,
         quant_type: str = "nf4",
     ):
-        from lighttrain.models.peft import LoRAAdapter
-        from lighttrain.models.peft._common import resolve_base_model
+        from lighttrain.builtin_plugins.models.peft import LoRAAdapter
+        from lighttrain.builtin_plugins.models.peft._common import resolve_base_model
 
         base_module, base_spec = resolve_base_model(base)
         bnb_quantize(

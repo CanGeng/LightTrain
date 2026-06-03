@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers.pretrain import PretrainTrainer
+from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
 
 
 class _ToyLM(torch.nn.Module):

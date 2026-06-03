@@ -7,7 +7,7 @@ import pytest
 torch = pytest.importorskip("torch")
 peft = pytest.importorskip("peft")
 
-from lighttrain.models.peft import IA3Adapter, dump_peft_spec  # noqa: E402
+from lighttrain.builtin_plugins.models.peft import IA3Adapter, dump_peft_spec  # noqa: E402
 
 
 def _spec_for_tiny() -> dict:

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from lighttrain.data.samplers.stateful_resumable import StatefulResumableSampler
-from lighttrain.data.samplers.length_grouped import LengthGroupedSampler
-from lighttrain.data.samplers.curriculum import CurriculumSampler
+from lighttrain.builtin_plugins.data.samplers.stateful_resumable import StatefulResumableSampler
+from lighttrain.builtin_plugins.data.samplers.length_grouped import LengthGroupedSampler
+from lighttrain.builtin_plugins.data.samplers.curriculum import CurriculumSampler
 
 
 class _FakeDataset:

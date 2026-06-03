@@ -349,7 +349,7 @@ def replay_step_bundle(
     if "name" in bundle.model_spec or "_target_" in bundle.model_spec:
         # Adapters must be importable for short-name resolution.
         try:
-            import lighttrain.models.adapters  # noqa: F401
+            import lighttrain.builtin_plugins.models.adapters  # noqa: F401
         except Exception:  # noqa: BLE001
             pass
         model = build_minimal_model(bundle.model_spec)
@@ -429,7 +429,7 @@ def _infer_model_spec(model: torch.nn.Module) -> dict[str, Any]:
     # short-name / _target_ paths if peft isn't installed or the model
     # isn't a recognised adapter.
     try:
-        from ..models.peft import dump_peft_spec, is_peft_wrapped
+        from lighttrain.builtin_plugins.models.peft import dump_peft_spec, is_peft_wrapped
 
         if is_peft_wrapped(model):
             return dump_peft_spec(model)

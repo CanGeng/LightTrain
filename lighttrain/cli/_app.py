@@ -719,12 +719,12 @@ def replay_cmd(
 
     import torch as _torch
 
-    from ..losses.core import CrossEntropyLoss
+    from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
     from ..minimal import build_minimal_model, load_state
     from ..protocols import LossContext
 
     try:
-        import lighttrain.models.adapters  # noqa: F401 — populate registry
+        import lighttrain.builtin_plugins.models.adapters  # noqa: F401 — populate registry
     except Exception:
         pass
 
@@ -961,7 +961,8 @@ def regression_gate_cmd(
     """
     import json
     from ..eval.metrics import perplexity
-    from ..eval.suite import EvalReport, RegressionGate
+    from ..eval.suite import EvalReport
+    from ..builtin_plugins.eval.regression_gate import RegressionGate
 
     load_dotenv_if_present()
     bundle = setup_run_from_config(config)
@@ -1103,7 +1104,7 @@ def replay_step_cmd(
         console.print(f"[red]bundle not found:[/] {bundle}")
         raise typer.Exit(code=1)
     from ..diagnostics.frozen_step import read_frozen_step_bundle, replay_step_bundle
-    from ..losses.core import CrossEntropyLoss
+    from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 
     try:
         bdl = read_frozen_step_bundle(bundle)

@@ -98,7 +98,10 @@ started](docs/guide/getting-started.md#what-you-get)
 | Data | datasets, collators, samplers, byte tokenizer, PrepGraph nodes |
 | Diagnostics | invariants, nan_hunter, frozen_step, loss_attribution, `doctor` |
 
-Full tables: [Registry & protocols](docs/reference/registry.md).
+All of these are concrete `@register` implementations and ship in
+`lighttrain.builtin_plugins` (core keeps only protocols + framework); they're
+resolved by short name regardless of where the code lives. Full tables:
+[Registry & protocols](docs/reference/registry.md).
 
 ## Documentation
 

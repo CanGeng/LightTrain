@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.data.core.collators``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.data.core.collators``.
 
 The collator's correctness is load-bearing for the whole training stack:
 a wrong pad direction or a mis-typed attention mask silently breaks the
@@ -30,8 +30,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.data.core.collators import CausalLMCollator, PreferenceCollator
-from lighttrain.data.core.tokenizers import PAD_ID
+from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator, PreferenceCollator
+from lighttrain.builtin_plugins.data.core.tokenizers import PAD_ID
 
 
 # ---------------------------------------------------------------------------

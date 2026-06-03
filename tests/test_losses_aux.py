@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.losses.aux import InfoNCELoss, MoEBalanceLoss
+from lighttrain.builtin_plugins.losses.aux import InfoNCELoss, MoEBalanceLoss
 from lighttrain.protocols import LossContext, ModelOutput
 
 _DUMMY = ModelOutput(outputs={})

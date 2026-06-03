@@ -3,7 +3,7 @@
 Two routes:
 
 * short name: ``{name: adamw, lr: 1e-4}`` → ``Registry.get('optimizer', 'adamw')(lr=1e-4)``
-* dotted target: ``{_target_: lighttrain.optim.AdamW, lr: 1e-4}`` → import + call
+* dotted target: ``{_target_: lighttrain.builtin_plugins.optim.AdamW, lr: 1e-4}`` → import + call
 
 The two routes are mutually exclusive (enforced by ComponentSpec validator).
 """

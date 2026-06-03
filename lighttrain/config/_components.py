@@ -19,36 +19,17 @@ import pkgutil
 import sys
 from types import ModuleType
 
-# Curated, explicit package list. ``walk_packages`` recurses INTO each, so
-# nested registrables are discovered. We deliberately do NOT scan the
-# ``lighttrain`` top package — that would pull in test/private/example modules
-# and their side effects.
-# Every top-level package that contains an ``@register`` decorator. ``grep -rl
-# '@register(' lighttrain/`` is the source of truth for this list — a brand-new
-# top-level package is the one residual maintenance point.
+# Curated package list. ``walk_packages`` recurses INTO each, so nested
+# registrables are discovered. We deliberately do NOT scan the ``lighttrain`` top
+# package — that would pull in test/private/example modules and their side effects.
+#
+# After the §3.3 relocation, **every** concrete ``@register`` implementation lives
+# under ``lighttrain.builtin_plugins`` — core retains only protocols / framework /
+# plumbing (no registered components). So this list is now a single entry; the
+# source of truth is ``grep -rlE '(^|[^.])register\(' lighttrain/`` (decorator and
+# function-form) — if it ever reports a registrable outside ``builtin_plugins``,
+# either move it there or add its top-level package here.
 _FIRST_PARTY_PACKAGES: tuple[str, ...] = (
-    "lighttrain.architectures",     # arch-profile factories (architecture: transformer)
-    "lighttrain.models",            # adapters (tiny_lm/hf_causal), peft (lora/ia3/adalora)
-    "lighttrain.data",              # core datasets/samplers/tokenizers/collators + mm
-    "lighttrain.prepgraph",         # prep_node graph nodes
-    "lighttrain.losses",            # core/distill/preference/aux (info_nce/moe_balance)
-    "lighttrain.rl",                # reward_adapters, value_heads
-    "lighttrain.optim",             # schedulers, wrappers
-    "lighttrain.engine",            # standard engine
-    "lighttrain.update_rules",      # standard/sam/mezo/rl
-    "lighttrain.distributed",       # grad_sync / model_parallel strategies
-    "lighttrain.logging.backends",  # console/jsonl/tb (tb optional)
-    "lighttrain.callbacks",         # builtins + invariants + frozen_step
-    "lighttrain.trainers",          # pretrain/preference/ppo/grpo/...
-    "lighttrain.eval",              # regression_gate invariant (judges live in builtin_plugins)
-    "lighttrain.artifacts",         # producer/store/joined_dataset/dynamic_producer
-    "lighttrain.invariants",        # invariant registry
-    "lighttrain.diagnostics",       # nan_hunter/dead_neuron/... (some optional)
-    "lighttrain.realtime_control",  # file_signals
-    # Bundled first-party extension modules (architectures/objectives/judges/quant/
-    # layer_offload/distributed/sweep/generation backends/update_rules). Walked here
-    # so their @register calls land; a submodule whose third-party dep (bnb/optuna/
-    # vllm/peft) is absent is skipped by the per-module contract below.
     "lighttrain.builtin_plugins",
 )
 

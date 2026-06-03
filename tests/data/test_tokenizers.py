@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.data.core.tokenizers.ByteTokenizer``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.data.core.tokenizers.ByteTokenizer``.
 
 Coverage beyond the smoke check in ``tests/test_data_core.py`` (which
 tests one round-trip + one unicode sample):
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import pytest
 
-from lighttrain.data.core.tokenizers import (
+from lighttrain.builtin_plugins.data.core.tokenizers import (
     BOS_ID,
     EOS_ID,
     PAD_ID,

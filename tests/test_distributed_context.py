@@ -15,7 +15,7 @@ import torch
 import pytest
 
 from lighttrain.distributed._context import ParallelContext, _compute_ranks
-from lighttrain.distributed._noop import NoopGradSyncStrategy
+from lighttrain.builtin_plugins.distributed._noop import NoopGradSyncStrategy
 from lighttrain.config._schema import ParallelSection
 
 

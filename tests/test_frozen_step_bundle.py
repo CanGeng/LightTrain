@@ -9,7 +9,7 @@ from lighttrain.diagnostics.frozen_step import (
     read_frozen_step_bundle,
 )
 from lighttrain.engine._context import StepContext
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
 
 def test_writer_commit_creates_zip(tmp_path):

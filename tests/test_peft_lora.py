@@ -7,8 +7,8 @@ import pytest
 torch = pytest.importorskip("torch")
 peft = pytest.importorskip("peft")
 
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM  # noqa: E402
-from lighttrain.models.peft import (  # noqa: E402
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM  # noqa: E402
+from lighttrain.builtin_plugins.models.peft import (  # noqa: E402
     LoRAAdapter,
     dump_peft_spec,
     is_peft_wrapped,
@@ -95,7 +95,7 @@ def test_lora_state_dict_round_trip():
 def test_lora_param_groups_via_optim_wrapper():
     """When optimizer is built off the wrapped model, only LoRA params should
     end up in trainable groups (because peft set requires_grad=False on base)."""
-    from lighttrain.optim.wrappers import AdamWWrapper
+    from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper
 
     model = _make_lora()
     wrapper = AdamWWrapper(lr=1e-3)

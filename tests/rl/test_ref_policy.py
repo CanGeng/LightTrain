@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.rl.ref_policy (_sequence_log_probs / freeze_as_ref)."""
+"""Adversarial tests for lighttrain.builtin_plugins.rl.ref_policy (_sequence_log_probs / freeze_as_ref)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from lighttrain.protocols import ModelOutput
-from lighttrain.rl.ref_policy import _sequence_log_probs, freeze_as_ref, ref_log_probs
+from lighttrain.builtin_plugins.rl.ref_policy import _sequence_log_probs, freeze_as_ref, ref_log_probs
 
 
 def test_seq_logprobs_uniform_logits_equals_neg_log_V():

@@ -18,8 +18,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.losses.distill import HiddenStatesMSELoss, LayerMapping
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.losses.distill import HiddenStatesMSELoss, LayerMapping
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.protocols import LossContext, ModelOutput
 
 
@@ -148,7 +148,7 @@ def test_project_true_via_standard_update_rule_registers_with_optimizer():
     params to the optimizer and step() actually updates them."""
     from lighttrain.callbacks.base import EventBus
     from lighttrain.engine._context import StepContext
-    from lighttrain.update_rules.standard import StandardUpdateRule
+    from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
 
     torch.manual_seed(0)
     student = _make_student(d=16)

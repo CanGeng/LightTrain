@@ -18,7 +18,7 @@ import torch.nn as nn
 
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.protocols import ModelOutput
-from lighttrain.trainers.ppo import LinearValueHead, PPOTrainer
+from lighttrain.builtin_plugins.trainers.ppo import LinearValueHead, PPOTrainer
 
 
 # ---------------------------------------------------------------------------

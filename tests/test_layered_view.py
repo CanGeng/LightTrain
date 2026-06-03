@@ -10,7 +10,7 @@ from lighttrain.builtin_plugins.layer_offload import (
     LayerOffloadNotSupported,
     get_layered_view,
 )
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
 
 def test_tiny_lm_layered_view_has_one_handle_per_block():
@@ -35,7 +35,7 @@ def test_layered_view_falls_through_for_unknown_model():
 
 def test_layered_view_drills_through_peft_wrap():
     pytest.importorskip("peft")
-    from lighttrain.models.peft import LoRAAdapter
+    from lighttrain.builtin_plugins.models.peft import LoRAAdapter
 
     wrapped = LoRAAdapter(
         base={

@@ -91,7 +91,7 @@ def test_estimate_hook_overrides_name_default_for_memory_efficient_optimizer():
     (smaller) footprint visible through ``estimate`` — the generalization of
     GaLore's saving to any memory-efficient optimizer.
     """
-    from lighttrain.optim.wrappers import AdamWWrapper
+    from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper
     from lighttrain.registry import contains as _has
     from lighttrain.registry import register
 
@@ -126,7 +126,7 @@ def test_estimate_warns_when_optimizer_cannot_be_resolved():
 def test_estimate_does_not_warn_for_resolvable_optimizer_without_hook():
     """A resolvable optimizer that simply doesn't implement optim_state_bytes is
     legitimate — no warning, silent fallback. (Here adamw DOES have the
-    _BaseWrapper default, so this also guards against spurious warnings.)"""
+    OptimizerWrapperBase default, so this also guards against spurious warnings.)"""
     import warnings
 
     with warnings.catch_warnings(record=True) as caught:

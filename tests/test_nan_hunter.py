@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from lighttrain.diagnostics.nan_hunter import NanHunterCallback
+from lighttrain.builtin_plugins.diagnostics.nan_hunter import NanHunterCallback
 from lighttrain.engine._context import StepContext
-from lighttrain.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 
 
 class _Trainer:

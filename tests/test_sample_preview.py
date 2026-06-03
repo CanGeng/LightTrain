@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.data.core.tokenizers import ByteTokenizer
-from lighttrain.diagnostics.sample_preview import SamplePreviewCallback
+from lighttrain.builtin_plugins.data.core.tokenizers import ByteTokenizer
+from lighttrain.builtin_plugins.diagnostics.sample_preview import SamplePreviewCallback
 
 
 class _DM:

@@ -1,4 +1,4 @@
-"""Adversarial tests for lighttrain.losses.distill.
+"""Adversarial tests for lighttrain.builtin_plugins.losses.distill.
 
 Covers KLDivLoss / HiddenStatesMSELoss / HiddenStatesCosineLoss /
 AttentionTransferLoss with closed-form assertions and regression pins.
@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lighttrain.losses.distill import (
+from lighttrain.builtin_plugins.losses.distill import (
     AttentionTransferLoss,
     HiddenStatesCosineLoss,
     HiddenStatesMSELoss,

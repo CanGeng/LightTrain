@@ -9,8 +9,8 @@ import pytest
 
 from lighttrain.prepgraph.dag import PrepGraph
 from lighttrain.prepgraph.node import RunContext
-from lighttrain.prepgraph.nodes.load import LoadNode, _iter_lines
-from lighttrain.prepgraph.nodes.pack import PackNode
+from lighttrain.builtin_plugins.prepgraph.nodes.load import LoadNode, _iter_lines
+from lighttrain.builtin_plugins.prepgraph.nodes.pack import PackNode
 from lighttrain.prepgraph.runner import PrepRunner
 
 

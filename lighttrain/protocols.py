@@ -114,7 +114,7 @@ class OptimizerWrapperProtocol(Protocol):
 
     **Full contract** (the update rule + checkpoint manager call all of these
     on the *wrapper*, not the inner optimizer — implement them or subclass
-    ``lighttrain.optim.wrappers._BaseWrapper`` which supplies them):
+    ``lighttrain.optim.base.OptimizerWrapperBase`` which supplies them):
 
     * ``optimizer`` — the inner ``torch.optim.Optimizer``, set by ``build()``.
       Must expose ``.param_groups``: the LR logger reads

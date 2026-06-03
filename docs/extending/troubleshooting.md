@@ -7,7 +7,7 @@
 | Symptom | Likely cause / fix |
 | ------- | ------------------ |
 | `recipe is missing 'model:'/'data:'/'optim:' section` | Add the required section — see [Configuration](../guide/configuration.md). |
-| `AttributeError` at the first `ckpt_every` (custom optimizer) | Your wrapper lacks `state_dict` / `load_state_dict`; subclass `_BaseWrapper` — see [Extending](extending.md). |
+| `AttributeError` at the first `ckpt_every` (custom optimizer) | Your wrapper lacks `state_dict` / `load_state_dict`; subclass `OptimizerWrapperBase` — see [Extending](extending.md). |
 | Custom trainer never sees the teacher / second model | `__init__` must declare `models=` / `optimizers=` to receive the set — see [Training § multi-model](../concepts/training.md#multi-model). |
 | `UserWarning: dropped recipe key …` on a model | A stray cross-architecture key; expected with explicit signatures — see [Alternative architectures](architectures.md). |
 | Mid-epoch resume fails `resume-verify` | Use fp32 + single worker for bit-exact checks; otherwise pass `--tol`. |

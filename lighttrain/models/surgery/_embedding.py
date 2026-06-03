@@ -12,9 +12,9 @@ present) without dropping existing weights. New rows can be initialized:
 
 Recognizes the two built-in adapters by attribute layout:
 
-* :class:`lighttrain.models.adapters.tiny_lm.TinyCausalLM` exposes
+* :class:`lighttrain.builtin_plugins.models.adapters.tiny_lm.TinyCausalLM` exposes
   ``tok_emb`` / ``lm_head`` directly (and ties weights via shared storage).
-* :class:`lighttrain.models.adapters.hf_causal.HFCausalLM` delegates to its
+* :class:`lighttrain.builtin_plugins.models.adapters.hf_causal.HFCausalLM` delegates to its
   ``inner`` HuggingFace model, which provides ``resize_token_embeddings``;
   we forward to that.
 """

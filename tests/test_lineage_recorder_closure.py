@@ -16,7 +16,7 @@ import pytest
 import torch
 
 from lighttrain.callbacks.base import EventBus
-from lighttrain.callbacks.builtins.lineage_recorder import LineageRecorderCallback
+from lighttrain.builtin_plugins.callbacks.builtins.lineage_recorder import LineageRecorderCallback
 from lighttrain.lineage.store import LineageStore
 
 
@@ -74,7 +74,7 @@ def test_checkpoint_events_dispatched_by_trainer(tmp_path):
     LineageRecorderCallback receives the path (REVIEW #7)."""
     from lighttrain.checkpoint.manager import CheckpointManager
     from lighttrain.engine._context import StepContext
-    from lighttrain.trainers.pretrain import PretrainTrainer
+    from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
 
     class _Spy:
         def __init__(self):

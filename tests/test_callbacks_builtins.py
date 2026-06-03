@@ -8,11 +8,11 @@ import time
 import torch
 
 from lighttrain.callbacks.base import Signal
-from lighttrain.callbacks.builtins.best_ckpt import BestCheckpointCallback
-from lighttrain.callbacks.builtins.early_stop import EarlyStopCallback
-from lighttrain.callbacks.builtins.ema import EMACallback
-from lighttrain.callbacks.builtins.nan_skip import NaNSkipCallback
-from lighttrain.callbacks.builtins.throughput import ThroughputCallback
+from lighttrain.builtin_plugins.callbacks.builtins.best_ckpt import BestCheckpointCallback
+from lighttrain.builtin_plugins.callbacks.builtins.early_stop import EarlyStopCallback
+from lighttrain.builtin_plugins.callbacks.builtins.ema import EMACallback
+from lighttrain.builtin_plugins.callbacks.builtins.nan_skip import NaNSkipCallback
+from lighttrain.builtin_plugins.callbacks.builtins.throughput import ThroughputCallback
 
 
 def test_nan_skip_returns_skip_then_stop():

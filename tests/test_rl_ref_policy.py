@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from lighttrain.rl.ref_policy import ReferencePolicy, freeze_as_ref, ref_log_probs
+from lighttrain.builtin_plugins.rl.ref_policy import ReferencePolicy, freeze_as_ref, ref_log_probs
 
 
 class _TinyModel(nn.Module):

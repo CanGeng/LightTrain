@@ -18,8 +18,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lighttrain.data import processors as _processors  # noqa: F401 — registry
-from lighttrain.prepgraph import nodes as _nodes  # noqa: F401 — registry
+from lighttrain.builtin_plugins.data import processors as _processors  # noqa: F401 — registry
+from lighttrain.builtin_plugins.prepgraph import nodes as _nodes  # noqa: F401 — registry
 from lighttrain.prepgraph import runner as runner_module
 from lighttrain.prepgraph.dag import PrepGraph
 from lighttrain.prepgraph.runner import PrepRunner
@@ -71,7 +71,7 @@ def _two_sibling_spec(jsonl: Path) -> dict:
                 "processor": {
                     "name": "chat_template",
                     "tokenizer": {
-                        "_target_": "lighttrain.data.core.tokenizers.ByteTokenizer"
+                        "name": "byte"
                     },
                 },
             },
@@ -83,7 +83,7 @@ def _two_sibling_spec(jsonl: Path) -> dict:
                 "processor": {
                     "name": "chat_template",
                     "tokenizer": {
-                        "_target_": "lighttrain.data.core.tokenizers.ByteTokenizer"
+                        "name": "byte"
                     },
                 },
             },

@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.diagnostics.nan_hunter.NanHunterCallback``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.diagnostics.nan_hunter.NanHunterCallback``.
 
 Layered on top of ``tests/test_nan_hunter.py``. New coverage:
 
@@ -25,7 +25,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.diagnostics.nan_hunter import (
+from lighttrain.builtin_plugins.diagnostics.nan_hunter import (
     NanHunterCallback,
     _flatten_tensors,
     _safe_name,

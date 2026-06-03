@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from lighttrain.data.collators.multimodal import MultiModalCollator
+from lighttrain.builtin_plugins.data.collators.multimodal import MultiModalCollator
 
 
 def test_multimodal_collator_text_only_path_matches_causal_lm():

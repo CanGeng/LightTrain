@@ -7,7 +7,7 @@ import json
 import torch
 import torch.nn as nn
 
-from lighttrain.diagnostics.grad_flow import GradFlowCallback
+from lighttrain.builtin_plugins.diagnostics.grad_flow import GradFlowCallback
 from lighttrain.engine._context import StepContext
 
 

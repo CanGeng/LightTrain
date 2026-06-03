@@ -1,10 +1,10 @@
-"""Adversarial tests for lighttrain.rl.buffers (Episode / RolloutBuffer)."""
+"""Adversarial tests for lighttrain.builtin_plugins.rl.buffers (Episode / RolloutBuffer)."""
 
 from __future__ import annotations
 
 import torch
 
-from lighttrain.rl.buffers import Episode, RolloutBuffer
+from lighttrain.builtin_plugins.rl.buffers import Episode, RolloutBuffer
 
 
 def _ep(input_len: int, reward: float, group_id: int = 0) -> Episode:

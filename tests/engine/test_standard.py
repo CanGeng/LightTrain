@@ -1,5 +1,5 @@
 """Adversarial tests for StandardEngine — the thin orchestrator at
-``lighttrain/engine/standard.py``.
+``lighttrain/builtin_plugins/engine/standard.py``.
 
 The engine has a tiny surface: it injects ``loss_fn`` and ``accelerator``
 into ``ctx`` if missing, then directly delegates to
@@ -22,7 +22,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from lighttrain.engine._context import StepContext
-from lighttrain.engine.standard import StandardEngine
+from lighttrain.builtin_plugins.engine.standard import StandardEngine
 
 
 def _stub_update_rule(return_metrics: dict[str, Any] | None = None):

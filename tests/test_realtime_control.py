@@ -9,7 +9,7 @@ import torch
 
 from lighttrain.callbacks.base import Signal
 from lighttrain.engine._context import StepContext
-from lighttrain.realtime_control.file_signals import FileSignalsCallback
+from lighttrain.builtin_plugins.realtime_control.file_signals import FileSignalsCallback
 
 
 class _Trainer:

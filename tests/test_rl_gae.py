@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.rl.gae import compute_gae, normalize_advantages
+from lighttrain.builtin_plugins.rl.gae import compute_gae, normalize_advantages
 
 
 def test_gae_shape_BT():
