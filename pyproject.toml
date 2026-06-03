@@ -160,7 +160,6 @@ module = [
     "lighttrain.builtin_plugins.trainers.grpo",
     "lighttrain.builtin_plugins.trainers.ppo",
     "lighttrain.builtin_plugins.trainers.rm",
-    "lighttrain.cli._app",
     "lighttrain.cli._produce",
     "lighttrain.cli._runtime",
     "lighttrain.config._loader",
