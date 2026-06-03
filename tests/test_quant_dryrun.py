@@ -14,7 +14,6 @@ from __future__ import annotations
 import pytest
 
 import lighttrain.builtin_plugins.quant  # noqa: F401 — register qlora
-
 from lighttrain.registry import contains as _has
 
 

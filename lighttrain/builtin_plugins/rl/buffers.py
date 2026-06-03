@@ -6,8 +6,9 @@ and exposes them as mini-batches for PPO/GRPO inner epochs.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Iterator
+from typing import Any
 
 import torch
 

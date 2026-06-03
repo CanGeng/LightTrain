@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import torch
 
+from lighttrain.builtin_plugins.realtime_control.file_signals import FileSignalsCallback
 from lighttrain.callbacks.base import Signal
 from lighttrain.engine._context import StepContext
-from lighttrain.builtin_plugins.realtime_control.file_signals import FileSignalsCallback
 
 
 class _Trainer:

@@ -110,7 +110,7 @@ def test_prune_preserves_last_pointer(tmp_path: Path):
     # protect step_20 only, deleting step_10. The `last`-aware prune must keep
     # step_30 (pointed to by `last`) plus the most-recent valid step.
     mgr._prune()
-    remaining = {p.name for p in mgr.list_steps()}
+    {p.name for p in mgr.list_steps()}
     # step_30 has no manifest so list_steps() excludes it; but the directory
     # must still exist on disk so the symlink isn't dangling.
     assert (mgr.ckpt_dir / "step_30").exists(), "last pointer target was pruned"

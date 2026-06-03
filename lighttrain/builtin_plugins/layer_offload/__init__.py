@@ -23,7 +23,7 @@ from ._activation import ActivationManager
 from ._adapters import get_layered_view, register_layered_view
 from ._engine import LayerOffloadEngine
 from ._io import probe_layer_bandwidth
-from ._layer_handle import LayerHandle, LayeredView, LayerOffloadNotSupported
+from ._layer_handle import LayeredView, LayerHandle, LayerOffloadNotSupported
 from ._optim_offload import OptimizerCPUOffloadWrapper
 from ._storage_cpu import CpuPinnedStorage
 from ._storage_nvme import IOUringBackend, NvmeStorage

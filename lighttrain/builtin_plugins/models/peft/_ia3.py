@@ -8,13 +8,15 @@ checkpoint / forward contract as :class:`LoRAAdapter`.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn as nn
 
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
+
 from ._common import (
     adapter_state_dict,
     import_peft,

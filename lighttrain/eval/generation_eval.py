@@ -8,7 +8,7 @@ in the lineage graph.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable
+from typing import Any
 
 import torch
 
@@ -88,7 +88,7 @@ class GenerationEvalTask:
         model.eval()
 
         with torch.no_grad():
-            for prompt, extras in zip(self.prompts, self.extras_per_prompt):
+            for prompt, extras in zip(self.prompts, self.extras_per_prompt, strict=False):
                 enc = self.tokenizer(prompt, return_tensors="pt")
                 input_ids = enc["input_ids"]
                 if device is not None:

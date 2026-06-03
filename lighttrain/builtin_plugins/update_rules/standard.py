@@ -23,14 +23,14 @@ exhaustion falls back to a soft SKIP_STEP and writes
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 
 from lighttrain.callbacks.base import Signal
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
-from lighttrain.utils.seed import restore_rng_state, rng_state
 from lighttrain.update_rules._primitives import (  # noqa: F401  (_register_new_params re-exported for back-compat)
     MicroState,
     _current_lr,
@@ -38,6 +38,7 @@ from lighttrain.update_rules._primitives import (  # noqa: F401  (_register_new_
     apply_update,
     make_autocast,
 )
+from lighttrain.utils.seed import restore_rng_state, rng_state
 
 
 def _to_metric(value: Any) -> float:

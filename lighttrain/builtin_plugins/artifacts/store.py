@@ -20,8 +20,9 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator, Mapping
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any
 
 import torch
 

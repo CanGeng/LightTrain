@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import math
 
-import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from lighttrain.builtin_plugins.rl.ref_policy import (
+    _sequence_log_probs,
+    freeze_as_ref,
+    ref_log_probs,
+)
 from lighttrain.protocols import ModelOutput
-from lighttrain.builtin_plugins.rl.ref_policy import _sequence_log_probs, freeze_as_ref, ref_log_probs
 
 
 def test_seq_logprobs_uniform_logits_equals_neg_log_V():

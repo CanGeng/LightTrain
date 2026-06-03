@@ -97,7 +97,7 @@ def test_f2_pointwise_adapter_matches_old_reward_fn():
     pid = torch.zeros(3, 2, dtype=torch.long)
     rid = torch.zeros(3, 2, dtype=torch.long)
     # same as old inline _reward_fn: judge.score(zip(prompts, responses))
-    assert adapter(pid, rid) == judge.score(list(zip(["0 0"] * 3, ["0 0"] * 3)))
+    assert adapter(pid, rid) == judge.score(list(zip(["0 0"] * 3, ["0 0"] * 3, strict=False)))
 
 
 def test_f2_custom_pointwise_judge_no_longer_rejected():
@@ -124,7 +124,8 @@ def test_f2_pairwise_adapter_is_deferred_seam_open_not_implemented():
     registered, so resolving one raises (clean missing-registration, not a
     hardcoded whitelist). Also: PairwiseLLMJudge declares reward_kind='pairwise'."""
     from lighttrain.builtin_plugins.judges.judge import PairwiseLLMJudge
-    from lighttrain.registry import get as _get, list_entries
+    from lighttrain.registry import get as _get
+    from lighttrain.registry import list_entries
     from lighttrain.registry._exceptions import NotRegisteredError
 
     assert "pointwise" in list_entries("reward_adapter")

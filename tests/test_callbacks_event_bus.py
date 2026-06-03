@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from lighttrain.callbacks.base import EventBus, Signal
 
 

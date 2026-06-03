@@ -12,8 +12,8 @@ keeps the registry strict-by-default while still extensible.
 
 from __future__ import annotations
 
-import inspect
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 
 from ._exceptions import (
     NotRegisteredError,

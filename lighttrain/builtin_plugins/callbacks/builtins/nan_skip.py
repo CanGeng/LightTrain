@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from lighttrain.registry import register
 from lighttrain.callbacks.base import Signal
+from lighttrain.registry import register
 
 
 @register("callback", "nan_skip")

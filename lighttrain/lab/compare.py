@@ -21,10 +21,9 @@ PNG export requires ``matplotlib`` (``pip install -e '.[dev]'``)::
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Data class
@@ -345,7 +344,7 @@ def render_png(report: CompareReport, out_path: Path) -> None:
     fig, axes = plt.subplots(1, n_metrics, figsize=(4 * n_metrics, 4), squeeze=False)
     run_labels = [f"Run {i}" for i in range(len(report.runs))]
 
-    for ax, metric in zip(axes[0], metrics):
+    for ax, metric in zip(axes[0], metrics, strict=False):
         vals = report.metrics_table[metric]
         bar_vals = [v if v is not None else 0.0 for v in vals]
         ax.bar(run_labels, bar_vals)

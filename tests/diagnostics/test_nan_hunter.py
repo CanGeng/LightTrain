@@ -252,7 +252,7 @@ def test_raise_on_hit_false_records_dump_without_raising(tmp_path):
     cb.on_step_begin(step=5, batch={"x": torch.tensor([1.0])})
 
     # Should NOT raise
-    out = model(torch.ones(1, 4))
+    model(torch.ones(1, 4))
     cb.on_train_end()
     dumps = list((tmp_path / "diagnostics" / "nan_dumps" / "step_5").glob("*.pt"))
     assert len(dumps) >= 1

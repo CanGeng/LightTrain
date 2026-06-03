@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
 import torch
 
-from lighttrain.protocols import ModelOutput
 from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
+from lighttrain.protocols import ModelOutput
 
 
 class _ToyLM(torch.nn.Module):

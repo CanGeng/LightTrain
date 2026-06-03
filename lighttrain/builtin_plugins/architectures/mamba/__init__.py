@@ -19,18 +19,17 @@ Registered as ``@register("model", "tiny_mamba")``.
 
 from __future__ import annotations
 
-import math
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from lighttrain.architectures.profile import ArchitectureProfile
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
-from lighttrain.architectures.profile import ArchitectureProfile
-
 
 # ---------------------------------------------------------------------------
 # Config
@@ -81,9 +80,7 @@ class MambaBlock(nn.Module):
         x: torch.Tensor,       # (B, D_inner)
         h: torch.Tensor,       # (B, D_inner, N)
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        B_size = x.shape[0]
         N = self._d_state
-        D_inner = self._d_inner
 
         # Compute time-varying B, C, dt
         bcd = self.x_proj(x)                        # (B, N+N+1)

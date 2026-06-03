@@ -18,13 +18,13 @@ import pytest
 import torch
 
 from lighttrain.architectures.profile import ArchitectureProfile, LossOnlyObjective
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.cli._runtime import (
     _build_arch_profile,
     _build_objective,
     _wire_objective,
 )
 from lighttrain.config import ConfigError, load_config
-from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.protocols import ModelOutput
 
 
@@ -299,7 +299,9 @@ def test_eval_strips_doc_boundary_before_model_forward():
 
 
 def test_target_ema_calls_update_ema_only_when_present():
-    from lighttrain.builtin_plugins.callbacks.builtins.target_ema import TargetEMACallback
+    from lighttrain.builtin_plugins.callbacks.builtins.target_ema import (
+        TargetEMACallback,
+    )
 
     cb = TargetEMACallback()
     hits = {"n": 0}

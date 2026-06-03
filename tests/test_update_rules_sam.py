@@ -62,7 +62,7 @@ def test_sam_parameters_updated():
     batch = {"input_ids": torch.randn(4, 8), "labels": torch.randint(0, 4, (4,))}
     rule.step(model, batch, ctx)
     after = [p.data.clone() for p in model.parameters()]
-    assert any(not torch.allclose(a, b) for a, b in zip(before, after))
+    assert any(not torch.allclose(a, b) for a, b in zip(before, after, strict=False))
 
 
 def test_sam_weights_restored_after_perturbation():

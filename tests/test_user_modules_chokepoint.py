@@ -16,7 +16,6 @@ from lighttrain.config import load_config
 from lighttrain.config._user_modules import _IMPORTED_USER_MODULES
 from lighttrain.registry import contains, unregister
 
-
 _CUSTOM_NODE_SRC = textwrap.dedent(
     """
     from lighttrain.registry import register

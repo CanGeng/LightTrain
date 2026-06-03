@@ -24,14 +24,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from lighttrain.callbacks.base import EventBus
 from lighttrain.diagnostics.callback_isolation import (
     CallbackIsolationSink,
     write_callback_report,
 )
-
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -333,7 +330,7 @@ def test_write_callback_report_includes_quarantined_list(tmp_path):
     out = write_callback_report(tmp_path, bus=bus)
     body = out.read_text(encoding="utf-8")
     # Header mentions Currently quarantined: _Boomer
-    quarantined_line = [l for l in body.splitlines() if "Currently quarantined" in l][0]
+    quarantined_line = [ln for ln in body.splitlines() if "Currently quarantined" in ln][0]
     assert "_Boomer" in quarantined_line
 
 

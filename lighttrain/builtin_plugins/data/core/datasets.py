@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from lighttrain.registry import register
 from lighttrain.data.core._schema import Sample
+from lighttrain.registry import register
 
 
 @register("dataset", "line_file_text")

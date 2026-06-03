@@ -8,10 +8,11 @@ the actual forward / backward / clip / step sequence it asks the configured
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
-from lighttrain.registry import register
 from lighttrain.engine._context import StepContext
+from lighttrain.registry import register
 
 
 @register("engine", "standard")

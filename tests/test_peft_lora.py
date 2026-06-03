@@ -7,7 +7,9 @@ import pytest
 torch = pytest.importorskip("torch")
 peft = pytest.importorskip("peft")
 
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM  # noqa: E402
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import (  # noqa: E402 — after importorskip
+    TinyCausalLM,
+)
 from lighttrain.builtin_plugins.models.peft import (  # noqa: E402
     LoRAAdapter,
     dump_peft_spec,

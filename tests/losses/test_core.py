@@ -18,8 +18,7 @@ from lighttrain.builtin_plugins.losses.core import (
     MaskedLMLoss,
     ZLoss,
 )
-from lighttrain.protocols import LossContext, ModelOutput
-
+from lighttrain.protocols import ModelOutput
 
 # ---------------------------------------------------------------------------
 # CrossEntropyLoss

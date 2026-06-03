@@ -15,20 +15,22 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import pytest
 
 # Ensure prep_node kinds are registered so PrepGraph.from_config can resolve
 # the real node classes used by the partial-cache reproducer.
-from lighttrain.builtin_plugins.data import processors as _processors  # noqa: F401 — registry side-effect
-from lighttrain.builtin_plugins.prepgraph import nodes as _nodes  # noqa: F401 — registry side-effect
+from lighttrain.builtin_plugins.data import (
+    processors as _processors,  # noqa: F401 — registry side-effect
+)
+from lighttrain.builtin_plugins.prepgraph import (
+    nodes as _nodes,  # noqa: F401 — registry side-effect
+)
 from lighttrain.prepgraph._fp import SCHEMA_VERSION
 from lighttrain.prepgraph.dag import PrepGraph
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
 from lighttrain.prepgraph.runner import PrepRunner
-
 
 # --------------------------------------------------------------------------- #
 # Dummy PrepNodes used by the topology tests                                  #
@@ -355,7 +357,7 @@ def test_cache_hit_reason_codes(tmp_path: Path, jsonl_corpus: Path, monkeypatch)
     runner.run()
     runner2 = PrepRunner(PrepGraph.from_config(spec), store_root=store_root)
     plan2 = runner2.plan()
-    by_name_second = {e.name: e for e in plan2}
+    {e.name: e for e in plan2}
     assert all(e.hit for e in plan2)
     assert all(e.reason == "cache_hit" for e in plan2)
 
@@ -367,7 +369,7 @@ def test_cache_hit_reason_codes(tmp_path: Path, jsonl_corpus: Path, monkeypatch)
     )
     runner3 = PrepRunner(PrepGraph.from_config(spec), store_root=store_root)
     plan3 = runner3.plan()
-    by_name_third = {e.name: e for e in plan3}
+    {e.name: e for e in plan3}
     # At least one rows-schema node must now report the bump.
     bumped = [e for e in plan3 if e.reason == "schema_version_bumped"]
     assert bumped, f"no node reported schema_version_bumped: {[(e.name, e.reason) for e in plan3]}"

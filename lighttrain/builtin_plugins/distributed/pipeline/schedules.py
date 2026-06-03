@@ -36,7 +36,7 @@ def _build_split_spec(
         return {}
     from torch.distributed.pipelining import SplitPoint
     split: dict[str, Any] = {}
-    for i, spec in enumerate(stage_spec[:-1]):  # N stages → N-1 split points
+    for _i, spec in enumerate(stage_spec[:-1]):  # N stages → N-1 split points
         layers = spec.get("layers", "")
         if layers:
             last_layer = layers.split(",")[-1].strip()
@@ -77,7 +77,7 @@ class OneFOneBSchedule:
     def prepare(self, model: nn.Module, parallel_ctx: ParallelContext) -> Any:
         """Split model into PP stages using torch.distributed.pipelining."""
         try:
-            from torch.distributed.pipelining import pipeline, SplitPoint
+            from torch.distributed.pipelining import SplitPoint, pipeline
         except ImportError as e:
             raise ImportError(
                 "torch.distributed.pipelining is required for PP; "
@@ -145,7 +145,7 @@ class GPipeSchedule:
         outputs = [stage(**mb) for mb in microbatches]
         if ctx.loss_fn is not None and hasattr(ctx, "parallel_ctx") and ctx.parallel_ctx.is_pp_last_stage:
             from lighttrain.protocols import LossContext, ModelOutput
-            for out, mb in zip(outputs, microbatches):
+            for out, mb in zip(outputs, microbatches, strict=False):
                 if not isinstance(out, ModelOutput):
                     out = ModelOutput(outputs={"logits": out} if isinstance(out, torch.Tensor) else dict(out))
                 loss_dict = ctx.loss_fn(out, mb, LossContext(step=ctx.step, epoch=ctx.epoch))

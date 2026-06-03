@@ -6,8 +6,8 @@ Equivalent CLI:
 
 from pathlib import Path
 
-from lighttrain.lab.sweep import SweepRunner
 from lighttrain.lab.auto_report import write_sweep_report
+from lighttrain.lab.sweep import SweepRunner
 
 runner = SweepRunner(
     Path("recipes/sweep_demo.yaml"),

@@ -15,10 +15,8 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 import torch
@@ -26,9 +24,10 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 
 from lighttrain.checkpoint import CheckpointManager
-from lighttrain.checkpoint import manager as ckpt_manager  # for monkeypatching internals
+from lighttrain.checkpoint import (
+    manager as ckpt_manager,  # for monkeypatching internals
+)
 from lighttrain.distributed import ParallelContext
-
 
 # --------------------------------------------------------------------------- #
 # Helpers                                                                     #
@@ -121,14 +120,13 @@ def test_io_error_during_optimizer_save_leaves_no_manifest(
     """
     # Save model (safetensors) successfully; raise on the FIRST torch.save
     # for the optimizer. Model has already been replaced — but no manifest.
-    real_torch_save = torch.save
 
     def _torch_save_raises(*_a, **_kw):
-        raise IOError("simulated disk failure during optimizer save")
+        raise OSError("simulated disk failure during optimizer save")
 
     mgr = CheckpointManager(tmp_run_dir)
     monkeypatch.setattr(ckpt_manager, "_torch_save_atomic",
-                        lambda *_a, **_kw: (_ for _ in ()).throw(IOError("disk")))
+                        lambda *_a, **_kw: (_ for _ in ()).throw(OSError("disk")))
 
     state = _make_state()
     state["optimizer"] = {"foo": torch.tensor([1.0])}
@@ -337,7 +335,7 @@ def test_prune_keeps_last_n_in_step_order(tmp_run_dir) -> None:
         assert loaded["step"] in (4, 5)
         # Model state dict round-trips.
         assert "model" in loaded
-        for k, v in loaded["model"].items():
+        for _k, v in loaded["model"].items():
             assert isinstance(v, torch.Tensor)
 
 
@@ -469,7 +467,7 @@ def test_invariant_atomic_writes_no_partial_bytes_under_concurrency(tmp_path) ->
         p.join(timeout=30)
         assert p.exitcode == 0, f"writer exited with {p.exitcode}"
 
-    for rd, (step, _) in zip(run_dirs, ((5, 1), (6, 2))):
+    for rd, (step, _) in zip(run_dirs, ((5, 1), (6, 2)), strict=False):
         manifest = rd / "checkpoints" / f"step_{step}" / "manifest.json"
         assert manifest.exists()
         data = json.loads(manifest.read_text(encoding="utf-8"))  # would raise on partial bytes

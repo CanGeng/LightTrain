@@ -24,12 +24,13 @@ import json
 import logging
 import math
 import warnings
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 import torch
 
-from ..callbacks.base import EventBus, Signal
+from ..callbacks.base import EventBus
 from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
 from ..protocols import LossContext, ModelOutput, StepOutput

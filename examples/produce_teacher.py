@@ -5,7 +5,7 @@ Equivalent CLI:
 """
 
 from pathlib import Path
-from lighttrain.config import load_config
+
 from lighttrain.cli._produce import run_produce
 
 manifest = run_produce(Path("recipes/produce_teacher.yaml"))

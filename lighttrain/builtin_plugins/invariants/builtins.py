@@ -19,7 +19,6 @@ import torch
 
 from lighttrain.registry import register
 
-
 # ----------------------------------------------------------------- registry
 # Stash {invariant_name: callable(**ns) -> bool}. The InvariantsCallback
 # pulls these in addition to user-declared ``check:`` strings.

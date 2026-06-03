@@ -6,10 +6,11 @@ long-document SFT).
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
+from typing import Any
 
-from lighttrain.registry import register
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.registry import register
 
 
 def _chunk_one(

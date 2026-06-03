@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from lighttrain.prepgraph.dag import PrepGraph
-from lighttrain.prepgraph.node import RunContext
 from lighttrain.builtin_plugins.prepgraph.nodes.load import LoadNode, _iter_lines
 from lighttrain.builtin_plugins.prepgraph.nodes.pack import PackNode
+from lighttrain.prepgraph.dag import PrepGraph
+from lighttrain.prepgraph.node import RunContext
 from lighttrain.prepgraph.runner import PrepRunner
 
 

@@ -24,10 +24,11 @@ metrics on ``NodeResult.extras`` (``truncation_rate``, ``token_utilization``,
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
-from lighttrain.registry import register
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.registry import register
 
 _DEFAULT_STRATEGY = "concat_chunk"
 _STRATEGIES = ("concat_chunk", "next_fit", "best_fit")

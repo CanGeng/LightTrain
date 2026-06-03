@@ -8,7 +8,9 @@ ablation studies that ask "what happens if I reset the last two blocks?".
 from __future__ import annotations
 
 import re
-from typing import Any, Iterable, Mapping, Pattern
+from collections.abc import Iterable, Mapping
+from re import Pattern
+from typing import Any
 
 import torch
 import torch.nn as nn

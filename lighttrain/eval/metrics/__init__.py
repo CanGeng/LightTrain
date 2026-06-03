@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import torch
 import torch.nn.functional as F
-
 
 # ---------------------------------------------------------------------------
 # Perplexity
@@ -118,7 +118,7 @@ def exact_match(
     def _norm(s: str) -> str:
         return s.strip().lower() if normalize else s
 
-    return sum(_norm(p) == _norm(r) for p, r in zip(predictions, references)) / len(predictions)
+    return sum(_norm(p) == _norm(r) for p, r in zip(predictions, references, strict=False)) / len(predictions)
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ def rouge_score(
     variant_key = variant.lower()
     p_sum = r_sum = 0.0
 
-    for pred, ref in zip(predictions, references):
+    for pred, ref in zip(predictions, references, strict=False):
         pt = _tokenize(pred)
         rt = _tokenize(ref)
 
@@ -229,7 +229,7 @@ def bleu_score(
     counts = [0] * max_n
     totals = [0] * max_n
 
-    for pred, ref in zip(predictions, references):
+    for pred, ref in zip(predictions, references, strict=False):
         pt = _tokenize(pred)
         rt = _tokenize(ref)
         total_pred_len += len(pt)

@@ -7,8 +7,8 @@ import warnings
 import pytest
 import torch
 
-from lighttrain.callbacks.base import Signal
 from lighttrain.builtin_plugins.callbacks.invariants import InvariantsCallback
+from lighttrain.callbacks.base import Signal
 from lighttrain.invariants import InvariantError
 
 

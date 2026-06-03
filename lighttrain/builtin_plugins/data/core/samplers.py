@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import random
-from typing import Any, Iterator, Sized
+from collections.abc import Iterator, Sized
+from typing import Any
 
 from lighttrain.registry import register
 
@@ -28,8 +29,7 @@ class SequentialSampler:
         order = self._order()
         skip = self._skip
         self._skip = 0
-        for idx in order[skip:]:
-            yield idx
+        yield from order[skip:]
         # Advance only when the epoch is fully consumed.
         self._epoch += 1
 
@@ -70,8 +70,7 @@ class ShuffleSampler:
         order = self._order()
         skip = self._skip
         self._skip = 0
-        for idx in order[skip:]:
-            yield idx
+        yield from order[skip:]
         self._epoch += 1
 
     def seek(self, epoch: int, consumed_indices: int) -> None:

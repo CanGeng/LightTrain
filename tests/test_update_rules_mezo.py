@@ -20,7 +20,6 @@ def _make_ctx(model):
 
 
 def _ce_loss(logits, labels):
-    from lighttrain.protocols import LossContext, ModelOutput
     return {"loss": torch.nn.functional.cross_entropy(logits.view(-1, logits.shape[-1]), labels.view(-1))}
 
 
@@ -103,7 +102,7 @@ def test_mezo_parameters_updated():
     batch = {"input_ids": torch.randn(4, 8), "labels": torch.randint(0, 4, (4,))}
     rule.step(model, batch, ctx)
     params_after = [p.data.clone() for p in model.parameters()]
-    any_changed = any(not torch.allclose(a, b) for a, b in zip(params_before, params_after))
+    any_changed = any(not torch.allclose(a, b) for a, b in zip(params_before, params_after, strict=False))
     assert any_changed
 
 

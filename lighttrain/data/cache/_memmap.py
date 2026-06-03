@@ -9,12 +9,11 @@ an int8 attention_mask. The header is a JSON sidecar; the .bin is contiguous
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
-
 
 HEADER_NAME = "header.json"
 DATA_NAME = "data.bin"
@@ -36,7 +35,7 @@ class MemmapHeader:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "MemmapHeader":
+    def from_dict(cls, d: dict) -> MemmapHeader:
         return cls(
             seq_len=int(d["seq_len"]),
             n_rows=int(d["n_rows"]),

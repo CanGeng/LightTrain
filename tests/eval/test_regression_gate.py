@@ -23,8 +23,8 @@ import warnings
 
 import pytest
 
-from lighttrain.eval.suite import EvalReport
 from lighttrain.builtin_plugins.eval.regression_gate import RegressionGate
+from lighttrain.eval.suite import EvalReport
 from lighttrain.invariants import InvariantError
 
 

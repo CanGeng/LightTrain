@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import torch
 
 from lighttrain.builtin_plugins.optim.schedulers import (

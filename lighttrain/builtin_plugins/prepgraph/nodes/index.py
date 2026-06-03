@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lighttrain.registry import register
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.registry import register
 
 
 @register("prep_node", "index")

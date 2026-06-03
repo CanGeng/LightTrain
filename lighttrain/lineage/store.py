@@ -23,10 +23,10 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Mapping
-
+from typing import Any
 
 _NODE_KINDS = ("artifact", "checkpoint", "config", "run", "frozen_step")
 _EDGE_KINDS = (
@@ -410,7 +410,7 @@ class LineageStore:
         except Exception:
             pass
 
-    def __enter__(self) -> "LineageStore":
+    def __enter__(self) -> LineageStore:
         return self
 
     def __exit__(self, *exc: Any) -> None:

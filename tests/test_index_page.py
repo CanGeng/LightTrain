@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from lighttrain.diagnostics.index_page import write_index_page
 
 

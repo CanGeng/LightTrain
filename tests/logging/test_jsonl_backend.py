@@ -30,7 +30,6 @@ import pytest
 
 from lighttrain.builtin_plugins.logging_backends.jsonl import JSONLLogger, _coerce
 
-
 # ---------------------------------------------------------------------------
 # Record format invariants
 # ---------------------------------------------------------------------------
@@ -213,7 +212,7 @@ def test_invariant_log_text_with_embedded_newlines_stays_one_line(tmp_path: Path
 
     lines = p.read_text(encoding="utf-8").splitlines()
     # Filter out any blank trailing line (from final newline)
-    nonempty = [l for l in lines if l.strip()]
+    nonempty = [ln for ln in lines if ln.strip()]
     assert len(nonempty) == 1
     rec = json.loads(nonempty[0])
     assert rec["text"] == payload  # unescaped on load
@@ -263,7 +262,7 @@ def test_invariant_records_visible_before_close(tmp_path: Path):
     # NO close()! The file should be readable now.
     content = p.read_text(encoding="utf-8")
     j.close()
-    nonempty = [l for l in content.splitlines() if l.strip()]
+    nonempty = [ln for ln in content.splitlines() if ln.strip()]
     assert len(nonempty) == 2
 
 
@@ -356,9 +355,9 @@ def test_invariant_subsequent_instantiation_appends_to_existing_file(tmp_path: P
     j2 = JSONLLogger(path=p)
     j2.log_scalars({"loss": 2.0}, step=2)
     j2.close()
-    lines = [l for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
     assert len(lines) == 2
-    parsed = [json.loads(l) for l in lines]
+    parsed = [json.loads(ln) for ln in lines]
     assert parsed[0]["loss"] == 1.0
     assert parsed[1]["loss"] == 2.0
 

@@ -12,8 +12,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 MANIFEST_NAME = "MANIFEST_COMPLETE.json"
 SHARD_COMPLETE_NAME = "complete.json"

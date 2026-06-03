@@ -8,16 +8,15 @@ train_step → exactly one engine.step call.
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.callbacks.base import EventBus, Signal
-from lighttrain.protocols import ModelOutput
 from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
+from lighttrain.callbacks.base import Signal
+from lighttrain.protocols import ModelOutput
 
 
 class _TinyLM(nn.Module):

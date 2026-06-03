@@ -23,13 +23,12 @@ The new run can then be resumed with::
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data class
@@ -224,9 +223,9 @@ def fork(
             cfg_dict = {}
 
         try:
-            from ..utils.run_dir import make_run_dir
-
             import yaml as _yaml
+
+            from ..utils.run_dir import make_run_dir
 
             resolved_yaml = _yaml.safe_dump(cfg_dict) if cfg_dict else ""
             new_run_dir = make_run_dir(

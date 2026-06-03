@@ -5,16 +5,14 @@ from __future__ import annotations
 import pytest
 import torch
 import torch.nn as nn
-from unittest.mock import MagicMock
 
-from lighttrain.exceptions import BatchValidationError, LightTrainError
 from lighttrain.builtin_plugins.losses.preference import DPOLoss
-from lighttrain.protocols import ModelOutput
 from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
 from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
 from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
 from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
-
+from lighttrain.exceptions import BatchValidationError, LightTrainError
+from lighttrain.protocols import ModelOutput
 
 # ---------------------------------------------------------------------------
 # Shared helpers

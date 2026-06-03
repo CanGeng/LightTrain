@@ -15,8 +15,6 @@ Layered on top of ``tests/test_logging_bus.py``. New coverage:
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from lighttrain.logging._bus import LoggerBus

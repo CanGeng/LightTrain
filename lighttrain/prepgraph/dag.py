@@ -11,8 +11,9 @@ walks layers serially while running nodes within a layer concurrently.
 from __future__ import annotations
 
 from collections import defaultdict, deque
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from ..config._resolver import resolve as _resolve
 from .node import PrepNode
@@ -27,7 +28,7 @@ class PrepGraph:
     # ---- construction -----------------------------------------------------
 
     @classmethod
-    def from_config(cls, spec: Mapping[str, Any]) -> "PrepGraph":
+    def from_config(cls, spec: Mapping[str, Any]) -> PrepGraph:
         if not isinstance(spec, Mapping):
             raise ValueError("prep_graph spec must be a mapping.")
         raw_nodes = spec.get("nodes")

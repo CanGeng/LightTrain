@@ -26,9 +26,10 @@ import pytest
 torch = pytest.importorskip("torch")
 peft = pytest.importorskip("peft")  # whole file requires peft
 
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM  # noqa: E402
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import (  # noqa: E402 — after importorskip
+    TinyCausalLM,
+)
 from lighttrain.builtin_plugins.models.peft import LoRAAdapter  # noqa: E402
-
 
 # Tiny base parameters chosen for fast tests AND deterministic shape math.
 _BASE_KW = {"vocab_size": 64, "d_model": 16, "n_layers": 2, "n_heads": 4, "max_seq_len": 32}
@@ -130,7 +131,7 @@ def test_invariant_lora_B_is_zero_at_init():
         (name, p) for name, p in model.named_parameters() if "lora_B" in name
     ]
     assert b_params, "no lora_B parameters found — peft API may have changed"
-    for name, p in b_params:
+    for _name, p in b_params:
         zeros = torch.zeros_like(p)
         torch.testing.assert_close(p, zeros, atol=0.0, rtol=0.0)
 

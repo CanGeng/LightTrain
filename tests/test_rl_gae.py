@@ -38,7 +38,6 @@ def test_gae_1d_input():
 
 def test_gae_done_mask_cuts_bootstrap():
     """Last done=1 should cut off the bootstrap value."""
-    T = 3
     rewards = torch.tensor([1.0, 1.0, 1.0])
     values = torch.tensor([0.0, 0.0, 0.0])
     dones = torch.tensor([0.0, 0.0, 1.0])

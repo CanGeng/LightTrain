@@ -1,13 +1,11 @@
 """Tests for JEPA architecture (M7)."""
-import pytest
 import torch
-import torch.nn as nn
 
 from lighttrain.builtin_plugins.architectures.jepa import (
+    EMATargetEncoder,
     JEPAEncoder,
     JEPAModelConfig,
     JEPAPredictor,
-    EMATargetEncoder,
     jepa_profile,
 )
 
@@ -46,7 +44,7 @@ def test_ema_update_changes_weights():
     before = [p.data.clone() for p in target.parameters()]
     target.update(enc)
     after = [p.data.clone() for p in target.parameters()]
-    assert any(not torch.allclose(a, b) for a, b in zip(before, after))
+    assert any(not torch.allclose(a, b) for a, b in zip(before, after, strict=False))
 
 
 def test_ema_momentum_respected():

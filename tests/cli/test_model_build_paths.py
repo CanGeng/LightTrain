@@ -120,4 +120,4 @@ def test_primary_is_first_trainable_in_axis_b(tmp_path):
     model, n_trainable = build_primary_model(load_config(recipe))
     assert n_trainable == 2
     # first trainable is ``gen`` (d_model=32), not ``disc`` (d_model=128).
-    assert int(getattr(model, "d_model")) == 32
+    assert int(model.d_model) == 32

@@ -16,14 +16,13 @@ import torch
 
 # Force eager registration.
 import lighttrain.builtin_plugins.layer_offload  # noqa: F401
-
-from lighttrain.callbacks.base import EventBus
-from lighttrain.engine._context import StepContext
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
-from lighttrain.registry import get as _registry_get
 from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
+from lighttrain.callbacks.base import EventBus
+from lighttrain.engine._context import StepContext
+from lighttrain.registry import get as _registry_get
 
 
 def _seed_everything(seed: int = 0):
@@ -46,7 +45,7 @@ def _make_components(seed: int = 0):
 
 def _take_one_step(engine, model, loss_fn, batch):
     optimizer = torch.optim.SGD(model.parameters(), lr=0.0)
-    update_rule = StandardUpdateRule(grad_clip=0.0)
+    StandardUpdateRule(grad_clip=0.0)
     ctx = StepContext(
         step=0, model=model, optimizer=optimizer, loss_fn=loss_fn, bus=EventBus()
     )

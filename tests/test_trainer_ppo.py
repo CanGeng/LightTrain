@@ -5,8 +5,8 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from lighttrain.protocols import ModelOutput
 from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
+from lighttrain.protocols import ModelOutput
 
 
 class _TinyLM(nn.Module):

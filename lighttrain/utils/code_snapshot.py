@@ -25,11 +25,10 @@ import os
 import shutil
 import warnings
 import zipfile
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Iterator
-
 
 MODE_ENV = "LIGHTTRAIN_CODE_SNAPSHOT_MODE"
 STORE_DIR_ENV = "LIGHTTRAIN_CODE_SNAPSHOT_STORE_DIR"
@@ -54,7 +53,7 @@ def _snapshot_mode() -> str:
     mode = (os.getenv(MODE_ENV) or "cas").strip().lower() or "cas"
     if mode not in VALID_MODES:
         warnings.warn(
-            f"code_snapshot: invalid {MODE_ENV}={mode!r}; falling back to 'cas'"
+            f"code_snapshot: invalid {MODE_ENV}={mode!r}; falling back to 'cas'", stacklevel=2
         )
         return "cas"
     return mode
@@ -112,7 +111,7 @@ def _iter_snapshot_sources(
     for entry in user_modules:
         src = Path(entry)
         if not src.exists():
-            warnings.warn(f"code_snapshot: user_module {src} not found, skipping")
+            warnings.warn(f"code_snapshot: user_module {src} not found, skipping", stacklevel=2)
             continue
         if src.is_file():
             if not _matches_exclude(src.name, excludes):
@@ -147,12 +146,12 @@ def _collect_files(
         package_root, user_modules=user_modules, excludes=excludes
     ):
         if rel in seen:
-            warnings.warn(f"code_snapshot: duplicate snapshot path {rel}, skipping")
+            warnings.warn(f"code_snapshot: duplicate snapshot path {rel}, skipping", stacklevel=2)
             continue
         try:
             digest, size = _hash_file(src)
         except OSError as e:
-            warnings.warn(f"code_snapshot: cannot read {src}: {e}")
+            warnings.warn(f"code_snapshot: cannot read {src}: {e}", stacklevel=2)
             continue
         files.append(_SnapshotFile(src=src, rel=rel, sha256=digest, size=size))
         seen.add(rel)
@@ -171,7 +170,7 @@ def _manifest(
         "schema_version": 2,
         "format": "lighttrain-code-snapshot",
         "mode": mode,
-        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "created_utc": datetime.now(UTC).isoformat(),
         "package_root": str(package_root.resolve()),
         "files": [
             {
@@ -302,7 +301,7 @@ def capture_code_snapshot(
 
     pkg = Path(package_root) if package_root is not None else _package_root()
     if not pkg.exists():
-        warnings.warn(f"code_snapshot: package root {pkg} not found")
+        warnings.warn(f"code_snapshot: package root {pkg} not found", stacklevel=2)
         return run_path
 
     tmp_dir: Path | None = None
@@ -326,7 +325,7 @@ def capture_code_snapshot(
             return snap_dir
         return snap_dir
     except Exception as e:  # noqa: BLE001
-        warnings.warn(f"code_snapshot: failed to capture snapshot: {e}")
+        warnings.warn(f"code_snapshot: failed to capture snapshot: {e}", stacklevel=2)
         if tmp_dir is not None:
             shutil.rmtree(tmp_dir, ignore_errors=True)
         return run_path

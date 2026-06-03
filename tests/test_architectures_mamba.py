@@ -1,8 +1,11 @@
 """Tests for TinyMamba architecture (M7)."""
-import pytest
 import torch
 
-from lighttrain.builtin_plugins.architectures.mamba import TinyMambaConfig, TinyMambaModel, mamba_profile
+from lighttrain.builtin_plugins.architectures.mamba import (
+    TinyMambaConfig,
+    TinyMambaModel,
+    mamba_profile,
+)
 
 
 def _model(vocab_size=32, d_model=16, d_state=8, num_layers=2):
@@ -39,7 +42,7 @@ def test_mamba_state_changes_per_step():
     model(input_ids=ids2)
     s2 = [s.clone() for s in model._state]
 
-    assert any(not torch.allclose(a, b) for a, b in zip(s1, s2))
+    assert any(not torch.allclose(a, b) for a, b in zip(s1, s2, strict=False))
 
 
 def test_mamba_profile_stateful():

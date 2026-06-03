@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 import torch
 
 from lighttrain.builtin_plugins.diagnostics.nan_hunter import NanHunterCallback
-from lighttrain.engine._context import StepContext
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.engine._context import StepContext
 
 
 class _Trainer:

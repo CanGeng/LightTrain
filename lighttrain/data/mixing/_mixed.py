@@ -14,7 +14,7 @@ materialization.
 from __future__ import annotations
 
 import random
-from typing import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 
 
 def mix_rows(

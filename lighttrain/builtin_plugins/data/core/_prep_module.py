@@ -10,8 +10,9 @@ Public surface mirrors :class:`SimpleDataModule`:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from torch.utils.data import DataLoader
 
@@ -19,6 +20,7 @@ from lighttrain.config._resolver import resolve as _resolve
 from lighttrain.prepgraph.dag import PrepGraph
 from lighttrain.prepgraph.runner import PrepRunner
 from lighttrain.registry import register
+
 from .collators import CausalLMCollator
 from .tokenizers import PAD_ID
 
@@ -142,8 +144,8 @@ class PrepGraphDataModule:
         # Prefer the on-disk view: the runner commits staging → final, leaving
         # any in-staging store handle's path stale. Rebuild from final_dir.
         if result.final_dir is not None and result.final_dir.exists():
-            from lighttrain.data.cache._rows import _RowsDataset
             from lighttrain.data.cache._memmap import MemmapDataset, read_header
+            from lighttrain.data.cache._rows import _RowsDataset
 
             if read_header(result.final_dir) is not None:
                 return MemmapDataset(result.final_dir)

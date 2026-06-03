@@ -23,10 +23,10 @@ The protocol stays small on purpose; new transforms register here, not in core.
 
 from __future__ import annotations
 
-import fnmatch
 import re
-from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from typing import Any
 
 import torch
 
@@ -178,7 +178,7 @@ class ExtrasHookManager:
         self._cache: dict[str, Any] = {}
         self._matched: dict[str, list[ExtraOutputSpec]] = {}
 
-    def attach(self) -> "ExtrasHookManager":
+    def attach(self) -> ExtrasHookManager:
         if self._handles:
             return self  # already attached — idempotent
         for module_name, module in self.model.named_modules():

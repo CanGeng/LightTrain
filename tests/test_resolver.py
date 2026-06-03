@@ -7,7 +7,6 @@ import pytest
 from lighttrain.config._exceptions import ConfigResolveError
 from lighttrain.config._resolver import _import_target, resolve
 
-
 # ---------------------------------------------------------------------------
 # Unit: multi-level dotted paths
 # ---------------------------------------------------------------------------

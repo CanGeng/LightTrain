@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import time
-import types
-
 import torch
 
 from lighttrain.builtin_plugins.artifacts import DynamicArtifactCallback
-from lighttrain.engine._context import StepContext
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.engine._context import StepContext
 
 
 def _make_ctx(model):

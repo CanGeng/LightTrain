@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lighttrain.logging._bus import LoggerBus
 from lighttrain.builtin_plugins.logging_backends.console import ConsoleLogger
 from lighttrain.builtin_plugins.logging_backends.jsonl import JSONLLogger
+from lighttrain.logging._bus import LoggerBus
 
 
 class _Recorder:
@@ -59,7 +59,7 @@ def test_jsonl_backend_writes_one_line_per_record(tmp_path: Path):
     j.close()
     lines = p.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
-    parsed = [json.loads(l) for l in lines]
+    parsed = [json.loads(ln) for ln in lines]
     assert parsed[0]["step"] == 1 and parsed[0]["loss"] == 0.5
     assert parsed[1]["step"] == 2 and parsed[1]["loss"] == 0.4
 

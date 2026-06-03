@@ -11,13 +11,11 @@ Pins:
 from __future__ import annotations
 
 import warnings
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from lighttrain.callbacks.base import EventBus
-from lighttrain.engine._context import StepContext
 from lighttrain.protocols import StepOutput
 from lighttrain.trainers.base import Trainer
 

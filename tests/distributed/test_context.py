@@ -28,7 +28,6 @@ from lighttrain.distributed._context import (
     _create_groups_manual,
 )
 
-
 # --------------------------------------------------------------------------- #
 # _compute_ranks: bijection over (rank → dp_r, tp_r, pp_r)                    #
 # --------------------------------------------------------------------------- #

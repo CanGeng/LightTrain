@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 
-import pytest
 import torch
 import torch.nn.functional as F
 
@@ -16,8 +15,6 @@ from lighttrain.builtin_plugins.losses.preference import (
     ORPOLoss,
     SimPOLoss,
 )
-from lighttrain.protocols import LossContext, ModelOutput
-
 
 _LOG2 = math.log(2.0)
 

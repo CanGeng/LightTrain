@@ -22,7 +22,6 @@ import torch
 
 from lighttrain.invariants._dsl import InvariantError, evaluate_check
 
-
 # ---------------------------------------------------------------------------
 # Baseline: allowlisted functionality
 # ---------------------------------------------------------------------------

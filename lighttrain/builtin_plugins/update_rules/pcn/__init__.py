@@ -26,7 +26,8 @@ Registered as ``@register("update_rule", "pcn")``.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn as nn

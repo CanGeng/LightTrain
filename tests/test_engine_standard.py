@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.callbacks.base import EventBus
-from lighttrain.engine._context import StepContext
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
+from lighttrain.callbacks.base import EventBus
+from lighttrain.engine._context import StepContext
 
 
 class _ToyLM(torch.nn.Module):

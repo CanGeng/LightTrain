@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest import mock
 
-import pytest
-
 
 def _import_class():
     """Import HFCausalLM once; subsequent calls are cheap."""

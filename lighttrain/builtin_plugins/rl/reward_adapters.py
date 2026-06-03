@@ -41,7 +41,7 @@ class PointwiseRewardAdapter:
     def __call__(self, prompt_ids: Any, response_ids: Any) -> list[float]:
         prompts = _decode_batch(self._tok, prompt_ids)
         responses = _decode_batch(self._tok, response_ids)
-        return self._judge.score(list(zip(prompts, responses)))
+        return self._judge.score(list(zip(prompts, responses, strict=False)))
 
 
 __all__ = ["PointwiseRewardAdapter"]

@@ -15,7 +15,6 @@ from lighttrain.eval.metrics import (
 )
 from lighttrain.protocols import ModelOutput
 
-
 # ---- Tiny model for perplexity -------------------------------------------
 
 class _TinyLM(nn.Module):

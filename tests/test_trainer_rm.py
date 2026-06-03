@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import types
-
-import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.protocols import ModelOutput
 from lighttrain.builtin_plugins.trainers.rm import LinearValueHead, RewardModelTrainer
-
+from lighttrain.protocols import ModelOutput
 
 # ---- Minimal helpers ------------------------------------------------------
 

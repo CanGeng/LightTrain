@@ -24,11 +24,11 @@ import os
 import re
 import secrets
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import torch
-
 
 _STEP_RE = re.compile(r"^step_(\d+)$")
 

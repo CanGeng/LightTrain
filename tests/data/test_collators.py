@@ -30,9 +30,11 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator, PreferenceCollator
+from lighttrain.builtin_plugins.data.core.collators import (
+    CausalLMCollator,
+    PreferenceCollator,
+)
 from lighttrain.builtin_plugins.data.core.tokenizers import PAD_ID
-
 
 # ---------------------------------------------------------------------------
 # CausalLMCollator — pad direction, mask, labels

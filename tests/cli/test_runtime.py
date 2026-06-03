@@ -27,8 +27,7 @@ from lighttrain.cli._runtime import (
     setup_run_from_config,
 )
 from lighttrain.config import ConfigError, load_config
-from lighttrain.registry import RegistryConflictError, get_registry
-
+from lighttrain.registry import get_registry
 
 # ===========================================================================
 # Issue #9 — _import_user_modules idempotency

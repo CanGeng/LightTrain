@@ -33,8 +33,9 @@ fixed teacher distribution it is given) — which is all this template asserts.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import torch
 import torch.nn.functional as F

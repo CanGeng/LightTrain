@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
 
-from lighttrain.lab.fork import ForkReport, fork, _try_detect_parent_run_dir
-
+from lighttrain.lab.fork import ForkReport, fork
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -5,11 +5,9 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
+from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.engine._context import StepContext
-from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
-
 
 # ---- helpers ----------------------------------------------------------------
 
@@ -115,7 +113,7 @@ def test_rl_rule_skip_step_skips_backward():
     ctx.optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 
     def _loss_fn(model_output, batch, ctx):
-        loss_mock = _TrackLoss()
+        _TrackLoss()
         # return a real tensor so float() works
         return {"loss": torch.tensor(0.5)}
 

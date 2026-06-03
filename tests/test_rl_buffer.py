@@ -43,7 +43,6 @@ def test_buffer_all_rewards():
 
 
 def test_buffer_batches_yields_batches():
-    import pytest  # noqa: PLC0415 — local import in test body
     buf = RolloutBuffer()
     for i in range(6):
         buf.add(_ep(reward=float(i)))

@@ -20,7 +20,6 @@ from pathlib import Path
 from .env_capture import capture_env
 from .hashing import short_hash
 
-
 _SLUG_RE = re.compile(r"[^a-z0-9_-]+")
 
 

@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Mapping, NotRequired, TypedDict
+from collections.abc import Mapping
+from typing import Any, NotRequired, TypedDict
 
 
 class Sample(TypedDict, total=False):

@@ -18,9 +18,9 @@ in tests.
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import torch
 import torch.nn as nn

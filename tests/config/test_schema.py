@@ -18,7 +18,6 @@ from lighttrain.config import (
     ComponentSpec,
     ConfigSchemaError,
     ParallelSection,
-    RootConfig,
     dump_resolved,
     load_config,
 )

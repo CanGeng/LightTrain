@@ -41,16 +41,15 @@ from __future__ import annotations
 
 import re
 import warnings
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping
+from typing import Any
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
-
 
 _AUX_RE = re.compile(r"^aux\.([^.]+)\.(.+)$")
 
@@ -120,7 +119,7 @@ class LayerMapping:
     mapping: dict[int, int] = field(default_factory=dict)
 
     @classmethod
-    def coerce(cls, value: Any) -> "LayerMapping":
+    def coerce(cls, value: Any) -> LayerMapping:
         if isinstance(value, cls):
             return value
         if isinstance(value, Mapping):

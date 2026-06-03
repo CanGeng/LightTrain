@@ -22,8 +22,8 @@ from typing import Any
 
 import torch
 
-from lighttrain.registry import register
 from lighttrain.diagnostics.nan_repro import write_nan_repro
+from lighttrain.registry import register
 
 
 @register("callback", "nan_hunter")

@@ -21,16 +21,21 @@ calls :meth:`reload`. Event-driven reload is wired by
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 import torch
 
+from lighttrain.artifacts import (
+    ArtifactHeader,
+    ArtifactStoreProtocol,
+    StaleArtifactError,
+)
 from lighttrain.data.core._schema import derive_sample_id
 from lighttrain.registry import register
-from lighttrain.artifacts import ArtifactHeader, ArtifactStoreProtocol, StaleArtifactError
-from .store import open_artifact_store
 
+from .store import open_artifact_store
 
 _MISSING_REQUIRE = "require"
 _MISSING_DROP = "drop"

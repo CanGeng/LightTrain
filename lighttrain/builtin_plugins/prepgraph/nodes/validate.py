@@ -16,8 +16,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from lighttrain.registry import register
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.registry import register
 
 
 def _histogram(values: list[int], bins: list[int]) -> list[int]:

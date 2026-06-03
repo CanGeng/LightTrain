@@ -68,7 +68,7 @@ def test_reward_fn_adapter_decodes_and_scores():
     def _reward_fn(prompt_ids: torch.Tensor, response_ids: torch.Tensor) -> list[float]:
         prompts = [tok.decode(ids.tolist(), skip_special_tokens=True) for ids in prompt_ids]
         responses = [tok.decode(ids.tolist(), skip_special_tokens=True) for ids in response_ids]
-        return judge.score(list(zip(prompts, responses)))
+        return judge.score(list(zip(prompts, responses, strict=False)))
 
     # Use same-length tensors (as the rollout engine would produce).
     resp_with_digit = torch.tensor(
@@ -210,8 +210,8 @@ def test_preference_runtime_no_grad_clip_leak(tmp_path):
 def test_removed_preference_trainer_raises_migration_error(tmp_path):
     """Keystone step 2: `trainer: dpo` (and ipo/simpo/orpo/kto) must fail with a
     clear migration error pointing at `trainer: preference` + the `loss:` seam."""
-    from lighttrain.config import ConfigError
     from lighttrain.cli._runtime import setup_run_from_config
+    from lighttrain.config import ConfigError
 
     fixture = Path(__file__).parent / "fixtures" / "tiny_preference.jsonl"
     if not fixture.exists():
@@ -230,6 +230,7 @@ def test_pairwise_llm_judge_with_grpo_raises():
     Either way, the framework must refuse rather than silently break.
     """
     import textwrap
+
     from lighttrain.cli._runtime import setup_run_from_config
     from lighttrain.config._exceptions import ConfigResolveError
 
@@ -244,7 +245,7 @@ def test_pairwise_llm_judge_with_grpo_raises():
     # Note: pairwise_llm requires judge_model_fn (a callable). Providing a
     # path string triggers a ConfigResolveError from the resolver itself,
     # which is still the correct failure mode for the constraint test.
-    import tempfile, textwrap
+    import tempfile
     with tempfile.NamedTemporaryFile(suffix=".yaml", mode="w", delete=False) as f:
         f.write(textwrap.dedent(f"""
             mode: lab

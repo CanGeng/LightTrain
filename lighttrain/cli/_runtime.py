@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import inspect
 import warnings
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping, get_args
+from typing import Any, get_args
 
 import torch
 from omegaconf import OmegaConf
+
+from lighttrain.builtin_plugins.engine.standard import StandardEngine
+from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
 
 from .. import __version__
 from ..architectures.profile import ArchitectureProfile, LossOnlyObjective
@@ -27,16 +31,6 @@ from ..config._models import (
 )
 from ..config._resolver import _as_plain_dict as _to_dict
 from ..config._resolver import resolve as _resolve
-from ..distributed._context import ParallelContext
-from ..engine._context import StepContext
-from lighttrain.builtin_plugins.engine.standard import StandardEngine
-from ..logging._bus import LoggerBus
-from ..registry import get as _registry_get
-from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
-from ..utils.accelerate import build_accelerator
-from ..utils.run_dir import make_run_dir, slugify
-from ..utils.seed import seed_everything
-
 
 # ``user_modules`` import now lives in ``config/`` and is invoked at the
 # ``load_config`` chokepoint (so every recipe-eating command gets it for free).
@@ -45,6 +39,13 @@ from ..utils.seed import seed_everything
 # process-wide dedup set.
 from ..config._user_modules import _IMPORTED_USER_MODULES  # noqa: F401
 from ..config._user_modules import import_user_modules as _import_user_modules
+from ..distributed._context import ParallelContext
+from ..engine._context import StepContext
+from ..logging._bus import LoggerBus
+from ..registry import get as _registry_get
+from ..utils.accelerate import build_accelerator
+from ..utils.run_dir import make_run_dir, slugify
+from ..utils.seed import seed_everything
 
 # Keystone migration (step 2): trainer names removed in favour of the single
 # ``preference`` trainer + the ``loss:`` seam. Resolved to a clear error below.
@@ -537,7 +538,9 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
     every = int(_diag_field(cfg, "frozen_step_every", 1000 if mode == "lab" else 0))
     if every > 0 and "FrozenStepCallback" not in have:
         try:
-            from ..builtin_plugins.callbacks.builtins.frozen_step import FrozenStepCallback
+            from ..builtin_plugins.callbacks.builtins.frozen_step import (
+                FrozenStepCallback,
+            )
 
             cb = FrozenStepCallback(every=every)
             bus.add(cb)
@@ -554,16 +557,18 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
     if isinstance(rt, Mapping) and "enabled" in rt:
         rt_enabled = bool(rt["enabled"])
     elif hasattr(rt, "enabled"):
-        rt_enabled = bool(getattr(rt, "enabled"))
+        rt_enabled = bool(rt.enabled)
     if rt_enabled and "FileSignalsCallback" not in have:
         try:
-            from ..builtin_plugins.realtime_control.file_signals import FileSignalsCallback
+            from ..builtin_plugins.realtime_control.file_signals import (
+                FileSignalsCallback,
+            )
 
             poll_every = 10
             if isinstance(rt, Mapping):
                 poll_every = int(rt.get("poll_every", poll_every))
             elif hasattr(rt, "poll_every"):
-                poll_every = int(getattr(rt, "poll_every") or poll_every)
+                poll_every = int(rt.poll_every or poll_every)
             bus.add(FileSignalsCallback(poll_every=poll_every))
             trainer.callbacks.append(bus.callbacks[-1])
         except Exception as exc:  # noqa: BLE001 — non-critical, warn & skip
@@ -606,7 +611,7 @@ def _validate_mode_override(mode: str) -> str:
 
 
 def setup_run_from_config(
-    config: "str | Path | RootConfig",
+    config: str | Path | RootConfig,
     *,
     overrides: list[str] | None = None,
     mode: str | None = None,
@@ -713,7 +718,7 @@ def setup_run_from_config(
         except Exception:  # noqa: BLE001 — must never block a training start
             import warnings
 
-            warnings.warn("code snapshot failed (see logs); continuing without it")
+            warnings.warn("code snapshot failed (see logs); continuing without it", stacklevel=2)
 
     # Phase A: distributed topology. The parallel-config preflight (mp_strategy /
     # pipeline_schedule) already ran above, before the run dir was created.

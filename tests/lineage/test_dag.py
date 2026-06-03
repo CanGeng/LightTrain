@@ -24,7 +24,6 @@ from lighttrain.lineage.dag import (
     to_mermaid,
 )
 
-
 RUN_A = "run-A"
 RUN_B = "run-B"
 
@@ -52,7 +51,7 @@ def _add_chain(store: LineageStore, run_id: str, depth: int) -> list[int]:
         )
         ids.append(nid)
     # Edge: src=parent, dst=child, kind=derived_from
-    for parent, child in zip(ids[:-1], ids[1:]):
+    for parent, child in zip(ids[:-1], ids[1:], strict=False):
         store.add_edge(parent, child, kind="derived_from")
     return ids
 
@@ -371,7 +370,7 @@ def test_to_mermaid_dedups_edges(lineage_store_factory) -> None:
 
     out = to_mermaid(store, root_id=a, depth=5)
     # Each unique (src, dst, kind) edge should appear once.
-    assert out.count("n{} -->|derived_from| n{}".format(a, b)) == 1
-    assert out.count("n{} -->|derived_from| n{}".format(a, c)) == 1
-    assert out.count("n{} -->|derived_from| n{}".format(b, d)) == 1
-    assert out.count("n{} -->|derived_from| n{}".format(c, d)) == 1
+    assert out.count(f"n{a} -->|derived_from| n{b}") == 1
+    assert out.count(f"n{a} -->|derived_from| n{c}") == 1
+    assert out.count(f"n{b} -->|derived_from| n{d}") == 1
+    assert out.count(f"n{c} -->|derived_from| n{d}") == 1

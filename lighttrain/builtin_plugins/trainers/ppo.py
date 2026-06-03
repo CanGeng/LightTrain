@@ -17,21 +17,26 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Callable, Mapping
+from collections.abc import Callable
+from typing import Any
 
 import torch
 import torch.nn.functional as F
 
-from lighttrain.config._resolver import resolve as _resolve
 from lighttrain.builtin_plugins.losses.rl import PPOSurrogateLoss
-from lighttrain.protocols import ModelOutput, StepOutput
-from lighttrain.registry import register
 from lighttrain.builtin_plugins.rl.buffers import RolloutBuffer
 from lighttrain.builtin_plugins.rl.gae import compute_gae, normalize_advantages
 from lighttrain.builtin_plugins.rl.ref_policy import ReferencePolicy, freeze_as_ref
-from lighttrain.builtin_plugins.rl.rollout import RolloutEngine  # noqa: F401 — import also registers hf_generate
-from lighttrain.builtin_plugins.rl.value_heads import LinearValueHead  # re-exported; registers value_head/linear
+from lighttrain.builtin_plugins.rl.rollout import (
+    RolloutEngine,  # noqa: F401 — import also registers hf_generate
+)
+from lighttrain.builtin_plugins.rl.value_heads import (
+    LinearValueHead,  # re-exported; registers value_head/linear
+)
 from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
+from lighttrain.config._resolver import resolve as _resolve
+from lighttrain.protocols import ModelOutput, StepOutput
+from lighttrain.registry import register
 from lighttrain.trainers._utils import _device_of, _move_batch, validate_batch
 from lighttrain.trainers.base import Trainer
 
@@ -402,7 +407,9 @@ class PPOTrainer(Trainer):
                 spec["hidden_size"] = hidden.shape[-1]
                 self._value_head = _resolve(spec, category="value_head").to(hidden.device)
                 # Register value head params with the inner optimizer (unwraps Accelerator)
-                from lighttrain.builtin_plugins.update_rules.standard import _register_new_params
+                from lighttrain.builtin_plugins.update_rules.standard import (
+                    _register_new_params,
+                )
                 _register_new_params(self.optimizer, list(self._value_head.parameters()))
             values_new = self._value_head(hidden)   # (B, T)
 

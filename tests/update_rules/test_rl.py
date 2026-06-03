@@ -10,18 +10,16 @@ Key contracts (different from StandardUpdateRule):
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 import torch
 import torch.nn as nn
 
+from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.engine._context import StepContext
-from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
-
+from lighttrain.protocols import ModelOutput
 
 # ---------------------------------------------------------------------------
 # helpers

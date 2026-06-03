@@ -1,8 +1,11 @@
 """Tests for TinyRWKV architecture (M7)."""
-import pytest
 import torch
 
-from lighttrain.builtin_plugins.architectures.rwkv import TinyRWKVConfig, TinyRWKVModel, rwkv_profile
+from lighttrain.builtin_plugins.architectures.rwkv import (
+    TinyRWKVConfig,
+    TinyRWKVModel,
+    rwkv_profile,
+)
 
 
 def _model(vocab_size=32, embed_dim=16, num_layers=2, chunk_size=8):
@@ -29,8 +32,8 @@ def _states_differ(s1, s2):
     """Return True if any tensor in state changed."""
     return any(
         not torch.allclose(t1, t2)
-        for ls1, ls2 in zip(s1, s2)
-        for t1, t2 in zip(ls1, ls2)
+        for ls1, ls2 in zip(s1, s2, strict=False)
+        for t1, t2 in zip(ls1, ls2, strict=False)
     )
 
 
@@ -81,7 +84,7 @@ def test_rwkv_profile_reset_fn():
     profile = rwkv_profile()
     ids = torch.randint(0, 32, (1, 8))
     model(input_ids=ids)
-    state_before = _clone_state(model._state)
+    _clone_state(model._state)
     # Reset via profile
     profile.reset_state(model)
     # State should be reset to zeros

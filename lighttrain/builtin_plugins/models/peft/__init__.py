@@ -19,6 +19,7 @@ recipe parses fine without them, but constructing the adapter requires
 
 from __future__ import annotations
 
+from ._adalora import AdaLoRAAdapter
 from ._common import (
     adapter_state_dict,
     auto_target_modules,
@@ -28,7 +29,6 @@ from ._common import (
     load_adapter_state_dict,
     resolve_base_model,
 )
-from ._adalora import AdaLoRAAdapter
 from ._ia3 import IA3Adapter
 from ._lora import LoRAAdapter
 

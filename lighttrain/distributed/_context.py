@@ -12,7 +12,7 @@ works without NCCL or any dist initialization.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import torch
@@ -55,12 +55,12 @@ class ParallelContext:
     # ------------------------------------------------------------------ #
 
     @classmethod
-    def single_gpu(cls) -> "ParallelContext":
+    def single_gpu(cls) -> ParallelContext:
         """Single-GPU context. No torch.distributed calls; safe without NCCL."""
         return cls()
 
     @classmethod
-    def from_env(cls, cfg: "ParallelSection") -> "ParallelContext":
+    def from_env(cls, cfg: ParallelSection) -> ParallelContext:
         """Initialize process groups from torchrun environment variables.
 
         Expects LOCAL_RANK / RANK / WORLD_SIZE to be set by the launcher.

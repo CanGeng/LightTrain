@@ -19,7 +19,6 @@ import torch
 from lighttrain.builtin_plugins.losses.rl import GRPOLoss, PPOSurrogateLoss
 from lighttrain.protocols import LossContext, ModelOutput
 
-
 _DUMMY = ModelOutput(outputs={})
 
 

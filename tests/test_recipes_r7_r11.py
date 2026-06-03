@@ -6,13 +6,15 @@ steps to confirm end-to-end plumbing works on CPU without a full trainer loop.
 import torch
 import torch.nn as nn
 
-
 # ---------------------------------------------------------------------------
 # R7 — RWKV stateful language model
 # ---------------------------------------------------------------------------
 
 def test_r7_rwkv_smoke():
-    from lighttrain.builtin_plugins.architectures.rwkv import TinyRWKVConfig, TinyRWKVModel, rwkv_profile
+    from lighttrain.builtin_plugins.architectures.rwkv import (
+        TinyRWKVConfig,
+        TinyRWKVModel,
+    )
     cfg = TinyRWKVConfig(vocab_size=32, embed_dim=16, num_layers=2, chunk_size=8)
     model = TinyRWKVModel(cfg)
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
@@ -68,7 +70,10 @@ def test_r8_diffusion_smoke():
 
 def test_r9_jepa_smoke():
     from lighttrain.builtin_plugins.architectures.jepa import (
-        JEPAEncoder, JEPAModelConfig, EMATargetEncoder, JEPAPredictor,
+        EMATargetEncoder,
+        JEPAEncoder,
+        JEPAModelConfig,
+        JEPAPredictor,
     )
     from lighttrain.builtin_plugins.objectives.jepa import JEPAObjective
     from lighttrain.protocols import LossContext, ModelOutput
@@ -129,13 +134,13 @@ def test_r10a_pcn_smoke():
     ctx.scheduler = None
 
     losses = []
-    for i in range(5):
+    for _i in range(5):
         batch = {"x": torch.randn(4, 8), "labels": torch.zeros(4, 4)}
         m = rule.step(model, batch, ctx)
         losses.append(m["loss"])
         ctx.step += 1
 
-    assert all(torch.isfinite(torch.tensor(l)) for l in losses)
+    assert all(torch.isfinite(torch.tensor(ln)) for ln in losses)
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +148,9 @@ def test_r10a_pcn_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r10b_ff_smoke():
-    from lighttrain.builtin_plugins.update_rules.forward_forward import ForwardForwardUpdateRule
+    from lighttrain.builtin_plugins.update_rules.forward_forward import (
+        ForwardForwardUpdateRule,
+    )
     from lighttrain.engine._context import StepContext
 
     model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 4))
@@ -163,13 +170,13 @@ def test_r10b_ff_smoke():
     ctx.scheduler = None
 
     losses = []
-    for i in range(5):
+    for _i in range(5):
         batch = {"x": torch.randn(4, 8)}
         m = rule.step(model, batch, ctx)
         losses.append(m["loss"])
         ctx.step += 1
 
-    assert all(torch.isfinite(torch.tensor(l)) for l in losses)
+    assert all(torch.isfinite(torch.tensor(ln)) for ln in losses)
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +221,7 @@ def test_r11_mezo_smoke():
     ctx.scheduler = None
 
     losses = []
-    for i in range(10):
+    for _i in range(10):
         batch = {"input_ids": torch.randn(4, 8), "labels": torch.randint(0, 4, (4,))}
         m = rule.step(model, batch, ctx)
         losses.append(m["loss"])
@@ -223,4 +230,4 @@ def test_r11_mezo_smoke():
         for p in model.parameters():
             assert p.grad is None
 
-    assert all(torch.isfinite(torch.tensor(l)) for l in losses)
+    assert all(torch.isfinite(torch.tensor(ln)) for ln in losses)

@@ -3,9 +3,11 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.update_rules.forward_forward import ForwardForwardUpdateRule
-from lighttrain.builtin_plugins.update_rules.pcn import PCNUpdateRule
 from lighttrain.builtin_plugins.update_rules.dfa import DFAUpdateRule
+from lighttrain.builtin_plugins.update_rules.forward_forward import (
+    ForwardForwardUpdateRule,
+)
+from lighttrain.builtin_plugins.update_rules.pcn import PCNUpdateRule
 
 
 def _ctx(model=None):
@@ -64,7 +66,7 @@ def test_ff_parameters_updated():
         rule.step(model, batch, ctx)
         ctx.step += 1
     after = [p.data.clone() for p in model.parameters()]
-    assert any(not torch.allclose(a, b) for a, b in zip(before, after))
+    assert any(not torch.allclose(a, b) for a, b in zip(before, after, strict=False))
 
 
 def test_ff_negative_auto_generated():
@@ -113,7 +115,7 @@ def test_pcn_parameters_updated():
         rule.step(model, batch, ctx)
         ctx.step += 1
     after = [p.data.clone() for p in model.parameters()]
-    assert any(not torch.allclose(a, b) for a, b in zip(before, after))
+    assert any(not torch.allclose(a, b) for a, b in zip(before, after, strict=False))
 
 
 def test_pcn_state_dict():

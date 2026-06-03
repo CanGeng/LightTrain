@@ -1,9 +1,11 @@
 """Tests for AdaLoRAAdapter (M7, M5 defer)."""
-import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.models.peft._adalora import AdaLoRAAdapter, AdaLoRALinear
+from lighttrain.builtin_plugins.models.peft._adalora import (
+    AdaLoRAAdapter,
+    AdaLoRALinear,
+)
 
 
 def _make_model():

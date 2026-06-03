@@ -16,10 +16,9 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.callbacks.base import EventBus, Signal
-from lighttrain.protocols import ModelOutput
 from lighttrain.builtin_plugins.trainers.ppo import LinearValueHead, PPOTrainer
-
+from lighttrain.callbacks.base import Signal
+from lighttrain.protocols import ModelOutput
 
 # ---------------------------------------------------------------------------
 # fixtures specific to PPO

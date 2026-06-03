@@ -8,6 +8,7 @@ Registers three sampler kinds:
 """
 
 from lighttrain.registry import register
+
 from .curriculum import CurriculumSampler
 from .length_grouped import LengthGroupedSampler
 from .stateful_resumable import StatefulResumableSampler

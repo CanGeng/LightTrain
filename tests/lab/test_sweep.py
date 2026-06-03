@@ -12,7 +12,6 @@ Focus on the pure / testable helpers that do not require subprocess spawn:
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -25,7 +24,6 @@ from lighttrain.lab.sweep import (
     _random_configs,
     _read_final_metric,
 )
-
 
 # ---------------------------------------------------------------------------
 # _grid_configs

@@ -14,7 +14,6 @@ import json
 from pathlib import Path
 
 import pytest
-import torch
 
 pytestmark = pytest.mark.heavy
 

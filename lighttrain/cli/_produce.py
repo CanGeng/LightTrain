@@ -14,13 +14,14 @@ The lineage store is opened against the run dir so the producer can write a
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 import torch
 from omegaconf import OmegaConf
 
-from ..config import RootConfig, load_config
+from ..config import load_config
 from ..utils.run_dir import make_run_dir, slugify
 from ..utils.seed import seed_everything
 from ._runtime import _build_data, _build_model, _to_dict

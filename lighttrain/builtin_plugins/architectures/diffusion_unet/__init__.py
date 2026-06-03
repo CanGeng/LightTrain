@@ -15,17 +15,17 @@ Registered as ``@register("model", "tiny_unet")``.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from lighttrain.architectures.profile import ArchitectureProfile
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
-from lighttrain.architectures.profile import ArchitectureProfile
-
 
 # ---------------------------------------------------------------------------
 # Config
@@ -153,14 +153,14 @@ class TinyUNet(nn.Module):
         h = self.enc_in(x)
         skips = [h]
 
-        for enc_block, down in zip(self.enc_blocks, self.downs):
+        for enc_block, down in zip(self.enc_blocks, self.downs, strict=False):
             h = enc_block(h, t_emb)
             skips.append(h)
             h = down(h)
 
         h = self.mid(h, t_emb)
 
-        for up, dec_block in zip(self.ups, self.dec_blocks):
+        for up, dec_block in zip(self.ups, self.dec_blocks, strict=False):
             h = up(h)
             skip = skips.pop()
             # Align sizes if pooling introduced mismatch

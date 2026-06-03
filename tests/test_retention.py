@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import time
 
-from lighttrain.lineage import LineageStore, RetentionPolicy, gc_artifacts, prune_orphans
+from lighttrain.lineage import (
+    LineageStore,
+    RetentionPolicy,
+    gc_artifacts,
+    prune_orphans,
+)
 
 
 def _seed_versions(store: LineageStore, name: str, n: int, *, base_ts: float):
@@ -20,7 +25,7 @@ def _seed_versions(store: LineageStore, name: str, n: int, *, base_ts: float):
 
 def test_keep_last_marks_older_deprecated(tmp_path):
     store = LineageStore(tmp_path / "l.sqlite")
-    ids = _seed_versions(store, "A", 5, base_ts=time.time() - 100)
+    _seed_versions(store, "A", 5, base_ts=time.time() - 100)
     report = gc_artifacts(store, policy=RetentionPolicy(keep_last=2),
                          delete_paths=False)
     # 5 - 2 = 3 deprecated on first pass
@@ -32,7 +37,7 @@ def test_pin_survives_gc(tmp_path):
     store = LineageStore(tmp_path / "l.sqlite")
     ids = _seed_versions(store, "A", 4, base_ts=time.time() - 100)
     store.pin(ids[0])
-    report = gc_artifacts(store, policy=RetentionPolicy(keep_last=2),
+    gc_artifacts(store, policy=RetentionPolicy(keep_last=2),
                          delete_paths=False)
     # Pinned one is preserved even though it's the oldest.
     survived = [n["id"] for n in store.iter_nodes() if not n.get("deprecated")]

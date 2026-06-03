@@ -21,13 +21,13 @@ import os
 import shutil
 import time
 from collections import deque
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 import yaml
 
 from ..prepgraph._fp import SCHEMA_VERSION
-
 
 MigrationFn = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -213,8 +213,7 @@ def migrate_file(
 # preserves comments, blank lines, and OmegaConf ``${...}`` interpolations,
 # touching only the model block.
 
-import re as _re
-
+import re as _re  # noqa: E402 — co-located with its only use (see comment above)
 
 _MODEL_BLOCK_RE = _re.compile(r"^model:[ \t]*(#.*)?$")
 _MODEL_FLOW_RE = _re.compile(r"^model:[ \t]*(\{.*\})[ \t]*(#.*)?$")

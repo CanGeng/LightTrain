@@ -24,8 +24,9 @@ import hashlib
 import inspect
 import json
 import os
+from collections.abc import Iterable, Mapping
 from functools import lru_cache
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 # Bumping a value here invalidates every downstream cache for the matching
 # schema_kind. Keep entries terse and prefer additive changes.

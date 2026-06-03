@@ -12,9 +12,10 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import torch
 
@@ -66,14 +67,14 @@ class ArtifactHeader:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "ArtifactHeader":
+    def from_dict(cls, data: Mapping[str, Any]) -> ArtifactHeader:
         kwargs: dict[str, Any] = {}
-        for name, fld in cls.__dataclass_fields__.items():
+        for name, _fld in cls.__dataclass_fields__.items():
             if name in data:
                 kwargs[name] = data[name]
         return cls(**kwargs)
 
-    def disagreements(self, other: "ArtifactHeader") -> list[str]:
+    def disagreements(self, other: ArtifactHeader) -> list[str]:
         """Return list of field names where ``self`` and ``other`` differ on
         non-empty values. Empty-vs-anything is considered a 'don't care'."""
         bad: list[str] = []

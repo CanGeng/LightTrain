@@ -5,14 +5,14 @@ These are typically added to a primary loss via CompositeLoss.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn.functional as F
 
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
-
 
 # ---------------------------------------------------------------------------
 # InfoNCE

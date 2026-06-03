@@ -61,5 +61,5 @@ def test_transformer_profile_reproduces_reference_losses(tmp_path):
 
     expected = ref["losses"]
     assert len(got) == len(expected), (got, expected)
-    for i, (g, e) in enumerate(zip(got, expected)):
+    for i, (g, e) in enumerate(zip(got, expected, strict=False)):
         assert math.isclose(g, e, abs_tol=1e-2), f"step {i + 1}: got {g}, expected {e}"

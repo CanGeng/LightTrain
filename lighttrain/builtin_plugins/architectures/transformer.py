@@ -18,9 +18,8 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from lighttrain.registry import register
 from lighttrain.architectures.profile import ArchitectureProfile
-
+from lighttrain.registry import register
 
 # ---------------------------------------------------------------------------
 # Seam helpers (heuristic attribute traversal)

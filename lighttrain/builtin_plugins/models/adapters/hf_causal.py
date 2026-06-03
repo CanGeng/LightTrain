@@ -18,7 +18,6 @@ import torch.nn as nn
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
 
-
 _DTYPE_MAP = {
     "float32": torch.float32,
     "fp32": torch.float32,

@@ -6,13 +6,12 @@ from __future__ import annotations
 
 import sys
 import textwrap
-from pathlib import Path
 
 import pytest
 
 from lighttrain.cli._runtime import _import_user_modules
-from lighttrain.registry import get as _reg_get, unregister as _unregister
-
+from lighttrain.registry import get as _reg_get
+from lighttrain.registry import unregister as _unregister
 
 # ---------------------------------------------------------------------------
 # Dotted-module-name form

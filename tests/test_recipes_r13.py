@@ -11,11 +11,10 @@ import os
 from pathlib import Path
 
 import pytest
+import torch
 
 # Force eager registration of frontier plug-ins.
 import lighttrain.builtin_plugins.quant  # noqa: F401
-
-import torch
 
 _RECIPE = Path("recipes/qlora.yaml")
 _HAS_BNB = False

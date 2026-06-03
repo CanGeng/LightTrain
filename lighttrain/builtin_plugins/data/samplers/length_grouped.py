@@ -11,7 +11,8 @@ State is resumable via ``state_dict``: epoch + within-block offset.
 from __future__ import annotations
 
 import random
-from typing import Any, Iterable, Sized
+from collections.abc import Iterable, Sized
+from typing import Any
 
 
 def _length_of(sample: Any) -> int:

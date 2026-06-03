@@ -11,9 +11,9 @@ Checkpoint strategy:
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import torch
 import torch.nn as nn

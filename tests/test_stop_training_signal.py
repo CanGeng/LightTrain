@@ -6,16 +6,14 @@ into the same ``skipped=1`` path and the trainer kept looping.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import torch
 
-from lighttrain.callbacks.base import EventBus, Signal
-from lighttrain.engine._context import StepContext
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
-from lighttrain.protocols import ModelOutput
 from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
+from lighttrain.callbacks.base import EventBus, Signal
+from lighttrain.engine._context import StepContext
+from lighttrain.protocols import ModelOutput
 
 
 class _TinyLM(torch.nn.Module):

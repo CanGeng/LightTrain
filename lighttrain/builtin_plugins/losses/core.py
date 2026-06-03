@@ -8,7 +8,8 @@ and downstream callbacks (z_loss / aux_loss / kl / ...).
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn.functional as F

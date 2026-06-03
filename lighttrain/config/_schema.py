@@ -72,7 +72,7 @@ class ComponentSpec(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _check_xor(self) -> "ComponentSpec":
+    def _check_xor(self) -> ComponentSpec:
         if (self.name is None) == (self.target is None):
             raise ValueError(
                 "ComponentSpec requires exactly one of 'name' or '_target_' "

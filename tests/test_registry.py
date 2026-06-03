@@ -6,8 +6,8 @@ import pytest
 
 from lighttrain.registry import (
     KNOWN_CATEGORIES,
-    Registry,
     NotRegisteredError,
+    Registry,
     RegistryConflictError,
     UnknownCategoryError,
     categories,

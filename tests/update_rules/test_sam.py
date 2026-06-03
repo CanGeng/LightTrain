@@ -23,11 +23,10 @@ import pytest
 import torch
 import torch.nn as nn
 
+from lighttrain.builtin_plugins.update_rules.sam import SAMUpdateRule
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.engine._context import StepContext
-from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.builtin_plugins.update_rules.sam import SAMUpdateRule
-
+from lighttrain.protocols import ModelOutput
 
 # ---------------------------------------------------------------------------
 # helpers

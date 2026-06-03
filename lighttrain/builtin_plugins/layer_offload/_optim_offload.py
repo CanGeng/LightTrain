@@ -17,7 +17,8 @@ an identity over the base optimizer (still legal; useful for unit tests).
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 
@@ -149,7 +150,7 @@ class OptimizerCPUOffloadWrapper:
             # 4) Restore original param objects in param_groups *and* re-key
             # optimizer.state so future state_dict / load_state_dict work.
             for g, origs, masters in originals:
-                for orig, master in zip(origs, masters):
+                for orig, master in zip(origs, masters, strict=False):
                     with torch.no_grad():
                         target_dtype = self.working_dtype or orig.dtype
                         orig.data.copy_(master.detach().to(

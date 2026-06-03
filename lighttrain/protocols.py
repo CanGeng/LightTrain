@@ -8,9 +8,10 @@ and Trainer dispatch are testable in isolation.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import torch
 
@@ -18,10 +19,13 @@ import torch
 # type-check against them without depending on builtin_plugins.
 from .distributed._protocols import (
     GradSyncStrategy as GradSyncStrategyProtocol,
+)
+from .distributed._protocols import (
     ModelParallelStrategy as ModelParallelStrategyProtocol,
+)
+from .distributed._protocols import (
     PipelineSchedule as PipelineScheduleProtocol,
 )
-
 
 # ---------------------------------------------------------------------------
 # Generic data carriers

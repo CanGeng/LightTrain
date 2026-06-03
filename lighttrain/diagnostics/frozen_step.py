@@ -37,16 +37,16 @@ import json
 import os
 import time
 import zipfile
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import torch
 from safetensors.torch import save_model as _save_model
 
 from ..minimal import build_minimal_model, dump_spec, load_state
 from ..utils.seed import restore_rng_state, rng_state
-
 
 _REASONS = ("scheduled", "exception", "cli", "retry")
 
@@ -429,7 +429,10 @@ def _infer_model_spec(model: torch.nn.Module) -> dict[str, Any]:
     # short-name / _target_ paths if peft isn't installed or the model
     # isn't a recognised adapter.
     try:
-        from lighttrain.builtin_plugins.models.peft import dump_peft_spec, is_peft_wrapped
+        from lighttrain.builtin_plugins.models.peft import (
+            dump_peft_spec,
+            is_peft_wrapped,
+        )
 
         if is_peft_wrapped(model):
             return dump_peft_spec(model)

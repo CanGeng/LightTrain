@@ -13,7 +13,8 @@ from __future__ import annotations
 import importlib
 import inspect
 import warnings
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from ..registry import get as _registry_get
 from ._exceptions import ConfigResolveError

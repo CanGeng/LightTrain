@@ -32,7 +32,6 @@ import torch.nn.functional as F
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
 
-
 # ---------------------------------------------------------------------------
 # Noise schedule helpers
 # ---------------------------------------------------------------------------

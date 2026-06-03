@@ -58,7 +58,7 @@ class StepContext:
     # parallel_ctx is ParallelContext.single_gpu() when not distributed.
     # grad_sync is None for single-GPU (the update rule uses loss.backward()
     # directly); set to a GradSyncStrategy instance for DDP/FSDP/ZeRO.
-    parallel_ctx: "ParallelContext | None" = None
+    parallel_ctx: ParallelContext | None = None
     grad_sync: Any | None = None
 
 

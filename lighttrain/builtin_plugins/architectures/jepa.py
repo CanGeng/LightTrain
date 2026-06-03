@@ -24,17 +24,16 @@ Usage::
 from __future__ import annotations
 
 import copy
-import math
-from dataclasses import dataclass, field
-from typing import Any, Iterator
+from collections.abc import Iterator
+from dataclasses import dataclass
+from typing import Any
 
 import torch
 import torch.nn as nn
 
+from lighttrain.architectures.profile import ArchitectureProfile
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
-from lighttrain.architectures.profile import ArchitectureProfile
-
 
 # ---------------------------------------------------------------------------
 # Config
@@ -151,7 +150,7 @@ class EMATargetEncoder(nn.Module):
     @torch.no_grad()
     def update(self, source: JEPAEncoder) -> None:
         m = self.momentum
-        for pt, ps in zip(self.encoder.parameters(), source.parameters()):
+        for pt, ps in zip(self.encoder.parameters(), source.parameters(), strict=False):
             pt.data.mul_(m).add_((1.0 - m) * ps.data)
 
     def forward(self, patches: torch.Tensor) -> torch.Tensor:

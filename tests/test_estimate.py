@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-import torch
 from typer.testing import CliRunner
 
 from lighttrain.cli._app import app

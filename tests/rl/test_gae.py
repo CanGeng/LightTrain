@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import math
-
-import pytest
 import torch
 
 from lighttrain.builtin_plugins.rl.gae import compute_gae, normalize_advantages
-
 
 # ---------------------------------------------------------------------------
 # compute_gae

@@ -19,16 +19,15 @@ lr_scale / stop / eval_now / inject paths):
 
 from __future__ import annotations
 
-import inspect
 import json
 from pathlib import Path
 
 import pytest
 import torch
 
+from lighttrain.builtin_plugins.realtime_control.file_signals import FileSignalsCallback
 from lighttrain.callbacks.base import Signal
 from lighttrain.engine._context import StepContext
-from lighttrain.builtin_plugins.realtime_control.file_signals import FileSignalsCallback
 
 
 class _Trainer:

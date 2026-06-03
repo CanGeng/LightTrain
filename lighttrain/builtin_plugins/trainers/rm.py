@@ -6,19 +6,21 @@ expected to have a value head that produces a scalar reward for each sequence.
 
 from __future__ import annotations
 
-import math
-from typing import Any, Mapping
+from typing import Any
 
 import torch
 import torch.nn.functional as F
 
+from lighttrain.builtin_plugins.rl.value_heads import (
+    LinearValueHead,  # re-exported; registers value_head/linear
+)
 from lighttrain.config._resolver import resolve as _resolve
-from lighttrain.protocols import LossContext, ModelOutput, StepOutput
+from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.registry import register
-from lighttrain.builtin_plugins.rl.value_heads import LinearValueHead  # re-exported; registers value_head/linear
-from lighttrain.update_rules._primitives import apply_update
-from ._preference_base import PreferenceTrainer, _device_of, _move_batch
 from lighttrain.trainers._utils import validate_batch
+from lighttrain.update_rules._primitives import apply_update
+
+from ._preference_base import PreferenceTrainer
 
 
 @register("trainer", "reward_model")

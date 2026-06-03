@@ -8,7 +8,8 @@ Returns a dict of tensors:
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 

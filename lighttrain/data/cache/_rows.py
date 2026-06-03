@@ -33,8 +33,7 @@ class _RowsDataset:
         return self._materialize()[int(idx)]
 
     def __iter__(self):
-        for r in self._materialize():
-            yield r
+        yield from self._materialize()
 
 
 __all__ = ["_RowsDataset"]

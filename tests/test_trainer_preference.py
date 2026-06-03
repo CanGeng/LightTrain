@@ -10,10 +10,18 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.losses.preference import DPOLoss, IPOLoss, KTOLoss, ORPOLoss, SimPOLoss
+from lighttrain.builtin_plugins.losses.preference import (
+    DPOLoss,
+    IPOLoss,
+    KTOLoss,
+    ORPOLoss,
+    SimPOLoss,
+)
+from lighttrain.builtin_plugins.trainers._preference_base import (
+    PreferenceTrainer,
+    _seq_logps_and_nll,
+)
 from lighttrain.protocols import ModelOutput
-from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer, _seq_logps_and_nll
-
 
 # ---- Minimal helpers -------------------------------------------------------
 

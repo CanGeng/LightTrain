@@ -7,14 +7,15 @@ objects ready for the PPO/GRPO inner loop.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import torch
 import torch.nn.functional as F
 
 from lighttrain.registry import register
+
 from .buffers import Episode
-from .ref_policy import _sequence_log_probs
 
 
 @register("rl_backend", "hf_generate")
@@ -152,7 +153,6 @@ class RolloutEngine:
         for i in range(B * G):
             seq = full_seqs[i]                          # (T_full,)
             response = seq[T_prompt:]                   # (T_resp,)
-            prompt_i = prompt_ids[i // G]              # (T_p,)
 
             # Construct labels: -100 for prompt positions, token id for response
             labels = torch.full_like(seq, self.ignore_index)
@@ -198,7 +198,7 @@ class RolloutEngine:
         responses = full_seqs[:, T_prompt:]                            # (B*G, T_r)
         rewards = reward_fn(prompt_ids_expanded, responses)
 
-        for ep, r in zip(episodes, rewards):
+        for ep, r in zip(episodes, rewards, strict=False):
             ep.reward = float(r)
 
         return episodes

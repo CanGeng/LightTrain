@@ -7,9 +7,10 @@ No torch.distributed calls are made anywhere in this class.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import torch
 import torch.nn as nn

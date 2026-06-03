@@ -76,7 +76,7 @@ def test_short_hash_unicode_input_stable():
     b = short_hash("你好")
     assert a == b
     # Cross-check with hashlib direct call
-    expected = hashlib.sha256("你好".encode("utf-8")).hexdigest()[:8]
+    expected = hashlib.sha256("你好".encode()).hexdigest()[:8]
     assert a == expected
 
 

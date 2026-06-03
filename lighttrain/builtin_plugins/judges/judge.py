@@ -10,10 +10,10 @@ Multi-model composition is a ``CompositeJudge`` plugin, not part of core.
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 
 from lighttrain.registry import register
-
 
 # ---------------------------------------------------------------------------
 # Verifier judge — symbolic / regex check

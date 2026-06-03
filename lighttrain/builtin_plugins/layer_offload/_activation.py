@@ -18,11 +18,9 @@ that are best validated on real GPU hardware.
 from __future__ import annotations
 
 import warnings
-from typing import Callable
 
 import torch
 import torch.utils.checkpoint as _ckpt
-
 
 _MODE_ALIASES = {
     "recompute": "recompute",

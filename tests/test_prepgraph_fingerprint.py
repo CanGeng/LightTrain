@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
 from lighttrain.prepgraph._fp import (
+    SCHEMA_VERSION,
     canonical_config,
     code_version_for,
     compose_fingerprint,
-    SCHEMA_VERSION,
 )
 
 

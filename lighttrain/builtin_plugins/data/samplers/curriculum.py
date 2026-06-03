@@ -13,7 +13,8 @@ re-derived from epoch when no signal is available).
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Sized
+from collections.abc import Iterable, Sized
+from typing import Any
 
 from .length_grouped import _materialize_lengths
 

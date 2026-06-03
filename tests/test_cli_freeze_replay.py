@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from lighttrain.cli._app import app
-
 
 # Minimal recipe that runs on CPU with byte tokenizer + tiny_lm + the
 # corpus fixture that all other recipes already use.

@@ -19,7 +19,6 @@ import pytest
 from lighttrain.lineage import LineageStore
 from lighttrain.lineage.retention import RetentionPolicy, gc_artifacts
 
-
 # --------------------------------------------------------------------------- #
 # Edges                                                                       #
 # --------------------------------------------------------------------------- #
@@ -302,7 +301,7 @@ def test_resolve_ref_by_name_and_version(lineage_store_factory) -> None:
     """
     store = lineage_store_factory()
     nid = store.upsert_node(kind="artifact", name="alpha", version="v1")
-    assert store.resolve_ref(f"artifact:alpha:v1") == nid
+    assert store.resolve_ref("artifact:alpha:v1") == nid
     assert store.resolve_ref(f"#{nid}") == nid
     assert store.resolve_ref("artifact:alpha:does-not-exist") is None
 

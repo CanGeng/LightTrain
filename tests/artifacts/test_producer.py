@@ -12,14 +12,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.artifacts import ModelForwardProducer, SafetensorsShardStore
+from lighttrain.builtin_plugins.artifacts import (
+    ModelForwardProducer,
+    SafetensorsShardStore,
+)
 from lighttrain.builtin_plugins.artifacts.producer import _coerce_model_output
 from lighttrain.protocols import ModelOutput
-
 
 # --------------------------------------------------------------------------- #
 # Deterministic tiny model                                                    #

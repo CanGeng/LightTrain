@@ -1,0 +1,19 @@
+# CI dependency constraints — QA toolchain lock for the lint / types gate.
+# Used by all three CI jobs:  pip install -c constraints.txt ...
+#
+# SCOPE (intentional — see docs/changelog Known limitations):
+#   Pins the QA toolchain EXACTLY so the lint/types CI jobs cannot go red on a
+#   tool upgrade with no code change (the real "no-code-change-red" risk for
+#   ruff/mypy). This is NOT a full transitive application lock.
+#
+# Why not a full transitive lock:
+#   The local dev env is a bespoke nightly build — torch 2.12.0+cu132 (CUDA 13),
+#   conda `@ file://` packages, and a git-editable mamba_ssm — none installable
+#   from the public CPU index, so a faithful local==CI transitive pin is not
+#   achievable. CI installs torch fresh from the CPU index. The mypy gate's
+#   torch-version sensitivity is limited because the torch-heavy modules are
+#   quarantined under [tool.mypy] (P0.4 ratchet); residual local-vs-CI drift
+#   risk is logged as a Known limitation.
+ruff==0.15.15
+mypy==2.1.0
+mypy_extensions==1.1.0

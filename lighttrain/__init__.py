@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 from .callbacks.base import EventBus, Signal
-from .distributed import ParallelContext
 from .checkpoint.manager import CheckpointManager
 from .config import (
     ComponentSpec,
@@ -17,6 +17,7 @@ from .config import (
     load_config,
     resolve,
 )
+from .distributed import ParallelContext
 from .engine._context import StepContext
 from .lineage import (
     LineageStore,

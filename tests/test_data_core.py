@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 import torch
 
+from lighttrain.builtin_plugins.data.core._module import SimpleDataModule
 from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
 from lighttrain.builtin_plugins.data.core.datasets import LineFileTextDataset
 from lighttrain.builtin_plugins.data.core.samplers import ShuffleSampler
@@ -18,7 +19,6 @@ from lighttrain.builtin_plugins.data.core.tokenizers import (
     VOCAB_SIZE,
     ByteTokenizer,
 )
-from lighttrain.builtin_plugins.data.core._module import SimpleDataModule
 
 
 def test_byte_tokenizer_round_trip():

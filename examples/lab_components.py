@@ -22,8 +22,9 @@ so resolution doesn't drop-and-warn.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -31,7 +32,6 @@ import torch.nn.functional as F
 
 from lighttrain import register
 from lighttrain.protocols import ModelOutput
-
 
 # ---------------------------------------------------------------------------
 # Toy model — Forward-Forward / PCN (a plain stack of nn.Linear layers)

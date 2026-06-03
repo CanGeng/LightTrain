@@ -5,7 +5,10 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.rl.ref_policy import ReferencePolicy, freeze_as_ref, ref_log_probs
+from lighttrain.builtin_plugins.rl.ref_policy import (
+    freeze_as_ref,
+    ref_log_probs,
+)
 
 
 class _TinyModel(nn.Module):
@@ -36,7 +39,7 @@ def test_freeze_as_ref_deep_copy():
     with torch.no_grad():
         for p in model.parameters():
             p.fill_(999.0)
-    for p_orig, p_ref in zip(model.parameters(), ref.model.parameters()):
+    for p_orig, p_ref in zip(model.parameters(), ref.model.parameters(), strict=False):
         assert not torch.allclose(p_orig, p_ref)
 
 

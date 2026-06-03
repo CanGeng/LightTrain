@@ -6,8 +6,6 @@ AttentionTransferLoss with closed-form assertions and regression pins.
 
 from __future__ import annotations
 
-import math
-
 import pytest
 import torch
 import torch.nn as nn
@@ -18,7 +16,6 @@ from lighttrain.builtin_plugins.losses.distill import (
     HiddenStatesCosineLoss,
     HiddenStatesMSELoss,
     KLDivLoss,
-    LayerMapping,
 )
 from lighttrain.protocols import LossContext, ModelOutput
 

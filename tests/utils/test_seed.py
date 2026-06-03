@@ -16,11 +16,9 @@ from __future__ import annotations
 import random
 
 import numpy as np
-import pytest
 import torch
 
 from lighttrain.utils.seed import restore_rng_state, rng_state, seed_everything
-
 
 # ---------------------------------------------------------------------------
 # Reproducibility

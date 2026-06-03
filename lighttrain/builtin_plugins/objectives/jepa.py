@@ -78,7 +78,7 @@ class JEPAObjective:
             return
         m = self.ema_momentum
         for ps, pt in zip(
-            student_encoder.parameters(), self._target_encoder.parameters()
+            student_encoder.parameters(), self._target_encoder.parameters(), strict=False
         ):
             pt.data.mul_(m).add_((1.0 - m) * ps.data)
 

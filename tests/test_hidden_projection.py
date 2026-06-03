@@ -18,9 +18,9 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.losses.distill import HiddenStatesMSELoss, LayerMapping
+from lighttrain.builtin_plugins.losses.distill import HiddenStatesMSELoss
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
-from lighttrain.protocols import LossContext, ModelOutput
+from lighttrain.protocols import LossContext
 
 
 def _make_student(d=16, output_hidden_states=True):
@@ -94,7 +94,7 @@ def test_project_true_overfit_loss_drops():
     ctx = LossContext(extras={"model": student})
 
     losses = []
-    for step in range(20):
+    for _step in range(20):
         opt.zero_grad()
         out = student(input_ids=ids, output_hidden_states=True)
         loss = loss_fn(out, batch, ctx)["loss"]
@@ -146,9 +146,9 @@ def test_project_true_state_dict_round_trip():
 def test_project_true_via_standard_update_rule_registers_with_optimizer():
     """Full integration: the update rule's drain step adds the projection
     params to the optimizer and step() actually updates them."""
+    from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
     from lighttrain.callbacks.base import EventBus
     from lighttrain.engine._context import StepContext
-    from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
 
     torch.manual_seed(0)
     student = _make_student(d=16)

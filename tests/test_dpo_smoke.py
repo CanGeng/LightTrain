@@ -9,8 +9,8 @@ from __future__ import annotations
 import math
 from unittest.mock import MagicMock
 
-import torch
 import pytest
+import torch
 
 from lighttrain.builtin_plugins.data.core.collators import PreferenceCollator
 from lighttrain.builtin_plugins.losses.preference import DPOLoss

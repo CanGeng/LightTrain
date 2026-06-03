@@ -34,15 +34,16 @@ Registered as ``@register("model", "adalora")``.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn as nn
 
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
-from ._common import auto_target_modules, resolve_base_model
 
+from ._common import auto_target_modules, resolve_base_model
 
 # ---------------------------------------------------------------------------
 # AdaLoRA linear layer (manual implementation — no PEFT dependency)
@@ -206,7 +207,6 @@ class AdaLoRAAdapter(nn.Module):
         n_layers = len(self._adalora_layers)
         if n_layers == 0:
             return
-        total_budget = self.target_r * n_layers
         # Simple uniform allocation: give each layer target_r
         for layer in self._adalora_layers.values():
             layer.prune_rank(self.target_r)

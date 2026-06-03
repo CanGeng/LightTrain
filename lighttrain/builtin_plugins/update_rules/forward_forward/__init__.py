@@ -24,13 +24,13 @@ Registered as ``@register("update_rule", "forward_forward")``.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
 
 

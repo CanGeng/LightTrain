@@ -144,7 +144,7 @@ def write_callback_report(run_dir: Path, *, bus: Any | None = None) -> Path | No
         except Exception:  # noqa: BLE001
             quarantined = []
     out_md = [
-        f"# Callback failure report",
+        "# Callback failure report",
         "",
         f"- Total isolated failures: **{len(lines)}**",
         f"- Currently quarantined: {', '.join(quarantined) or '_none_'}",

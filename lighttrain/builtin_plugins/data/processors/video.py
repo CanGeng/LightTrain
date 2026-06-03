@@ -8,13 +8,15 @@ Frame-folder approach is hermetic: a "video" is a directory with
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 import numpy as np
 
 from lighttrain.registry import register
-from .image import SimpleImageProcessor, _open_image
+
+from .image import SimpleImageProcessor
 
 
 def _list_frame_files(folder: Path) -> list[Path]:

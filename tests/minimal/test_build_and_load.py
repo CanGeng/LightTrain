@@ -18,16 +18,19 @@ tests pin the public surface:
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.minimal import build_minimal_model, dump_spec, load_state
-from lighttrain.minimal import _import_target, _jsonable
+from lighttrain.minimal import (
+    _import_target,
+    _jsonable,
+    build_minimal_model,
+    dump_spec,
+    load_state,
+)
 from lighttrain.registry import register
-
 
 # ---------------------------------------------------------------------------
 # build_minimal_model — short name path

@@ -29,7 +29,6 @@ from typing import Any
 
 import torch
 
-
 # ----- peak component identification --------------------------------------
 
 

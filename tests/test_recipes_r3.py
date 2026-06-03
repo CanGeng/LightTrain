@@ -9,23 +9,24 @@ Heavy tests are gated; default ``pytest`` skips them.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.artifacts import ArtifactJoinedDataset, ModelForwardProducer, open_artifact_store
+from lighttrain.builtin_plugins.artifacts import (
+    ArtifactJoinedDataset,
+    ModelForwardProducer,
+    open_artifact_store,
+)
 from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
 from lighttrain.builtin_plugins.data.core.tokenizers import PAD_ID
-from lighttrain.engine._context import StepContext
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from lighttrain.builtin_plugins.losses.core import CompositeLoss
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
-from lighttrain.models.extras import ExtraOutputSpec
 from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper
-from lighttrain.protocols import LossContext
 from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
 from lighttrain.callbacks.base import EventBus
+from lighttrain.engine._context import StepContext
+from lighttrain.models.extras import ExtraOutputSpec
 
 
 def _samples(n: int = 6, T: int = 8, vocab: int = 60, seed: int = 0):
@@ -79,7 +80,7 @@ def test_r3_end_to_end_loss_decreases(tmp_path):
     )
     collator = CausalLMCollator(pad_id=PAD_ID, max_len=16)
     optimizer_wrapper = AdamWWrapper(lr=1e-3)
-    optimizer = optimizer_wrapper.build(student)
+    optimizer_wrapper.build(student)
 
     composite = CompositeLoss(children=[
         {"name": "cross_entropy", "weight": 0.5},

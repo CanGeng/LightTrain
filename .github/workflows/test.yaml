@@ -6,6 +6,60 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
+
+      - name: Install ruff (pinned)
+        # ruff only — no torch, no project install needed (fast).
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c constraints.txt ruff
+
+      - name: Run ruff
+        run: ruff check .
+
+  types:
+    name: Types (mypy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
+
+      - name: Install (CPU torch + dev; pinned QA toolchain)
+        # Gate baseline = full *typed* env: real torch types. CPU wheel from the
+        # pytorch index, everything else from PyPI; constraints.txt pins ruff/mypy.
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]" -c constraints.txt
+
+      - name: Run mypy
+        run: python -m mypy lighttrain
+
   test:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
@@ -24,23 +78,18 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: pyproject.toml
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
 
-      - name: Install dependencies (with CPU-only PyTorch)
+      - name: Install dependencies (CPU-only PyTorch)
+        # --index-url (not --extra-index-url) for the torch command so we can't
+        # accidentally pull a non-CPU/larger wheel from PyPI; the rest from PyPI.
         run: |
           python -m pip install --upgrade pip
-          # 💡 核心优化：强制从 PyTorch 官方源下载 CPU 版本的 torch，体积小 80%，极大提升 CI 速度！
-          pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
-          # 安装你的项目自身及其 dev 依赖
-          pip install -e ".[dev]"
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]" -c constraints.txt
 
       - name: Run Pytest
-        run: |
-          # 你的 toml 已经配置了自动跳过 gpu 和 heavy 测试，这里直接跑即可
-          pytest
-          
-      # （可选）代码覆盖率测试。
-      # - name: Run Pytest with Coverage
-      #   if: success() # 上一步普通测试通过后，才运行 coverage
-      #   run: |
-      #     pytest --cov=lighttrain --cov-report=xml --cov-fail-under=75
+        # toml already skips gpu + heavy markers by default
+        run: pytest

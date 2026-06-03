@@ -65,8 +65,8 @@ def test_explicit_models_equals_sugar(tmp_path):
 
 @pytest.mark.skipif(not RECIPE.exists(), reason="pretrain_causal.yaml missing")
 def test_model_and_models_conflict_raises(tmp_path):
-    from lighttrain.config import ConfigError
     from lighttrain.cli._runtime import setup_run_from_config
+    from lighttrain.config import ConfigError
 
     cfg = yaml.safe_load(RECIPE.read_text(encoding="utf-8"))
     # keep model: AND add models: → conflict

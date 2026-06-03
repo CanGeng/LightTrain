@@ -14,12 +14,12 @@ consumer keeping its own parser; this module collapses them.)
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from ._exceptions import ConfigError
-from ._resolver import _as_plain_dict
+from ._resolver import _as_plain_dict, select_model_spec
 from ._resolver import resolve as _resolve
-from ._resolver import select_model_spec
 
 
 def _field(cfg: Any, key: str) -> Any:

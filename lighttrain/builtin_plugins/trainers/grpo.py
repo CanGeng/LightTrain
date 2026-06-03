@@ -8,19 +8,22 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import torch
 import torch.nn.functional as F
 
 from lighttrain.builtin_plugins.losses.rl import GRPOLoss
-from lighttrain.protocols import ModelOutput, StepOutput
-from lighttrain.registry import register
 from lighttrain.builtin_plugins.rl.buffers import RolloutBuffer
 from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
-from lighttrain.config._resolver import resolve as _resolve
-from lighttrain.builtin_plugins.rl.rollout import RolloutEngine  # noqa: F401 — import also registers hf_generate
+from lighttrain.builtin_plugins.rl.rollout import (
+    RolloutEngine,  # noqa: F401 — import also registers hf_generate
+)
 from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
+from lighttrain.config._resolver import resolve as _resolve
+from lighttrain.protocols import ModelOutput, StepOutput
+from lighttrain.registry import register
 from lighttrain.trainers._utils import _device_of, _move_batch, validate_batch
 from lighttrain.trainers.base import Trainer
 
@@ -151,7 +154,10 @@ class GRPOTrainer(Trainer):
         if self.reward_fn is None:
             raise RuntimeError("GRPOTrainer.fit: reward_fn is not set.")
 
-        ref_policy = freeze_as_ref(self.model, lora_base_as_ref=self._lora_base_as_ref)
+        # TODO(P3): ref_policy is computed but never consumed in fit() — GRPO KL
+        # reference may be wired elsewhere or this is a latent gap. Preserved as-is
+        # (behavior-neutral) for P0; investigate during P3 cleanup.
+        ref_policy = freeze_as_ref(self.model, lora_base_as_ref=self._lora_base_as_ref)  # noqa: F841
 
         target = int(steps) if steps is not None else self.max_steps
         loader = self.data_module.train_loader()

@@ -24,7 +24,8 @@ from __future__ import annotations
 import enum
 import sys
 import traceback
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 
 from ..protocols import CALLBACK_EVENTS
 

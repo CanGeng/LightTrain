@@ -1,9 +1,8 @@
 """Tests for ArchitectureProfile and ObjectiveProfile (M7)."""
 import pytest
-import torch
 import torch.nn as nn
 
-from lighttrain.architectures import ArchitectureProfile, ObjectiveProfile
+from lighttrain.architectures import ArchitectureProfile
 from lighttrain.builtin_plugins.architectures.transformer import transformer_profile
 
 
@@ -16,8 +15,8 @@ def _make_tiny_transformer():
             self.lm_head = nn.Linear(16, 100)
         def forward(self, input_ids, **kw):
             x = self.embed_tokens(input_ids)
-            for l in self.layers:
-                x = l(x)
+            for ln in self.layers:
+                x = ln(x)
             return {"logits": self.lm_head(x)}
     return TinyTransformer()
 

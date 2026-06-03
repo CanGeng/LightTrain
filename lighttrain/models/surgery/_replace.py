@@ -20,11 +20,11 @@ Two primitives:
 
 from __future__ import annotations
 
-from typing import Callable, Union
+from collections.abc import Callable
 
 import torch.nn as nn
 
-Factory = Union[nn.Module, Callable[[nn.Module], nn.Module]]
+Factory = nn.Module | Callable[[nn.Module], nn.Module]
 
 
 def _split_path(dotted: str) -> tuple[list[str], str]:

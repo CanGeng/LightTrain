@@ -9,6 +9,7 @@ Equivalent CLI sequence:
 
 from pathlib import Path
 
+from lighttrain.cli._runtime import setup_run_from_config
 from lighttrain.config import load_config
 from lighttrain.lab.fork import fork
 
@@ -29,7 +30,5 @@ print(f"Gen2 run dir: {r2.new_run_dir}")
 print(f"Lineage recorded: {r2.lineage_edge_recorded}")
 
 # Resume gen2
-from lighttrain.cli._runtime import setup_run_from_config
-
 bundle2 = setup_run_from_config(cfg2, existing_run_dir=r2.new_run_dir)
 bundle2["trainer"].fit()

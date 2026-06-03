@@ -7,7 +7,7 @@ import platform
 import socket
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -36,7 +36,7 @@ def _git_sha() -> str | None:
 
 def capture_env() -> dict[str, Any]:
     info: dict[str, Any] = {
-        "ts_utc": datetime.now(timezone.utc).isoformat(),
+        "ts_utc": datetime.now(UTC).isoformat(),
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "hostname": _safe(socket.gethostname, "unknown"),

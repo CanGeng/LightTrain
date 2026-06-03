@@ -27,16 +27,16 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn.functional as F
 
+from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
 from lighttrain.callbacks.base import Signal
 from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.registry import register
-from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
-from lighttrain.utils.seed import restore_rng_state, rng_state
 from lighttrain.trainers._utils import _device_of, _move_batch, validate_batch
 from lighttrain.trainers.base import Trainer
 
@@ -69,7 +69,6 @@ def _seq_logps_and_nll(
     else:
         logits = out
 
-    B = input_ids.size(0)
     # Causal shift: predict t+1 from t context.
     shift_logits = logits[:, :-1, :].contiguous()   # (B, T-1, V)
     shift_labels = labels[:, 1:].contiguous()        # (B, T-1)

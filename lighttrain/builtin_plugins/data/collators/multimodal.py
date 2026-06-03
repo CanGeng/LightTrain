@@ -26,12 +26,14 @@ processor / sample builder, not by this collator.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 import numpy as np
 import torch
 
 from lighttrain.registry import register
+
 from ..core.collators import CausalLMCollator
 
 

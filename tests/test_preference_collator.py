@@ -4,13 +4,13 @@ and PreferenceJsonlDataset (registered as ('dataset', 'preference_jsonl')).
 from __future__ import annotations
 
 import json
+
 import pytest
 import torch
 
 from lighttrain.builtin_plugins.data.core.collators import PreferenceCollator
 from lighttrain.builtin_plugins.data.core.datasets import PreferenceJsonlDataset
 from lighttrain.registry import get as registry_get
-
 
 # ---------------------------------------------------------------------------
 # PreferenceCollator
@@ -141,7 +141,6 @@ def test_preference_jsonl_fixture_loads():
 
 def test_aux_scalar_passthrough():
     """aux.ref.* scalar logprobs must survive PreferenceCollator."""
-    import torch
     samples = [
         {
             "chosen_input_ids": [1, 2, 3],
@@ -170,7 +169,6 @@ def test_aux_scalar_passthrough():
 
 def test_aux_token_level_passthrough():
     """aux keys with token-level tensors (B, T) must also survive collation."""
-    import torch
     T = 4
     samples = [
         {

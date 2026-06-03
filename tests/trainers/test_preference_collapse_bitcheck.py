@@ -12,10 +12,16 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.losses.preference import DPOLoss, IPOLoss, KTOLoss, ORPOLoss, SimPOLoss
-from lighttrain.protocols import ModelOutput
+from lighttrain.builtin_plugins.losses.preference import (
+    DPOLoss,
+    IPOLoss,
+    KTOLoss,
+    ORPOLoss,
+    SimPOLoss,
+)
 from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
 from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
+from lighttrain.protocols import ModelOutput
 
 # ---- preference golden (captured pre-migration) ---------------------------
 
@@ -107,7 +113,7 @@ def _run_pref(loss_fn, n=5):
     return [round(float(t.train_step(b).loss), 8) for b in batches]
 
 
-import pytest
+import pytest  # noqa: E402 — placed after the helper above by design
 
 
 @pytest.mark.parametrize("name,loss_fn", [
@@ -142,5 +148,5 @@ def test_reward_model_apply_update_bit_identical():
     # tolerance, not 8-decimal exact: cross-platform float noise drifts the
     # accumulated reward_margin ~1e-7 (the loss matches; a real change is >>1e-5).
     assert len(got) == len(_RM_GOLDEN)
-    for g, exp in zip(got, _RM_GOLDEN):
+    for g, exp in zip(got, _RM_GOLDEN, strict=False):
         assert g == pytest.approx(exp, rel=1e-5, abs=1e-7)

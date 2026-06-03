@@ -14,18 +14,19 @@ Six sections (matching plan groups C1–C6):
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 import torch.nn as nn
 
+from lighttrain.builtin_plugins.update_rules.standard import (
+    StandardUpdateRule,
+    _register_new_params,
+)
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.engine._context import StepContext
-from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule, _register_new_params
-
+from lighttrain.protocols import ModelOutput
 
 # ---------------------------------------------------------------------------
 # helpers — recorders + tiny model + builders
@@ -659,7 +660,6 @@ def test_signal_precedence_retry_step_beats_skip_step():
     Expected: backward fires once (retry succeeded on second try).
     """
     forward_post = [0]
-    backward_pre = [0]
     retries_left = [1]
 
     class _A:

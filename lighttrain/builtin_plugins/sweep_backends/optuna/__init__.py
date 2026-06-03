@@ -68,7 +68,7 @@ class OptunaSearcher:
         self._trial_map[trial_id] = trial
         return self._trial_to_config(trial)
 
-    def _trial_to_config(self, trial: "optuna.Trial") -> dict[str, Any]:
+    def _trial_to_config(self, trial: optuna.Trial) -> dict[str, Any]:
         cfg: dict[str, Any] = {}
         for k, v in self.params.items():
             if isinstance(v, list):

@@ -10,10 +10,6 @@ Pre-fix:
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
-
-import pytest
 from typer.testing import CliRunner
 
 from lighttrain.checkpoint.manager import CheckpointManager

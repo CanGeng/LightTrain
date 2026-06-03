@@ -39,8 +39,9 @@ from __future__ import annotations
 
 import warnings
 from collections import deque
+from collections.abc import Mapping
 from contextlib import nullcontext as _nullctx
-from typing import Any, Mapping
+from typing import Any
 
 import torch
 
@@ -163,7 +164,8 @@ class LayerOffloadEngine:
                 # 1) ensure current layer is resident.
                 self._weights_storage.swap_in(name, _module)
                 self._resident[name] = True
-                if name in self._lru: self._lru.remove(name)
+                if name in self._lru:
+                    self._lru.remove(name)
                 self._lru.appendleft(name)
                 # 2) prefetch next ``self.prefetch`` layers.
                 for j in range(1, self.prefetch + 1):
@@ -173,7 +175,8 @@ class LayerOffloadEngine:
                         with self._streams.on_transfer() if self._streams else _nullctx():
                             self._weights_storage.swap_in(nxt_name, nxt)
                             self._resident[nxt_name] = True
-                            if nxt_name in self._lru: self._lru.remove(nxt_name)
+                            if nxt_name in self._lru:
+                                self._lru.remove(nxt_name)
                             self._lru.appendleft(nxt_name)
                 # 3) evict any layer outside the LRU window.
                 self._evict_outside_window(idx)
@@ -183,7 +186,8 @@ class LayerOffloadEngine:
             def _hook(_module, _grad):
                 self._weights_storage.swap_in(name, _module)
                 self._resident[name] = True
-                if name in self._lru: self._lru.remove(name)
+                if name in self._lru:
+                    self._lru.remove(name)
                 self._lru.appendleft(name)
                 self._evict_outside_window(-1)
             return _hook
@@ -222,7 +226,7 @@ class LayerOffloadEngine:
         # rather than scattered. This is also what guarantees a consistent
         # ``checkpoint.save`` later.
         if self._view is not None and self._weights_storage is not None:
-            for i, h in enumerate(self._view.layers):
+            for _i, h in enumerate(self._view.layers):
                 if self._resident.get(h.name):
                     self._weights_storage.swap_out(h.name, h.module)
                     self._resident[h.name] = False

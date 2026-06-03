@@ -18,15 +18,14 @@ Coverage beyond ``tests/test_architectures_jepa.py``:
 
 from __future__ import annotations
 
-import pytest
 import torch
 
-from lighttrain.builtin_plugins.architectures.jepa import jepa_profile
 from lighttrain.builtin_plugins.architectures.jepa import (
     EMATargetEncoder,
     JEPAEncoder,
     JEPAModel,
     JEPAModelConfig,
+    jepa_profile,
 )
 
 

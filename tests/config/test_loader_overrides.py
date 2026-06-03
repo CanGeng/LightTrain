@@ -14,11 +14,10 @@ Coverage layered on top of the flat ``tests/test_config.py`` smoke checks:
 from __future__ import annotations
 
 import pytest
+from omegaconf import OmegaConf
 
 from lighttrain.config import ConfigError, load_config
 from lighttrain.config._loader import _apply_overrides, _parse_override_value
-from omegaconf import OmegaConf
-
 
 # ---------------------------------------------------------------------------
 # _parse_override_value — direct unit tests of the scalar coercer

@@ -16,11 +16,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from lighttrain.data.cache._memmap import MemmapDataset, write_memmap
 from lighttrain.data.cache._rows import _RowsDataset
 from lighttrain.data.cache._shards import ShardWriter
-from lighttrain.data.cache._memmap import MemmapDataset, write_memmap
-from lighttrain.registry import register
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.registry import register
 
 
 @register("prep_node", "materialize")

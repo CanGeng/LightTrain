@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from lighttrain.architectures.profile import LossOnlyObjective
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
-from lighttrain.trainers.base import Trainer
 from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
+from lighttrain.trainers.base import Trainer
 
 
 def test_base_default_objective_is_none():

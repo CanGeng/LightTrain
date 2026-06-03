@@ -12,12 +12,10 @@ Covers all logic that can be verified without a real multi-process setup:
 from __future__ import annotations
 
 import torch
-import pytest
 
-from lighttrain.distributed._context import ParallelContext, _compute_ranks
 from lighttrain.builtin_plugins.distributed._noop import NoopGradSyncStrategy
 from lighttrain.config._schema import ParallelSection
-
+from lighttrain.distributed._context import ParallelContext, _compute_ranks
 
 # ------------------------------------------------------------------ #
 # ParallelContext.single_gpu()                                         #
@@ -218,7 +216,6 @@ class TestNoopGradSyncStrategy:
     def test_accumulate_is_nullcontext(self):
         strategy = NoopGradSyncStrategy()
         model = self._make_model()
-        from contextlib import nullcontext
         ctx = strategy.accumulate(model)
         with ctx:
             pass  # must not raise
@@ -254,5 +251,5 @@ class TestNoopGradSyncStrategy:
         model(x).sum().backward()
         before = [p.clone() for p in model.parameters()]
         strategy.optimizer_step(opt, model)
-        for p_before, p_after in zip(before, model.parameters()):
+        for p_before, p_after in zip(before, model.parameters(), strict=False):
             assert not torch.equal(p_before, p_after)

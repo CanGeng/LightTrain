@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 try:
     import pyarrow as pa  # type: ignore
@@ -149,8 +150,7 @@ def iter_rows(out_dir: str | Path) -> Iterable[dict[str, Any]]:
         path = out_dir / shard["path"]
         if fmt == "parquet" and _HAS_PARQUET:
             table = pq.read_table(str(path))
-            for r in table.to_pylist():
-                yield r
+            yield from table.to_pylist()
         else:
             yield from _iter_jsonl(path)
 

@@ -83,7 +83,6 @@ class ReferencePolicy:
         attention_mask: torch.Tensor | None,
         labels: torch.Tensor,
     ) -> torch.Tensor:
-        device = input_ids.device
         kwargs: dict[str, Any] = {"input_ids": input_ids}
         if attention_mask is not None:
             kwargs["attention_mask"] = attention_mask

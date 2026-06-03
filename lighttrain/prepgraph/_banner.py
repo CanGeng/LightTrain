@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 try:
     from rich.console import Console
@@ -47,7 +47,7 @@ def format_plan(plan: Iterable[PlanEntry]) -> str:
     return "\n".join(lines)
 
 
-def print_plan(console: "Console | None", plan: Iterable[PlanEntry]) -> None:
+def print_plan(console: Console | None, plan: Iterable[PlanEntry]) -> None:
     plan = list(plan)
     if not _HAS_RICH or console is None:
         print(format_plan(plan))

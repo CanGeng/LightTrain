@@ -19,8 +19,9 @@ that fires periodically (``every_n_steps``) and also on demand via
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import torch
 import torch.nn.functional as F
@@ -113,7 +114,7 @@ def compute_loss_attribution(
                     create_graph=False,
                     allow_unused=True,
                 )
-                for (name, _), g in zip(captured.items(), grads):
+                for (name, _), g in zip(captured.items(), grads, strict=False):
                     if g is None:
                         continue
                     module_norms[name] = float(g.detach().data.norm(2).item())

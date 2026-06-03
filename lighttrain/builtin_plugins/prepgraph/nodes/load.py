@@ -9,11 +9,12 @@ invalidates downstream caches.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any
 
-from lighttrain.registry import register
 from lighttrain.prepgraph.node import NodeEstimate, NodeResult, PrepNode, RunContext
+from lighttrain.registry import register
 
 
 def _iter_jsonl(path: Path) -> Iterator[dict[str, Any]]:
@@ -39,8 +40,7 @@ def _iter_parquet(path: Path) -> Iterator[dict[str, Any]]:
     import pyarrow.parquet as pq  # type: ignore
 
     table = pq.read_table(str(path))
-    for r in table.to_pylist():
-        yield r
+    yield from table.to_pylist()
 
 
 def _iter_dir(path: Path) -> Iterator[dict[str, Any]]:

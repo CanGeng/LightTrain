@@ -33,17 +33,17 @@ Config schema::
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 import torch
 
 from lighttrain.artifacts import ArtifactHeader
 from lighttrain.builtin_plugins.artifacts.store import open_artifact_store
 from lighttrain.data.core._schema import derive_sample_id
-from lighttrain.registry import register
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
-
+from lighttrain.registry import register
 
 _MISSING_REQUIRE = "require"
 _MISSING_DROP = "drop"

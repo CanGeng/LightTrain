@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
 
 import torch
 
-from lighttrain.diagnostics.nan_repro import write_nan_repro
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.diagnostics.nan_repro import write_nan_repro
 
 
 def test_repro_script_executes(tmp_path):

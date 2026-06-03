@@ -17,9 +17,8 @@ import yaml
 
 from lighttrain.lab.auto_report import render_sweep_markdown, write_sweep_report
 from lighttrain.lab.compare import compare, render_ascii
-from lighttrain.lab.fork import ForkReport, fork
-from lighttrain.lab.sweep import SweepReport, SweepRunner, TrialResult
-
+from lighttrain.lab.fork import fork
+from lighttrain.lab.sweep import SweepRunner
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -9,8 +9,9 @@ optimizers and schedulers in ``lighttrain.builtin_plugins.optim`` subclass
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 import torch
 
@@ -59,8 +60,8 @@ class ParamGroupSpec:
     def match(
         self,
         name: str,
-        param: "torch.Tensor | None" = None,
-        module: "torch.nn.Module | None" = None,
+        param: torch.Tensor | None = None,
+        module: torch.nn.Module | None = None,
     ) -> bool:
         if re.search(self.pattern, name) is None:
             return False
@@ -157,7 +158,7 @@ class OptimizerWrapperBase:
 
     def _safe_state_dict(
         self,
-        convert: "Callable[[Any, Any], Any] | None" = None,
+        convert: Callable[[Any, Any], Any] | None = None,
     ) -> dict[str, Any]:
         """A ``state_dict()`` whose inner per-param state dicts are **copies** —
         safe to mutate.
@@ -234,7 +235,7 @@ class SchedulerBase:
     def _set_lrs(self, factor: float) -> None:
         if self.optimizer is None or not self._base_lrs:
             return
-        for g, base in zip(self.optimizer.param_groups, self._base_lrs):
+        for g, base in zip(self.optimizer.param_groups, self._base_lrs, strict=False):
             g["lr"] = base * factor
 
     def step(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002

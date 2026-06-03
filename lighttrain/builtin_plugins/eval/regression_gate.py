@@ -56,7 +56,7 @@ class RegressionGate:
 
     def check(
         self,
-        report: "EvalReport | dict[str, float]",
+        report: EvalReport | dict[str, float],
         *,
         step: int | None = None,
     ) -> None:
@@ -93,7 +93,7 @@ class RegressionGate:
                 from lighttrain.invariants import InvariantError
                 raise InvariantError(msg)
             except ImportError:
-                raise RuntimeError(msg)
+                raise RuntimeError(msg) from None
         elif self.action == "warn":
             import warnings
             warnings.warn(msg, stacklevel=2)

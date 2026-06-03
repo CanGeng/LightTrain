@@ -12,8 +12,8 @@ time (block-level mask) without having to track real boundaries elsewhere.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import Iterable, Iterator
 
 
 @dataclass

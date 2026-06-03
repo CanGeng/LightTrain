@@ -27,13 +27,13 @@ so :func:`write_index_page` can show them in ``diagnostics/index.md``.
 from __future__ import annotations
 
 import warnings
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
+from lighttrain.callbacks.base import Signal
 from lighttrain.invariants import InvariantError, evaluate_check
 from lighttrain.registry import get as _registry_get
 from lighttrain.registry import register
-from lighttrain.callbacks.base import Signal
-
 
 _DEFAULTS: tuple[dict[str, Any], ...] = (
     {"name": "loss_finite", "action": "abort"},

@@ -19,7 +19,8 @@ mirroring the three-path logic of StandardUpdateRule:
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 

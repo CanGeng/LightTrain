@@ -17,8 +17,6 @@ tests one round-trip + one unicode sample):
 
 from __future__ import annotations
 
-import pytest
-
 from lighttrain.builtin_plugins.data.core.tokenizers import (
     BOS_ID,
     EOS_ID,
@@ -27,7 +25,6 @@ from lighttrain.builtin_plugins.data.core.tokenizers import (
     VOCAB_SIZE,
     ByteTokenizer,
 )
-
 
 # ---------------------------------------------------------------------------
 # Vocab constants

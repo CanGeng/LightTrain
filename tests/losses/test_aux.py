@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import math
 
-import pytest
 import torch
 import torch.nn.functional as F
 
 from lighttrain.builtin_plugins.losses.aux import InfoNCELoss, MoEBalanceLoss
-from lighttrain.protocols import LossContext, ModelOutput
-
+from lighttrain.protocols import LossContext
 
 # ---------------------------------------------------------------------------
 # InfoNCELoss

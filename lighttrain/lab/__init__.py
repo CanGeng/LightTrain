@@ -13,7 +13,11 @@
 from __future__ import annotations
 
 from .ab_test import ABReport, ab_test
-from .auto_report import render_compare_markdown, render_sweep_markdown, write_sweep_report
+from .auto_report import (
+    render_compare_markdown,
+    render_sweep_markdown,
+    write_sweep_report,
+)
 from .compare import CompareReport, compare, render_ascii, render_png
 from .decision_record import DecisionEntry, DecisionRecord
 from .estimate import EstimateReport, OffloadEstimate, estimate

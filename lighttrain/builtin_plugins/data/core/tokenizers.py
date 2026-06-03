@@ -11,7 +11,6 @@ from typing import Any
 
 from lighttrain.registry import register
 
-
 PAD_ID = 256
 BOS_ID = 257
 EOS_ID = 258

@@ -9,9 +9,11 @@ import torch
 
 from lighttrain.builtin_plugins.artifacts import ModelForwardProducer
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
-from lighttrain.builtin_plugins.prepgraph import nodes  # noqa: F401 — register prep_node entries
-from lighttrain.prepgraph.node import NodeResult, RunContext
+from lighttrain.builtin_plugins.prepgraph import (
+    nodes,  # noqa: F401 — register prep_node entries
+)
 from lighttrain.builtin_plugins.prepgraph.nodes.join import JoinNode
+from lighttrain.prepgraph.node import NodeResult, RunContext
 
 
 def _build_artifact_store(root: Path, sample_ids: list[str]) -> Path:

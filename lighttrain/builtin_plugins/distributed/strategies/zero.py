@@ -12,8 +12,9 @@ engine itself (returned as the ``optimizer`` slot from ``prepare()``).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import torch
 import torch.nn as nn

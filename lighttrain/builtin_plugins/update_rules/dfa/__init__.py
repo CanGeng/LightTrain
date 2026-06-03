@@ -25,7 +25,8 @@ Registered as ``@register("update_rule", "dfa")``.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -79,7 +80,7 @@ class DFAUpdateRule:
         return torch.ones_like(z)
 
     def _ensure_feedback(self, layers: list[nn.Linear], out_size: int, device: torch.device) -> None:
-        for i, layer in enumerate(layers[:-1]):  # no feedback matrix for last layer
+        for _i, layer in enumerate(layers[:-1]):  # no feedback matrix for last layer
             key = id(layer)
             if key not in self._feedback or self._feedback[key].shape != (layer.out_features, out_size):
                 self._feedback[key] = torch.randn(

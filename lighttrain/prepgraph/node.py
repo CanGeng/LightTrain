@@ -17,9 +17,10 @@ Every concrete node lives in ``lighttrain/builtin_plugins/prepgraph/nodes/`` and
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from ._fp import code_version_for, compose_fingerprint
 
@@ -40,7 +41,7 @@ class RunContext:
 
     store_root: Path
     workers: int = 1
-    upstream: dict[str, "NodeResult"] = field(default_factory=dict)
+    upstream: dict[str, NodeResult] = field(default_factory=dict)
     dry_run: bool = False
     # Caller-supplied logger (rich console wrapper or print). May be None.
     log: Any | None = None

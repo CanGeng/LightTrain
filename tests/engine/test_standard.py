@@ -21,8 +21,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lighttrain.engine._context import StepContext
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
+from lighttrain.engine._context import StepContext
 
 
 def _stub_update_rule(return_metrics: dict[str, Any] | None = None):

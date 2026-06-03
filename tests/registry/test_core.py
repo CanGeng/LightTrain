@@ -20,18 +20,16 @@ import warnings
 import pytest
 
 from lighttrain.registry import (
-    Registry,
     NotRegisteredError,
+    Registry,
     RegistryConflictError,
     UnknownCategoryError,
     contains,
     get,
     list_entries,
     register,
-    register_category,
     unregister,
 )
-
 
 # ---------------------------------------------------------------------------
 # Force-overwrite contract (the highest-stakes corner of the registry)
@@ -111,9 +109,14 @@ def test_sequential_force_overwrites_chain_correctly(clean_registry):
     Setup: register A; force-register B; force-register C.
     Expected: ``get`` returns C; list length stays 1.
     """
-    class A: pass
-    class B: pass
-    class C: pass
+    class A:
+        pass
+
+    class B:
+        pass
+
+    class C:
+        pass
 
     register("model", "chain", A)
     register("model", "chain", B, force=True)
@@ -129,9 +132,14 @@ def test_force_false_after_force_true_overwrite_still_raises(clean_registry):
     Setup: register A; force-register B; attempt register C without force.
     Expected: RegistryConflictError, get still returns B.
     """
-    class A: pass
-    class B: pass
-    class C: pass
+    class A:
+        pass
+
+    class B:
+        pass
+
+    class C:
+        pass
 
     register("model", "no_sticky", A)
     register("model", "no_sticky", B, force=True)
@@ -219,7 +227,8 @@ def test_decorator_function_register_round_trip_identity_equivalence(clean_regis
     category.
     Expected: both retrievable; identity matches.
     """
-    class A: pass
+    class A:
+        pass
 
     register("loss", "fa", A)
 
@@ -272,9 +281,14 @@ def test_snapshot_after_force_overwrite_restores_to_overwritten_state(clean_regi
     Expected: post-restore, ``get`` returns B (the snapshotted overwrite),
     not A and not C.
     """
-    class A: pass
-    class B: pass
-    class C: pass
+    class A:
+        pass
+
+    class B:
+        pass
+
+    class C:
+        pass
 
     reg = clean_registry
     reg.register("model", "snap_after", A)

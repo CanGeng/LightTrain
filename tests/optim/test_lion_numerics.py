@@ -15,7 +15,6 @@ All numerical assertions use ``torch.testing.assert_close(atol=1e-5, rtol=1e-4)`
 
 from __future__ import annotations
 
-import pytest
 import torch
 
 from lighttrain.builtin_plugins.optim.wrappers import _Lion

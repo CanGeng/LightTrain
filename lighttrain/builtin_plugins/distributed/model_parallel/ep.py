@@ -10,8 +10,6 @@ via ``router_module_pattern``).
 
 from __future__ import annotations
 
-from typing import Any
-
 import torch.nn as nn
 
 from lighttrain.distributed._context import ParallelContext
@@ -37,7 +35,7 @@ class ExpertParallelStrategy:
 
         # Find all modules matching the router pattern.
         routers = _find_modules(model, self.router_module_pattern)
-        for name, router in routers:
+        for _name, router in routers:
             _install_ep_hooks(router, parallel_ctx, self.top_k)
 
         return model

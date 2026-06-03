@@ -21,34 +21,23 @@ Coverage:
 
 from __future__ import annotations
 
-import typing
-
 import pytest
 import torch
 
 import lighttrain.protocols as protomod
 from lighttrain.protocols import (
     CALLBACK_EVENTS,
-    ArtifactStoreProtocol,
     CallbackProtocol,
     CheckpointManagerProtocol,
-    CollatorProtocol,
-    DataModuleProtocol,
-    EngineProtocol,
     LoggerProtocol,
     LossContext,
     LossFnProtocol,
-    MetricProtocol,
     ModelOutput,
     ModelProtocol,
     OptimizerWrapperProtocol,
-    SamplerProtocol,
     SchedulerProtocol,
     StepOutput,
-    TokenizerProtocol,
-    TrainerProtocol,
 )
-
 
 # ---------------------------------------------------------------------------
 # CallbackProtocol — empty body is a deliberate design (pinned)
@@ -66,7 +55,8 @@ def test_pin_callback_protocol_is_empty_any_object_passes_isinstance():
     a name attribute or a base on_init method), update this test AND
     document the breaking change in the changelog.
     """
-    class C: pass
+    class C:
+        pass
 
     for obj in [object(), 42, [], C()]:
         assert isinstance(obj, CallbackProtocol), (

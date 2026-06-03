@@ -6,8 +6,8 @@ from __future__ import annotations
 import torch
 
 from lighttrain.builtin_plugins.artifacts import ModelForwardProducer
-from lighttrain.lineage.store import LineageStore
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.lineage.store import LineageStore
 
 
 def test_finalize_uses_explicit_run_node_id(tmp_path):

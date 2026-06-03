@@ -29,12 +29,12 @@ import random
 import statistics
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import yaml
-
 
 # ---------------------------------------------------------------------------
 # Config parsing
@@ -61,7 +61,7 @@ def _grid_configs(params: dict[str, Any]) -> list[dict[str, Any]]:
             value_lists.append(v)
     if not keys:
         return [{}]
-    return [dict(zip(keys, combo)) for combo in itertools.product(*value_lists)]
+    return [dict(zip(keys, combo, strict=False)) for combo in itertools.product(*value_lists)]
 
 
 def _random_configs(
@@ -143,7 +143,7 @@ def _read_final_metric(run_dir: Path, metric_key: str) -> float | None:
 
 
 def _compute_sensitivity(
-    trials: list["TrialResult"],
+    trials: list[TrialResult],
     params: dict[str, Any],
 ) -> dict[str, float]:
     """Estimate each param's impact as a normalised absolute correlation."""
@@ -168,14 +168,14 @@ def _compute_sensitivity(
                 continue
             cov = sum(
                 (p - mean_p) * (m - mean_m)
-                for p, m in zip(numeric, metrics)
+                for p, m in zip(numeric, metrics, strict=False)
             ) / len(metrics)
             r = abs(cov / (var_p**0.5 * var_m**0.5))
             result[pname] = round(min(1.0, r), 4)
         except (TypeError, ValueError):
             # Categorical: between-group vs total variance
             groups: dict[Any, list[float]] = {}
-            for v, m in zip(pvals, metrics):
+            for v, m in zip(pvals, metrics, strict=False):
                 groups.setdefault(v, []).append(m)
             if len(groups) < 2:
                 result[pname] = 0.0

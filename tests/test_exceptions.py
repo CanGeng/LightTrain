@@ -24,7 +24,6 @@ from lighttrain.registry import (
     UnknownCategoryError,
 )
 
-
 # ---------------------------------------------------------------------------
 # BatchValidationError — message format + truncation
 # ---------------------------------------------------------------------------

@@ -13,16 +13,22 @@ ships only the model-forward variant since that's the one R3 needs.
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Protocol
+from typing import Any, Protocol
 
 import torch
 
+from lighttrain.artifacts import ArtifactStoreProtocol
 from lighttrain.data.core._schema import derive_sample_id
-from lighttrain.models.extras import ExtraOutputSpec, ExtrasHookManager, flatten_model_output_tensors
+from lighttrain.models.extras import (
+    ExtraOutputSpec,
+    ExtrasHookManager,
+    flatten_model_output_tensors,
+)
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
-from lighttrain.artifacts import ArtifactHeader, ArtifactStoreProtocol
+
 from .store import SafetensorsShardStore, open_artifact_store
 
 

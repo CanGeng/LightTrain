@@ -26,8 +26,8 @@ import torch
 from lighttrain.builtin_plugins.optim.schedulers import (
     ConstantScheduler,
     LinearScheduler,
-    WSDScheduler,
     WarmupCosineScheduler,
+    WSDScheduler,
 )
 
 

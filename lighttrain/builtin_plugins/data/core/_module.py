@@ -5,13 +5,14 @@ Wires a dataset / collator / sampler into a torch DataLoader pair.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
-import torch
 from torch.utils.data import DataLoader
 
 from lighttrain.config._resolver import resolve as _resolve
 from lighttrain.registry import register
+
 from .tokenizers import PAD_ID
 
 

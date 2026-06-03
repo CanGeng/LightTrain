@@ -15,8 +15,10 @@ from types import SimpleNamespace
 import pytest
 import torch
 
+from lighttrain.builtin_plugins.callbacks.builtins.lineage_recorder import (
+    LineageRecorderCallback,
+)
 from lighttrain.callbacks.base import EventBus
-from lighttrain.builtin_plugins.callbacks.builtins.lineage_recorder import LineageRecorderCallback
 from lighttrain.lineage.store import LineageStore
 
 
@@ -72,9 +74,8 @@ def test_lineage_recorder_critical_raises_when_store_missing_method():
 def test_checkpoint_events_dispatched_by_trainer(tmp_path):
     """PretrainTrainer must dispatch on_save_checkpoint_pre/post so the
     LineageRecorderCallback receives the path (REVIEW #7)."""
-    from lighttrain.checkpoint.manager import CheckpointManager
-    from lighttrain.engine._context import StepContext
     from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
+    from lighttrain.checkpoint.manager import CheckpointManager
 
     class _Spy:
         def __init__(self):

@@ -24,6 +24,7 @@ docs/deprecated
 acceptance/
 scripts/check_core_size.py
 .mypy_cache/
+.ruff_cache/
 
 # Run artifacts
 runs/

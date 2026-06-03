@@ -9,22 +9,20 @@ Three layers:
 from __future__ import annotations
 
 import math
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 import torch.nn as nn
 
 from lighttrain.builtin_plugins.losses.preference import DPOLoss
-from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
-from lighttrain.trainers.base import Trainer
 from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
 from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
 from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
 from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
-
+from lighttrain.protocols import ModelOutput, StepOutput
+from lighttrain.trainers.base import Trainer
 
 # ---------------------------------------------------------------------------
 # Layer 1: Protocol normalization tests (DummyTrainers, no real model)

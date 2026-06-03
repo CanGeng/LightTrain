@@ -12,7 +12,8 @@ chunk boundaries are where the model can call ``state_reset()``.
 from __future__ import annotations
 
 import random
-from typing import Any, Iterable, Iterator, Sized
+from collections.abc import Iterable, Iterator, Sized
+from typing import Any
 
 
 class StatefulResumableSampler:

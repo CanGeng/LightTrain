@@ -14,8 +14,12 @@ from pathlib import Path
 
 import pytest
 
-from lighttrain.builtin_plugins.data import processors as _processors  # noqa: F401 — register
-from lighttrain.builtin_plugins.prepgraph import nodes as _nodes  # noqa: F401 — register
+from lighttrain.builtin_plugins.data import (
+    processors as _processors,  # noqa: F401 — register
+)
+from lighttrain.builtin_plugins.prepgraph import (
+    nodes as _nodes,  # noqa: F401 — register
+)
 from lighttrain.prepgraph.dag import PrepGraph
 from lighttrain.prepgraph.runner import PrepRunner
 

@@ -14,12 +14,10 @@ Coverage:
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
 from lighttrain.utils.run_dir import make_run_dir, slugify
-
 
 # ---------------------------------------------------------------------------
 # slugify
@@ -134,7 +132,7 @@ def test_make_run_dir_uses_slug_override_when_provided(tmp_path):
     """
     rd = make_run_dir(tmp_path, exp="exp_a", slug="my_slug")
     # The slug appears in the dir name between ts and hash.
-    parts = rd.name.split("-")
+    rd.name.split("-")
     # parts: [ts_date, ts_time, "my_slug", ..., hash]
     # We use a more permissive check.
     assert "my_slug" in rd.name

@@ -13,8 +13,9 @@ Checkpoint modes (``state_dict_type``):
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import torch
 import torch.nn as nn
@@ -47,14 +48,14 @@ class FSDPStrategy:
         self.min_num_params = min_num_params
 
     def _fsdp_kwargs(self, parallel_ctx: ParallelContext, device: torch.device) -> dict[str, Any]:
+        import functools
+
         from torch.distributed.fsdp import (
-            FullyShardedDataParallel as FSDP,
-            ShardingStrategy,
             CPUOffload,
             MixedPrecision,
+            ShardingStrategy,
         )
         from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
-        import functools
 
         kwargs: dict[str, Any] = {
             "process_group": parallel_ctx.dp_group,
@@ -93,7 +94,6 @@ class FSDPStrategy:
 
         if self.activation_checkpointing:
             try:
-                from torch.distributed.fsdp.wrap import enable_wrap, wrap
                 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
                     apply_activation_checkpointing,
                 )
@@ -134,8 +134,8 @@ class FSDPStrategy:
         parallel_ctx: ParallelContext,
         path: Path,
     ) -> None:
+        from torch.distributed.fsdp import FullStateDictConfig, StateDictType
         from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-        from torch.distributed.fsdp import StateDictType, FullStateDictConfig
 
         path.mkdir(parents=True, exist_ok=True)
 
@@ -150,7 +150,6 @@ class FSDPStrategy:
                     str(path / "model.safetensors"),
                 )
         else:
-            from torch.distributed.fsdp import ShardedStateDictConfig
             with FSDP.state_dict_type(model, StateDictType.SHARDED_STATE_DICT):
                 sd = model.state_dict()
             torch.save(sd, str(path / f"shard_{parallel_ctx.rank}.pt"))
@@ -162,8 +161,8 @@ class FSDPStrategy:
         parallel_ctx: ParallelContext,
         path: Path,
     ) -> None:
+        from torch.distributed.fsdp import FullStateDictConfig, StateDictType
         from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-        from torch.distributed.fsdp import StateDictType, FullStateDictConfig
 
         if self.state_dict_type == "full":
             cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=False)

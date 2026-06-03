@@ -30,7 +30,8 @@ untrusted parties (e.g. a multi-tenant service) on the strength of this guard.
 from __future__ import annotations
 
 import ast
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 

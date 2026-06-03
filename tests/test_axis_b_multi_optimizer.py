@@ -116,7 +116,8 @@ def test_two_models_two_optimizers_update_jointly(tmp_path):
                for n in ("actor", "critic"))
     # distinct optimizer instances with the per-entry specs honoured (different
     # types AND different lr) — proves each trainable model got its OWN optimizer
-    inner = lambda o: getattr(o, "optimizer", o)
+    def inner(o):
+        return getattr(o, "optimizer", o)
     oa, oc = inner(trainer.optimizers["actor"]), inner(trainer.optimizers["critic"])
     assert oa is not oc
     assert type(oa).__name__ != type(oc).__name__

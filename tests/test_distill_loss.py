@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as F
 
 from lighttrain.builtin_plugins.losses.distill import (
     AttentionTransferLoss,
@@ -34,7 +33,7 @@ def test_kl_topk_zero_when_student_matches_teacher():
 
 
 def test_kl_topk_positive_when_student_disagrees():
-    B, T, V, K = 1, 3, 16, 4
+    B, T, V, _K = 1, 3, 16, 4
     teacher_idx = torch.tensor([[0, 1, 2, 3]] * T).unsqueeze(0)  # (1, T, K)
     teacher_vals = torch.tensor([[5.0, 0.0, 0.0, 0.0]] * T).unsqueeze(0)
     student_logits = torch.zeros(B, T, V)  # uniform → KL > 0

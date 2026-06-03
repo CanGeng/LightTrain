@@ -16,17 +16,15 @@ true loss gradient is delegated to losses/rl group. We test the
 
 from __future__ import annotations
 
-import copy
 from unittest.mock import MagicMock
 
 import torch
 import torch.nn as nn
 
+from lighttrain.builtin_plugins.update_rules.mezo import MeZOUpdateRule
 from lighttrain.callbacks.base import EventBus
 from lighttrain.engine._context import StepContext
-from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.builtin_plugins.update_rules.mezo import MeZOUpdateRule
-
+from lighttrain.protocols import ModelOutput
 
 # ---------------------------------------------------------------------------
 # helpers

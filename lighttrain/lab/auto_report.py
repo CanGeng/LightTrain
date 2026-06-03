@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,7 +15,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def render_sweep_markdown(report: "SweepReport", top_k: int = 5) -> str:
+def render_sweep_markdown(report: SweepReport, top_k: int = 5) -> str:
     """Return a Markdown string summarising a :class:`~.sweep.SweepReport`."""
     lines: list[str] = []
     lines.append(f"# Sweep report: {report.sweep_name}")
@@ -98,7 +97,7 @@ def render_sweep_markdown(report: "SweepReport", top_k: int = 5) -> str:
     return "\n".join(lines)
 
 
-def _guess_metric_key(report: "SweepReport") -> str:
+def _guess_metric_key(report: SweepReport) -> str:
     ok = [t for t in report.trials if t.metric is not None]
     if not ok:
         return "metric"
@@ -106,7 +105,7 @@ def _guess_metric_key(report: "SweepReport") -> str:
 
 
 def write_sweep_report(
-    report: "SweepReport",
+    report: SweepReport,
     out_path: Path | None = None,
     top_k: int = 5,
 ) -> Path:
@@ -127,7 +126,7 @@ def write_sweep_report(
 # ---------------------------------------------------------------------------
 
 
-def render_compare_markdown(report: "CompareReport") -> str:
+def render_compare_markdown(report: CompareReport) -> str:
     """Return a Markdown string summarising a :class:`~.compare.CompareReport`."""
     lines: list[str] = []
     lines.append("# Compare report")

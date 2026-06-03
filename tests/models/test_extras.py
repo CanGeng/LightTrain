@@ -18,9 +18,6 @@ idempotency). This file adds:
 
 from __future__ import annotations
 
-import re
-
-import pytest
 import torch
 import torch.nn as nn
 
@@ -33,7 +30,6 @@ from lighttrain.models.extras import (
     flatten_model_output_tensors,
 )
 from lighttrain.protocols import ModelOutput
-
 
 # ---------------------------------------------------------------------------
 # Pattern matching

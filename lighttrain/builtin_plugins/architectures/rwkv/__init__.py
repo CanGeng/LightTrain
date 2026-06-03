@@ -21,16 +21,16 @@ Registered as ``@register("model", "tiny_rwkv")``.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
 
 import torch
 import torch.nn as nn
 
+from lighttrain.architectures.profile import ArchitectureProfile
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
-from lighttrain.architectures.profile import ArchitectureProfile
-
 
 # ---------------------------------------------------------------------------
 # Config

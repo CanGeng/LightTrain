@@ -24,7 +24,6 @@ This file pins:
 from __future__ import annotations
 
 import pytest
-import torch
 import torch.nn as nn
 
 from lighttrain.architectures import ArchitectureProfile
@@ -34,7 +33,6 @@ from lighttrain.builtin_plugins.architectures.transformer import (
     _transformer_head,
     transformer_profile,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers — adversarial model topologies

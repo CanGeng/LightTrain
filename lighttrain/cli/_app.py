@@ -6,7 +6,7 @@ Run ``lighttrain --help`` to see the full command map.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -90,7 +90,7 @@ def _version_callback(value: bool) -> None:
 
 @app.callback()
 def _root(
-    version: Optional[bool] = typer.Option(  # noqa: UP007
+    version: bool | None = typer.Option(  # noqa: UP007
         None,
         "--version",
         callback=_version_callback,
@@ -111,14 +111,14 @@ def _root(
 # ---------------------------------------------------------------------------
 
 
-def _final_loss_from_run(run_dir: Path) -> Optional[float]:
+def _final_loss_from_run(run_dir: Path) -> float | None:
     """Return the last logged ``loss`` from ``<run_dir>/logs/metrics.jsonl``."""
     import json
 
     metrics = Path(run_dir) / "logs" / "metrics.jsonl"
     if not metrics.exists():
         return None
-    last: Optional[float] = None
+    last: float | None = None
     for line in metrics.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -132,7 +132,7 @@ def _final_loss_from_run(run_dir: Path) -> Optional[float]:
     return last
 
 
-def _eval_perplexity(trainer: object, max_batches: int) -> Optional[float]:
+def _eval_perplexity(trainer: object, max_batches: int) -> float | None:
     """Perplexity on the val loader, falling back to the train loader.
 
     Mirrors ``eval_cmd``'s perplexity path so ``train --eval`` and
@@ -185,10 +185,10 @@ def _append_run_summary(path: Path, row: dict) -> None:
 def train_cmd(
     config: Path = typer.Option(..., "-c", "--config", help="Recipe YAML path."),
     overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
-    mode: Optional[str] = typer.Option(None, "--mode", help="lab | prod"),
+    mode: str | None = typer.Option(None, "--mode", help="lab | prod"),
     print_config: bool = typer.Option(False, "--print-config", help="Print resolved config and exit."),
     no_cache: bool = typer.Option(False, "--no-cache", help="Disable all caches."),
-    apply_degrade: Optional[Path] = typer.Option(
+    apply_degrade: Path | None = typer.Option(
         None, "--apply-degrade", help="Apply OOM degrade patch."
     ),
     allow_stale_artifact: bool = typer.Option(
@@ -200,10 +200,10 @@ def train_cmd(
     eval_max_batches: int = typer.Option(
         0, "--eval-max-batches", help="Limit post-train eval to N batches (0 = no limit)."
     ),
-    eval_json: Optional[Path] = typer.Option(
+    eval_json: Path | None = typer.Option(
         None, "--eval-json", help="Write post-train eval metrics to this JSON path."
     ),
-    output_summary: Optional[Path] = typer.Option(
+    output_summary: Path | None = typer.Option(
         None,
         "--output-summary",
         help="Append a one-row run summary (exp, wall, final_loss, eval_ppl, "
@@ -271,7 +271,7 @@ def train_cmd(
 
     import time as _time
 
-    def _last_checkpoint() -> Optional[str]:
+    def _last_checkpoint() -> str | None:
         mgr = getattr(trainer, "ckpt_manager", None)
         if mgr is None:
             return None
@@ -282,7 +282,7 @@ def train_cmd(
             return None
 
     t0 = _time.perf_counter()
-    fit_error: Optional[BaseException] = None
+    fit_error: BaseException | None = None
     try:
         try:
             trainer.fit()
@@ -294,7 +294,7 @@ def train_cmd(
     wall_seconds = _time.perf_counter() - t0
 
     # Post-fit eval (only on a clean run).
-    eval_ppl: Optional[float] = None
+    eval_ppl: float | None = None
     if eval and fit_error is None:
         eval_ppl = _eval_perplexity(trainer, eval_max_batches)
         if eval_ppl is not None:
@@ -344,8 +344,8 @@ def prep_cmd(
     pool: str = typer.Option(
         "thread", "--pool", help="In-layer pool: thread | process."
     ),
-    only: Optional[str] = typer.Option(None, "--only"),
-    from_: Optional[str] = typer.Option(None, "--from"),
+    only: str | None = typer.Option(None, "--only"),
+    from_: str | None = typer.Option(None, "--from"),
 ) -> None:
     """Run the PrepGraph and print a cache-status banner.
 
@@ -372,7 +372,7 @@ def prep_cmd(
 @app.command("prep-graph")
 def prep_graph_cmd(
     config: Path = typer.Option(..., "-c", "--config"),
-    out: Optional[Path] = typer.Option(None, "--out"),
+    out: Path | None = typer.Option(None, "--out"),
 ) -> None:
     """Render the PrepGraph as DOT (or print to stdout)."""
     try:
@@ -502,7 +502,7 @@ def sweep_cmd(
     sweep: Path = typer.Option(..., "-s", "--sweep"),
     strategy: str = typer.Option("grid", "--strategy"),
     top_k: int = typer.Option(5, "--top-k", help="Show top-K trials in report."),
-    report_out: Optional[Path] = typer.Option(
+    report_out: Path | None = typer.Option(
         None, "--report-out", help="Path for sweep_report.md (default: auto)."
     ),
 ) -> None:
@@ -514,8 +514,8 @@ def sweep_cmd(
     Example:
       lighttrain sweep -c recipes/sweep_demo.yaml -s recipes/sweep_r15.yaml
     """
-    from ..lab.sweep import SweepRunner
     from ..lab.auto_report import write_sweep_report
+    from ..lab.sweep import SweepRunner
 
     if not config.exists():
         console.print(f"[red]config not found:[/] {config}")
@@ -557,11 +557,11 @@ def sweep_cmd(
 @app.command("compare")
 def compare_cmd(
     runs: list[str] = typer.Argument(..., help="Run directories to compare."),
-    png: Optional[Path] = typer.Option(None, "--png", help="Also write a PNG chart."),
-    metric: Optional[list[str]] = typer.Option(
+    png: Path | None = typer.Option(None, "--png", help="Also write a PNG chart."),
+    metric: list[str] | None = typer.Option(
         None, "--metric", help="Restrict the table to these metric(s); repeatable."
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None,
         "--output",
         help="Write the comparison to a file: Markdown sweep table (.md) or "
@@ -575,7 +575,13 @@ def compare_cmd(
       lighttrain compare runs/exp/run_001 runs/exp/run_002
       lighttrain compare runs/exp/run_* --metric loss --output table.md
     """
-    from ..lab.compare import compare, render_ascii, render_markdown, render_png, to_records
+    from ..lab.compare import (
+        compare,
+        render_ascii,
+        render_markdown,
+        render_png,
+        to_records,
+    )
 
     run_paths = [Path(r) for r in runs]
     missing = [p for p in run_paths if not p.exists()]
@@ -668,7 +674,7 @@ def fork_cmd(
 @app.command("replay")
 def replay_cmd(
     run: Path = typer.Option(..., "--run"),
-    at: Optional[str] = typer.Option(None, "--at"),
+    at: str | None = typer.Option(None, "--at"),
 ) -> None:
     """Replay the last crash bundle (or frozen step) of a run.
 
@@ -680,7 +686,7 @@ def replay_cmd(
         raise typer.Exit(code=1)
 
     # Locate a target bundle.
-    target: Optional[Path] = None
+    target: Path | None = None
     if at is not None and at.startswith("step_"):
         cands = sorted((run / "frozen_steps").glob(f"{at}_*.zip")) if (
             run / "frozen_steps"
@@ -720,6 +726,7 @@ def replay_cmd(
     import torch as _torch
 
     from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
+
     from ..minimal import build_minimal_model, load_state
     from ..protocols import LossContext
 
@@ -746,7 +753,7 @@ def replay_cmd(
 def estimate_cmd(
     config: Path = typer.Option(..., "-c", "--config"),
     overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
-    json_out: Optional[Path] = typer.Option(
+    json_out: Path | None = typer.Option(
         None, "--json", help="Also write the report as JSON to this path."
     ),
 ) -> None:
@@ -832,10 +839,10 @@ def estimate_cmd(
 def eval_cmd(
     config: Path = typer.Option(..., "-c", "--config"),
     overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
-    checkpoint: Optional[Path] = typer.Option(
+    checkpoint: Path | None = typer.Option(
         None, "--checkpoint", help="Checkpoint directory to evaluate (overrides config)."
     ),
-    json_out: Optional[Path] = typer.Option(
+    json_out: Path | None = typer.Option(
         None, "--json", help="Write EvalReport to this JSON path."
     ),
     max_batches: int = typer.Option(
@@ -946,7 +953,7 @@ def regression_gate_cmd(
     metric: str = typer.Option(..., "--metric", help="Metric name to check."),
     threshold: float = typer.Option(..., "--threshold", help="Gate threshold."),
     op: str = typer.Option("<", "--op", help="Comparison operator: <, <=, >, >=, ==, !="),
-    checkpoint: Optional[Path] = typer.Option(None, "--checkpoint"),
+    checkpoint: Path | None = typer.Option(None, "--checkpoint"),
     action: str = typer.Option("abort", "--action", help="abort | warn | skip"),
     max_batches: int = typer.Option(8, "--max-batches"),
 ) -> None:
@@ -959,10 +966,10 @@ def regression_gate_cmd(
 
         lighttrain regression-gate -c recipe.yaml --metric perplexity --threshold 50.0 --op "<"
     """
-    import json
+
+    from ..builtin_plugins.eval.regression_gate import RegressionGate
     from ..eval.metrics import perplexity
     from ..eval.suite import EvalReport
-    from ..builtin_plugins.eval.regression_gate import RegressionGate
 
     load_dotenv_if_present()
     bundle = setup_run_from_config(config)
@@ -989,7 +996,7 @@ def regression_gate_cmd(
                 metrics["perplexity"] = perplexity(model, val_loader, device=device, max_batches=mb)
             except Exception as exc:
                 console.print(f"[yellow]eval failed:[/] {exc}")
-                raise typer.Exit(code=1)
+                raise typer.Exit(code=1) from None
 
     report = EvalReport(task_name="regression_gate", metrics=metrics)
     gate = RegressionGate(
@@ -1007,7 +1014,7 @@ def regression_gate_cmd(
         )
     except Exception as exc:
         console.print(f"[red]FAIL[/] {exc}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
 
 
 # ---------------------------------------------------------------------------
@@ -1092,7 +1099,7 @@ def freeze_step_cmd(
 def replay_step_cmd(
     bundle: Path = typer.Argument(...),
     debugger: bool = typer.Option(False, "--debugger"),
-    inject: Optional[Path] = typer.Option(None, "--inject"),
+    inject: Path | None = typer.Option(None, "--inject"),
 ) -> None:
     """Replay a frozen step bundle (functional replay).
 
@@ -1103,8 +1110,9 @@ def replay_step_cmd(
     if not bundle.exists():
         console.print(f"[red]bundle not found:[/] {bundle}")
         raise typer.Exit(code=1)
-    from ..diagnostics.frozen_step import read_frozen_step_bundle, replay_step_bundle
     from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
+
+    from ..diagnostics.frozen_step import read_frozen_step_bundle, replay_step_bundle
 
     try:
         bdl = read_frozen_step_bundle(bundle)
@@ -1400,7 +1408,7 @@ def lineage_graph_cmd(
     node: str = typer.Argument(...),
     db: Path = typer.Option(..., "--db"),
     depth: int = typer.Option(5, "--depth"),
-    out: Optional[Path] = typer.Option(None, "--out", help="Write to file; ext=.dot or .mermaid."),
+    out: Path | None = typer.Option(None, "--out", help="Write to file; ext=.dot or .mermaid."),
     fmt: str = typer.Option("mermaid", "--fmt", help="mermaid | dot"),
 ) -> None:
     from ..lineage.dag import to_dot, to_mermaid
@@ -1735,7 +1743,7 @@ def inspect_data_cmd(
 @app.command("resume")
 def resume_cmd(
     run: Path = typer.Option(..., "--run", help="Existing run dir to resume from."),
-    config: Optional[Path] = typer.Option(
+    config: Path | None = typer.Option(
         None, "-c", "--config", help="Recipe YAML (defaults to run_dir/config.snapshot.yaml)."
     ),
     mode: str = typer.Option("functional", "--mode"),
@@ -1831,7 +1839,7 @@ def convert_checkpoint_cmd(
     from_: str = typer.Option(..., "--from", help="Source format: safetensors | pt | hf"),
     to: str = typer.Option(..., "--to", help="Target format: safetensors | pt | hf"),
     path: Path = typer.Option(..., "--path", help="Path to checkpoint file or directory."),
-    out: Optional[Path] = typer.Option(None, "--out", help="Output path (default: next to source)."),
+    out: Path | None = typer.Option(None, "--out", help="Output path (default: next to source)."),
 ) -> None:
     """Convert a checkpoint between storage formats.
 
@@ -1910,7 +1918,7 @@ def export_cmd(
     to: str = typer.Option(..., "--to", help="Export format: safetensors | hf | gguf"),
     ckpt: Path = typer.Option(..., "--ckpt", help="Checkpoint directory (step_<n>/)."),
     out: Path = typer.Option(..., "--out", help="Output path or directory."),
-    config: Optional[Path] = typer.Option(
+    config: Path | None = typer.Option(
         None, "-c", "--config", help="Recipe YAML (needed for hf / gguf export)."
     ),
     overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
@@ -1985,8 +1993,8 @@ def export_cmd(
             console.print(f"[green]exported →[/] {out}")
 
         elif to == "gguf":
-            import subprocess as _sp
             import shutil as _sh
+            import subprocess as _sp
 
             if config is None:
                 console.print("[red]--config required for gguf export[/]")

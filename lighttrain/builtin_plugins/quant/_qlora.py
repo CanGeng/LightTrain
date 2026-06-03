@@ -14,13 +14,16 @@ Linux + CUDA + bitsandbytes only — Windows raises a friendly install error.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch.nn as nn
 
 from lighttrain.registry import register
 
-from ..layer_offload._adapters import register_layered_view  # type: ignore  # noqa: F401
+from ..layer_offload._adapters import (
+    register_layered_view,  # type: ignore  # noqa: F401
+)
 from ._bnb import bnb_quantize
 
 

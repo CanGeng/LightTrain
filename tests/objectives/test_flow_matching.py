@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 import torch
 
 from lighttrain.builtin_plugins.objectives.flow_matching import FlowMatchingObjective

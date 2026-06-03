@@ -17,15 +17,12 @@ from __future__ import annotations
 import hashlib
 import inspect
 
-import pytest
-
 from lighttrain.prepgraph._fp import (
     SCHEMA_VERSION,
     canonical_config,
     code_version_for,
     compose_fingerprint,
 )
-
 
 # --------------------------------------------------------------------------- #
 # canonical_config: None preservation (FP_NONE_01 regression)                 #

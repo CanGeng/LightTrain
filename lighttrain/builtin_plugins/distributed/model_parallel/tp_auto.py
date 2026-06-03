@@ -14,7 +14,6 @@ import torch.nn as nn
 from lighttrain.distributed._context import ParallelContext
 from lighttrain.registry import register
 
-
 # Built-in parallelize_plan presets for common architectures.
 # Keys are normalised lowercase architecture names; values are dicts mapping
 # submodule dotted paths to parallel styles ("colwise" / "rowwise" / "sequence_parallel").

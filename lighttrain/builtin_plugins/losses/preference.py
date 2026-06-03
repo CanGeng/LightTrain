@@ -20,7 +20,8 @@ SimPO and ORPO are reference-free and ignore ``ref_*`` keys.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 import torch.nn.functional as F

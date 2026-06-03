@@ -5,8 +5,8 @@ from __future__ import annotations
 from .schedulers import (
     ConstantScheduler,
     LinearScheduler,
-    WSDScheduler,
     WarmupCosineScheduler,
+    WSDScheduler,
 )
 from .wrappers import AdamWWrapper, LionWrapper
 

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import sys
 import traceback
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 
 class LoggerBus:

@@ -16,7 +16,6 @@ import pytest
 from lighttrain.lab.ab_test import ABReport
 from lighttrain.lab.compare import CompareReport
 
-
 # ---------------------------------------------------------------------------
 # Dataclass surface
 # ---------------------------------------------------------------------------

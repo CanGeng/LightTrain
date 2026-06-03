@@ -29,7 +29,6 @@ from typing import Any
 from lighttrain.callbacks.base import Signal
 from lighttrain.registry import register
 
-
 _FILES = ("lr.json", "stop", "eval_now", "inject.py")
 
 

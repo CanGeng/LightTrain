@@ -12,18 +12,19 @@ Targets that the legacy ``tests/test_prepgraph_process_pool.py`` misses:
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
-from lighttrain.builtin_plugins.data import processors as _processors  # noqa: F401 — registry
-from lighttrain.builtin_plugins.prepgraph import nodes as _nodes  # noqa: F401 — registry
+from lighttrain.builtin_plugins.data import (
+    processors as _processors,  # noqa: F401 — registry
+)
+from lighttrain.builtin_plugins.prepgraph import (
+    nodes as _nodes,  # noqa: F401 — registry
+)
 from lighttrain.prepgraph import runner as runner_module
 from lighttrain.prepgraph.dag import PrepGraph
 from lighttrain.prepgraph.runner import PrepRunner
-
 
 # --------------------------------------------------------------------------- #
 # Helpers                                                                     #

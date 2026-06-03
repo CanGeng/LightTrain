@@ -10,7 +10,6 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from .compare import CompareReport, compare
 from .sweep import _find_run_dir, _read_final_metric

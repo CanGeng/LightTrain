@@ -11,7 +11,8 @@ regex, count how many were touched.
 from __future__ import annotations
 
 import re
-from typing import Iterable, Pattern
+from collections.abc import Iterable
+from re import Pattern
 
 import torch.nn as nn
 

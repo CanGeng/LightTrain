@@ -22,7 +22,8 @@ Registered as ``@register("update_rule", "sam")``.
 from __future__ import annotations
 
 import warnings
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 
