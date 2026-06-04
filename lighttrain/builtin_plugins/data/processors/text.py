@@ -140,7 +140,7 @@ class HFTextProcessor:
 
     def _ensure_tokenizer(self) -> Any:
         if self._tokenizer is None:
-            from transformers import AutoTokenizer  # type: ignore
+            from transformers import AutoTokenizer
 
             tk = AutoTokenizer.from_pretrained(
                 self.model_name_or_path, **self._fp_kwargs

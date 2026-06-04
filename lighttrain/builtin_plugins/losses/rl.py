@@ -210,7 +210,19 @@ class GRPOLoss:
         policy_loss = -_masked_mean(torch.min(surr1, surr2), mask)
 
         kl_loss = torch.tensor(0.0, device=policy_loss.device)
-        if self.beta_kl > 0 and "log_probs_ref" in ctx.extras:
+        if self.beta_kl > 0:
+            # Fail loud rather than silently dropping the KL term: a missing
+            # log_probs_ref means the trainer never injected the reference-policy
+            # log-probs (e.g. ref not built, or a loss-wrapping config the gate
+            # didn't recognize). This guard backstops every mis-wiring path.
+            if "log_probs_ref" not in ctx.extras:
+                raise RuntimeError(
+                    "GRPOLoss has beta_kl > 0 but ctx.extras is missing "
+                    "'log_probs_ref' — the trainer did not inject reference-policy "
+                    "log-probs. The GRPO trainer builds a reference policy in fit() "
+                    "when the effective loss has beta_kl > 0; ensure beta_kl is set "
+                    "on the effective (loss-seam) GRPOLoss and that fit() ran."
+                )
             log_probs_ref = ctx.extras["log_probs_ref"]
             # k3 estimator (Schulman): KL(π_θ || π_ref) ≈ E[exp(Δ) - Δ - 1], Δ = log_ref - log_new
             log_diff = log_probs_ref - log_probs_new

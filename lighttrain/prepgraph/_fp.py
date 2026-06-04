@@ -95,8 +95,8 @@ def code_version_for(qualname_or_cls: Any) -> str:
         # Fallback: module path + file mtime.
         try:
             obj = qualname_or_cls if not isinstance(qualname_or_cls, str) else None
-            mod = inspect.getmodule(obj) if obj is not None else None
-            file = getattr(mod, "__file__", None) if mod else None
+            module_obj = inspect.getmodule(obj) if obj is not None else None
+            file = getattr(module_obj, "__file__", None) if module_obj else None
             if file and os.path.exists(file):
                 stamp = f"{file}:{os.path.getmtime(file)}"
             else:

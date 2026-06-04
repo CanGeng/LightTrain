@@ -177,7 +177,7 @@ class HFAudioProcessor:
 
     def _ensure_extractor(self) -> Any:
         if self._extractor is None:
-            from transformers import AutoFeatureExtractor  # type: ignore
+            from transformers import AutoFeatureExtractor
 
             self._extractor = AutoFeatureExtractor.from_pretrained(
                 self.model_name_or_path, **self._fp_kwargs

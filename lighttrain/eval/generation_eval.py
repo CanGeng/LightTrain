@@ -142,6 +142,8 @@ class GenerationEvalTask:
         ``(eval:<task_name>, step=<step>)``.
         """
         store = self.lineage_store
+        if store is None:
+            return
 
         # Resolve source node ID
         if isinstance(self.artifact_id, int):

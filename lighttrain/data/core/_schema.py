@@ -22,6 +22,7 @@ class Sample(TypedDict, total=False):
     id: NotRequired[str]
     modality_inputs: NotRequired[dict[str, Any]]
     metadata: NotRequired[dict[str, Any]]
+    _doc_boundary: NotRequired[bool]
 
 
 def is_valid_sample(s: Mapping[str, Any]) -> bool:

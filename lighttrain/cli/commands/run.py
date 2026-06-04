@@ -80,7 +80,7 @@ def train_cmd(
                 register_components=False,
             )
             if mode is not None:
-                cfg_pc.mode = _validate_mode_override(mode)  # type: ignore[union-attr]
+                cfg_pc.mode = _validate_mode_override(mode)
         except (ConfigError, FileNotFoundError) as e:
             console.print(f"[red]config error:[/] {e}")
             raise typer.Exit(code=1) from e

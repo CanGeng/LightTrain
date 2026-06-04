@@ -149,7 +149,7 @@ class MixedDataset:
 
 def _iter_source(s: object) -> Iterable[dict]:
     if hasattr(s, "__iter__"):
-        return iter(s)  # type: ignore[arg-type]
+        return iter(s)
     raise TypeError(f"Mix source must be iterable, got {type(s).__name__}")
 
 

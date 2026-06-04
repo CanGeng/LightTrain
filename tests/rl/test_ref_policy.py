@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import math
 
+import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from lighttrain.builtin_plugins.rl.ref_policy import (
+    ReferencePolicy,
     _sequence_log_probs,
     freeze_as_ref,
     ref_log_probs,
@@ -164,3 +166,69 @@ def test_regression_ref_logprobs_must_be_detached():
         out.sum().backward()
     for p in ref.model.parameters():
         assert p.grad is None
+
+
+# ---------------------------------------------------------------------------
+# per-token path (per_token=True) — used by GRPO's per-token k3 KL (L-P0f)
+# ---------------------------------------------------------------------------
+
+
+def test_log_probs_per_token_shape_and_leading_zero():
+    """Goal: per_token=True returns (B, T) with a 0 first column.
+
+    The leading 0 column mirrors the GRPO trainer's log_probs_new so the two
+    align position-for-position for the per-token KL subtraction.
+    """
+    torch.manual_seed(45)
+    B, T, V = 3, 5, 10
+    ref = freeze_as_ref(_TinyLM(vocab=V, hidden=4))
+    input_ids = torch.randint(0, V, (B, T))
+    labels = input_ids.clone()
+
+    out = ref.log_probs(input_ids, None, labels, per_token=True)
+
+    assert out.shape == (B, T)
+    assert torch.all(out[:, 0] == 0.0)
+    # Default (per_token=False) still returns (B,) — the existing contract.
+    assert ref.log_probs(input_ids, None, labels).shape == (B,)
+
+
+def test_log_probs_per_token_gathers_input_ids_not_labels():
+    """Goal: per-token gather targets input_ids[:, 1:], NOT labels.
+
+    With labels != input_ids the reconstruction from input_ids must match; a
+    labels-based gather would differ — pinning the realized-token track.
+    """
+    torch.manual_seed(46)
+    B, T, V = 2, 4, 10
+    ref = freeze_as_ref(_TinyLM(vocab=V, hidden=4))
+    input_ids = torch.randint(0, V, (B, T))
+    labels = (input_ids + 3) % V  # deliberately different track
+
+    out = ref.log_probs(input_ids, None, labels, per_token=True)
+
+    logits = ref.model(input_ids).outputs["logits"]
+    shift_logits = logits[:, :-1, :]
+    shift_targets = input_ids[:, 1:]
+    lp = F.log_softmax(shift_logits, dim=-1)
+    gathered = torch.gather(lp, -1, shift_targets.unsqueeze(-1)).squeeze(-1)
+    expected = torch.cat([torch.zeros_like(gathered[:, :1]), gathered], dim=1)
+    torch.testing.assert_close(out, expected, atol=1e-5, rtol=1e-4)
+
+
+def test_log_probs_per_token_is_detached():
+    """Goal: per-token path inherits the @torch.no_grad guard."""
+    torch.manual_seed(47)
+    ref = freeze_as_ref(_TinyLM(vocab=10, hidden=4))
+    input_ids = torch.randint(0, 10, (2, 4))
+    out = ref.log_probs(input_ids, None, input_ids.clone(), per_token=True)
+    assert not out.requires_grad
+
+
+def test_log_probs_per_token_rejects_lora_base():
+    """Goal: public-API misuse guard — per_token=True is unsupported with
+    lora_base_as_ref=True (would crash unclearly on model=None)."""
+    ref = ReferencePolicy(model=None, lora_base_as_ref=True)
+    input_ids = torch.randint(0, 10, (2, 4))
+    with pytest.raises(RuntimeError, match="lora_base_as_ref"):
+        ref.log_probs(input_ids, None, input_ids.clone(), per_token=True)

@@ -36,7 +36,7 @@ def render_sweep_markdown(report: SweepReport, top_k: int = 5) -> str:
     # Top-K results table
     ok_trials = sorted(
         [t for t in report.trials if t.status == "ok" and t.metric is not None],
-        key=lambda t: t.metric,  # type: ignore[arg-type]
+        key=lambda t: t.metric if t.metric is not None else 0.0,
         reverse=(report.direction != "minimize"),
     )
     lines.append(f"## Top-{min(top_k, len(ok_trials))} trials")

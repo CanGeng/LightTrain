@@ -21,7 +21,7 @@ from typing import Any
 import torch
 from omegaconf import OmegaConf
 
-from ..config import load_config
+from ..config import RootConfig, load_config
 from ..utils.run_dir import make_run_dir, slugify
 from ..utils.seed import seed_everything
 from ._runtime import _build_data, _build_model, _to_dict
@@ -37,6 +37,7 @@ def run_produce(
     snapshot_yaml = Path(config).read_text(encoding="utf-8")
     # load_config populates the registry (register_components default True).
     cfg = load_config(config, overrides=overrides or [])
+    assert isinstance(cfg, RootConfig)  # load_config validates by default
     seed_everything(int(cfg.seed))
 
     art_spec = _to_dict(getattr(cfg, "artifacts", None))
@@ -95,7 +96,7 @@ def run_produce(
     if estimate:
         # Best-effort sample-count + size estimate.
         try:
-            n = len(dataset)  # type: ignore[arg-type]
+            n = len(dataset)
             if console is not None:
                 console.print(f"[cyan]estimate[/] samples={n}, store={store_spec.get('name')}")
         except TypeError:
@@ -120,7 +121,7 @@ def _iter_dataset(dataset: Any) -> Iterable[Mapping[str, Any]]:
         for sample in dataset:
             yield sample
         return
-    n = len(dataset) if hasattr(dataset, "__len__") else None  # type: ignore[arg-type]
+    n = len(dataset) if hasattr(dataset, "__len__") else None
     if n is not None:
         for i in range(n):
             yield dataset[i]

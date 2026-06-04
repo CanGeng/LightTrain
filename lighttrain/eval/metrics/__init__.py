@@ -273,7 +273,7 @@ def lm_eval_harness_hook(
     Requires ``pip install lm-eval``.
     """
     try:
-        import lm_eval  # type: ignore[import]
+        import lm_eval
     except ImportError as exc:
         raise ImportError(
             "lm_eval_harness_hook requires the lm-eval package. "

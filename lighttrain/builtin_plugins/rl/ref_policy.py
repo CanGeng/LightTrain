@@ -55,8 +55,9 @@ class ReferencePolicy:
         labels: torch.Tensor,
         *,
         live_model: Any | None = None,
+        per_token: bool = False,
     ) -> torch.Tensor:
-        """Compute mean per-token log-prob under the reference policy.
+        """Compute log-probs under the reference policy.
 
         Parameters
         ----------
@@ -65,15 +66,31 @@ class ReferencePolicy:
         labels : (B, T)  — padding marked with ``ignore_index``
         live_model :
             Required when ``lora_base_as_ref=True``; the live LoRA-wrapped model.
+        per_token :
+            When ``False`` (default) return ``(B,)`` mean per-token log-probs
+            (negative NLL average) — the sequence-level signal used by DPO/PPO
+            monitoring. When ``True`` return ``(B, T)`` per-token log-probs of
+            the realized tokens (next-token targets ``input_ids[:, 1:]`` with a
+            leading 0 column), aligned position-for-position with the GRPO
+            trainer's ``log_probs_new`` for the per-token k3 KL estimator.
 
         Returns
         -------
-        (B,) tensor of mean per-token log-probs (negative NLL average).
+        ``(B,)`` if ``per_token=False`` else ``(B, T)``.
         """
+        if per_token and self.lora_base_as_ref:
+            raise RuntimeError(
+                "ReferencePolicy.log_probs(per_token=True) is not supported with "
+                "lora_base_as_ref=True: the LoRA-base reference path needs adapter "
+                "toggling + eval-state handling that is not wired yet. Use a "
+                "deep-copy reference (lora_base_as_ref=False)."
+            )
         if self.lora_base_as_ref:
             return self._lora_base_log_probs(input_ids, attention_mask, labels, live_model)
         if self.model is None:
             raise RuntimeError("ReferencePolicy: model is None and lora_base_as_ref=False.")
+        if per_token:
+            return self._frozen_log_probs_per_token(self.model, input_ids, attention_mask)
         return self._frozen_log_probs(self.model, input_ids, attention_mask, labels)
 
     def _frozen_log_probs(
@@ -89,6 +106,19 @@ class ReferencePolicy:
         out = model(**kwargs)
         logits = out.outputs["logits"] if hasattr(out, "outputs") else out["logits"]
         return _sequence_log_probs(logits, labels, self.ignore_index)
+
+    def _frozen_log_probs_per_token(
+        self,
+        model: Any,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor | None,
+    ) -> torch.Tensor:
+        kwargs: dict[str, Any] = {"input_ids": input_ids}
+        if attention_mask is not None:
+            kwargs["attention_mask"] = attention_mask
+        out = model(**kwargs)
+        logits = out.outputs["logits"] if hasattr(out, "outputs") else out["logits"]
+        return _per_token_log_probs(logits, input_ids)
 
     def _lora_base_log_probs(
         self,
@@ -137,6 +167,24 @@ def _sequence_log_probs(
     mask = (shift_labels != ignore_index).float()
     per_sample = (gathered * mask).sum(dim=-1) / mask.sum(dim=-1).clamp_min(1.0)
     return per_sample  # (B,)
+
+
+def _per_token_log_probs(
+    logits: torch.Tensor,
+    input_ids: torch.Tensor,
+) -> torch.Tensor:
+    """Per-token log-probs of the realized ``input_ids``, shape ``(B, T)``.
+
+    Mirrors the GRPO trainer's ``log_probs_new``: causal shift, gather the
+    log-prob of the *actual* next token (``input_ids[:, 1:]`` — **not** labels),
+    then prepend a 0 column so the result aligns position-for-position with the
+    policy log-probs the KL estimator subtracts against.
+    """
+    shift_logits = logits[:, :-1, :].contiguous()        # (B, T-1, V)
+    shift_targets = input_ids[:, 1:].contiguous()         # (B, T-1)
+    lp = F.log_softmax(shift_logits, dim=-1)
+    gathered = torch.gather(lp, -1, shift_targets.unsqueeze(-1)).squeeze(-1)  # (B, T-1)
+    return torch.cat([torch.zeros_like(gathered[:, :1]), gathered], dim=1)    # (B, T)
 
 
 def freeze_as_ref(

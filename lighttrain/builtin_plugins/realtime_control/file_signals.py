@@ -177,7 +177,7 @@ class FileSignalsCallback:
             scheduler = getattr(self._trainer, "scheduler", None)
         # Schedulers cache base_lrs (LinearScheduler / WarmupCosine etc.).
         base_lrs = getattr(scheduler, "base_lrs", None)
-        if isinstance(base_lrs, list):
+        if scheduler is not None and isinstance(base_lrs, list):
             scheduler.base_lrs = [float(lr) * float(scale) for lr in base_lrs]
 
 

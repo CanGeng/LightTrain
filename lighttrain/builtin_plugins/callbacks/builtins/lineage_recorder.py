@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 from lighttrain.lineage.dag import apply_cycle_policy, cycle_check
 from lighttrain.lineage.store import LineageStore
@@ -142,7 +142,7 @@ class LineageRecorderCallback:
                 )
                 apply_cycle_policy(
                     hits,
-                    self_feeding=self.cycle_policy,
+                    self_feeding=cast(Literal["allowed", "warn", "forbid"], self.cycle_policy),
                     require_external_signal=self.require_external_signal,
                     external_signal_present=False,
                 )

@@ -140,7 +140,7 @@ class HypothesisLog:
     def __len__(self) -> int:
         return len(self._entries)
 
-    def __iter__(self):  # type: ignore[override]
+    def __iter__(self):
         return iter(self._entries)
 
 

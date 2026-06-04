@@ -120,7 +120,7 @@ class RolloutBuffer:
     ) -> dict[str, Any]:
         max_len = max(ep.input_ids.size(0) for ep in episodes)
 
-        def _pad(t: torch.Tensor, pad_val: int, target_len: int) -> torch.Tensor:
+        def _pad(t: torch.Tensor, pad_val: float, target_len: int) -> torch.Tensor:
             diff = target_len - t.size(0)
             if diff == 0:
                 return t

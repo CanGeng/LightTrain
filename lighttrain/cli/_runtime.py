@@ -1041,7 +1041,7 @@ def _wire_trainer_context(
     ctx.grad_sync = grad_sync
     # Stash run_dir on the trainer so LineageRecorderCallback can read it.
     try:
-        trainer._run_dir = run_dir  # type: ignore[attr-defined]
+        trainer._run_dir = run_dir
     except Exception:  # noqa: BLE001
         pass
     # Auto-attach default lab-mode callbacks (land at the *end* of the list so

@@ -61,3 +61,14 @@ def test_ref_log_probs_finite():
     labels = input_ids.clone()
     lp = ref_log_probs(ref, input_ids, None, labels)
     assert torch.isfinite(lp).all()
+
+
+def test_ref_log_probs_per_token_shape():
+    """Default API stays (B,); per_token=True yields per-token (B, T)."""
+    B, T, V = 2, 4, 16
+    model = _TinyModel(V=V)
+    ref = freeze_as_ref(model)
+    input_ids = torch.randint(0, V, (B, T))
+    labels = input_ids.clone()
+    assert ref_log_probs(ref, input_ids, None, labels).shape == (B,)
+    assert ref.log_probs(input_ids, None, labels, per_token=True).shape == (B, T)

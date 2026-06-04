@@ -8,13 +8,17 @@ inside GRPOLoss, not the trainer.
 
 from __future__ import annotations
 
+import math
 from unittest.mock import MagicMock
 
 import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
+from lighttrain.architectures.profile import LossOnlyObjective
+from lighttrain.builtin_plugins.losses.rl import GRPOLoss
+from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
+from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer, _effective_beta_kl
 from lighttrain.callbacks.base import Signal
 from lighttrain.protocols import ModelOutput
 
@@ -299,3 +303,121 @@ def test_grpo_stop_requested_breaks_outer_loop():
     trainer.fit()
 
     assert trainer.ctx.step == 1
+
+
+# ===========================================================================
+# KL reference-policy wiring (L-P0f) — the trainer must inject per-token
+# log_probs_ref so a configured beta_kl actually applies the KL penalty.
+# The k3 KL math itself is covered in tests/losses/test_rl.py — here we pin
+# the *wiring* (shape, gating, stale-clearing, fail-loud paths).
+# ===========================================================================
+
+
+def _stub_rollout_with_batch(trainer: GRPOTrainer, rewards: torch.Tensor, batch: dict) -> None:
+    """Like _stub_rollout_phase but feeds one real minibatch into the inner loop."""
+    trainer._rollout_engine.rollout = MagicMock(return_value=[])
+    trainer._buffer.clear = MagicMock()
+    trainer._buffer.add = MagicMock()
+    trainer._buffer.all_rewards = MagicMock(return_value=rewards)
+    trainer._buffer.batches = MagicMock(return_value=iter([batch]))
+
+
+def test_effective_beta_kl_unwraps_objective_and_defaults_to_zero():
+    """_effective_beta_kl honors loss-seam: unwrap LossOnlyObjective.loss_fn,
+    read beta_kl; a loss without the knob → 0.0 (never builds an unusable ref)."""
+    assert _effective_beta_kl(GRPOLoss(beta_kl=0.3)) == pytest.approx(0.3)
+    assert _effective_beta_kl(
+        LossOnlyObjective(GRPOLoss(beta_kl=0.3), loss_family="rl")
+    ) == pytest.approx(0.3)
+
+    def _custom_loss(model_output, batch, ctx):  # no beta_kl attribute
+        return {"loss": torch.tensor(0.0)}
+
+    assert _effective_beta_kl(LossOnlyObjective(_custom_loss)) == 0.0
+
+
+def test_grpo_step_injects_per_token_log_probs_ref_shape():
+    """beta_kl>0 + ref built → ctx.extras['log_probs_ref'] is (B, T) (== log_probs_new),
+    first column 0, and the kl metric is finite."""
+    trainer = _make_grpo(beta_kl=1.0)
+    trainer._ref_policy = freeze_as_ref(trainer.model)
+
+    batch = _grpo_batch()  # B=4, T=4
+    raw = trainer._grpo_step(batch)
+
+    ref = trainer.ctx.extras["log_probs_ref"]
+    assert ref.shape == (4, 4)
+    assert torch.all(ref[:, 0] == 0.0)
+    assert math.isfinite(raw["kl"])
+
+
+def test_grpo_step_kl_positive_with_distinct_ref():
+    """A reference that differs from the current policy yields kl_loss > 0.
+
+    (A just-frozen ref equals the policy → KL=0 by construction, so we inject a
+    separately-initialized model as the reference to exercise a real penalty.)
+    """
+    trainer = _make_grpo(beta_kl=1.0)
+    trainer._ref_policy = freeze_as_ref(_TinyLM())  # independent init → differs
+
+    raw = trainer._grpo_step(_grpo_batch())
+
+    assert raw["kl"] > 0.0
+
+
+def test_grpo_step_fail_loud_when_beta_kl_but_no_ref():
+    """Direct _grpo_step (no fit()) with beta_kl>0 and no ref → GRPOLoss raises
+    instead of silently dropping the KL term."""
+    trainer = _make_grpo(beta_kl=0.1)
+    assert trainer._ref_policy is None
+    with pytest.raises(RuntimeError, match="log_probs_ref"):
+        trainer._grpo_step(_grpo_batch())
+
+
+def test_grpo_step_clears_stale_log_probs_ref():
+    """Once a step injects log_probs_ref, a later step without a ref must not
+    leave the stale value in ctx.extras (GRPOLoss only checks key presence)."""
+    trainer = _make_grpo()  # beta_kl=0 → GRPOLoss won't require the key
+    trainer._ref_policy = freeze_as_ref(trainer.model)
+    trainer._grpo_step(_grpo_batch())
+    assert "log_probs_ref" in trainer.ctx.extras
+
+    trainer._ref_policy = None
+    trainer._grpo_step(_grpo_batch())
+    assert "log_probs_ref" not in trainer.ctx.extras
+
+
+def test_grpo_step_fail_loud_when_kl_enabled_but_no_labels():
+    """KL enabled (ref built) but a batch without labels → fail loud rather than
+    forming a meaningless 'ref vs zeros' KL."""
+    trainer = _make_grpo(beta_kl=1.0)
+    trainer._ref_policy = freeze_as_ref(trainer.model)
+    batch = _grpo_batch()
+    del batch["labels"]
+    with pytest.raises(RuntimeError, match="labels"):
+        trainer._grpo_step(batch)
+
+
+def test_grpo_fit_builds_ref_only_when_beta_kl_positive():
+    """The fit() gate builds the reference policy iff effective beta_kl>0."""
+    batch = _grpo_batch()
+
+    t_kl = _make_grpo(beta_kl=0.5, max_steps=1)
+    _stub_rollout_with_batch(t_kl, rewards=batch["rewards"], batch=batch)
+    t_kl.fit()
+    assert t_kl._ref_policy is not None
+
+    t_no = _make_grpo(beta_kl=0.0, max_steps=1)
+    _stub_rollout_with_batch(t_no, rewards=batch["rewards"], batch=_grpo_batch())
+    t_no.fit()
+    assert t_no._ref_policy is None
+
+
+def test_grpo_step_beta_kl_zero_does_not_inject_ref():
+    """Behavior-neutral baseline: default beta_kl=0 builds no ref, injects no
+    log_probs_ref, and computes a zero KL term (unchanged from pre-fix)."""
+    trainer = _make_grpo()  # beta_kl=0
+    raw = trainer._grpo_step(_grpo_batch())
+    assert trainer._ref_policy is None
+    assert "log_probs_ref" not in trainer.ctx.extras
+    assert raw["kl"] == 0.0

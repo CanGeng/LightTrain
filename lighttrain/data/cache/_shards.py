@@ -28,8 +28,8 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import pyarrow as pa  # type: ignore
-    import pyarrow.parquet as pq  # type: ignore
+    import pyarrow as pa
+    import pyarrow.parquet as pq
 
     _HAS_PARQUET = True
 except ImportError:  # pragma: no cover — pyarrow is in our base deps
@@ -97,7 +97,7 @@ class ShardWriter:
             "shards": list(self._completed),
             "total_rows": self._total_rows,
         }
-        (self.out_dir / "shards.json").write_text(
+        (Path(self.out_dir) / "shards.json").write_text(
             json.dumps(manifest, sort_keys=True, indent=2),
             encoding="utf-8",
         )
@@ -107,11 +107,11 @@ class ShardWriter:
         idx = self._shard_idx
         rows = self._current
         if self.fmt == "parquet":
-            path = self.out_dir / f"shard-{idx:05d}.parquet"
+            path = Path(self.out_dir) / f"shard-{idx:05d}.parquet"
             table = pa.Table.from_pylist(rows)
             pq.write_table(table, str(path))
         else:
-            path = self.out_dir / f"shard-{idx:05d}.jsonl"
+            path = Path(self.out_dir) / f"shard-{idx:05d}.jsonl"
             with path.open("w", encoding="utf-8") as f:
                 for r in rows:
                     f.write(json.dumps(r, separators=(",", ":")) + "\n")

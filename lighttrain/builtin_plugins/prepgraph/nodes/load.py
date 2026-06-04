@@ -37,7 +37,7 @@ def _iter_lines(path: Path) -> Iterator[dict[str, Any]]:
 
 
 def _iter_parquet(path: Path) -> Iterator[dict[str, Any]]:
-    import pyarrow.parquet as pq  # type: ignore
+    import pyarrow.parquet as pq
 
     table = pq.read_table(str(path))
     yield from table.to_pylist()

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.3.0"
-description = "PyTorch LM training framework for research labs"
+version = "0.3.1"
+description = "PyTorch training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
@@ -105,18 +105,26 @@ python_version = "3.12"
 # Gate authority = the full *typed* env (CPU torch installed in CI types job;
 # see constraints.txt). "Zero tolerance" = the gate is green (no reported
 # errors), NOT one-shot strict. strict is intentionally off; ratchet later.
-# (warn_unused_ignores left off for P0 — pre-existing stale ignores are a
-# separate hygiene ratchet, not a type error; revisit after the quarantine
-# is burned down.)
+# warn_unused_ignores is on: stale `# type: ignore` comments are flagged so they
+# don't accumulate. Optional/untyped third-party imports are handled by the
+# per-module ignore_missing_imports overrides below (NOT inline ignores), so the
+# CI types env — which installs only `.[dev]`, not optional extras — stays green.
+warn_unused_ignores = true
 
 # Third-party without stubs → Any. PER-MODULE only (never global
 # ignore_missing_imports) so first-party import breakage still surfaces.
+# Includes optional extras (bitsandbytes/lm_eval) absent from the CI types env
+# and core deps that ship no py.typed (pyarrow/transformers).
 [[tool.mypy.overrides]]
 module = [
     "accelerate.*",
+    "bitsandbytes.*",
     "deepspeed.*",
+    "lm_eval.*",
     "matplotlib.*",
     "optuna.*",
+    "pyarrow.*",
+    "transformers.*",
     "vllm.*",
     "yaml",
 ]
@@ -138,16 +146,12 @@ module = [
     "lighttrain.builtin_plugins.artifacts.joined_dataset",
     "lighttrain.builtin_plugins.artifacts.producer",
     "lighttrain.builtin_plugins.artifacts.store",
-    "lighttrain.builtin_plugins.callbacks.builtins.lineage_recorder",
-    "lighttrain.builtin_plugins.data.core.datasets",
     "lighttrain.builtin_plugins.data.processors.image",
-    "lighttrain.builtin_plugins.diagnostics.loss_attribution",
     "lighttrain.builtin_plugins.distributed.model_parallel.ep",
     "lighttrain.builtin_plugins.distributed.model_parallel.tp_aware",
     "lighttrain.builtin_plugins.distributed.strategies.ddp",
     "lighttrain.builtin_plugins.distributed.strategies.fsdp",
     "lighttrain.builtin_plugins.distributed.strategies.zero",
-    "lighttrain.builtin_plugins.generation_backends.vllm",
     "lighttrain.builtin_plugins.layer_offload._engine",
     "lighttrain.builtin_plugins.models.peft._adalora",
     "lighttrain.builtin_plugins.models.peft._common",
@@ -156,30 +160,15 @@ module = [
     "lighttrain.builtin_plugins.objectives.diffusion",
     "lighttrain.builtin_plugins.objectives.masked_denoising",
     "lighttrain.builtin_plugins.quant._qlora",
-    "lighttrain.builtin_plugins.realtime_control.file_signals",
-    "lighttrain.builtin_plugins.rl.buffers",
-    "lighttrain.builtin_plugins.sweep_backends.optuna",
     "lighttrain.builtin_plugins.trainers._preference_base",
     "lighttrain.builtin_plugins.trainers.grpo",
     "lighttrain.builtin_plugins.trainers.ppo",
     "lighttrain.builtin_plugins.trainers.rm",
-    "lighttrain.cli._produce",
-    "lighttrain.config._loader",
-    "lighttrain.data.cache._shards",
     "lighttrain.diagnostics.oom_report",
-    "lighttrain.eval.generation_eval",
-    "lighttrain.lab.auto_report",
-    "lighttrain.lab.compare",
-    "lighttrain.lab.fork",
     "lighttrain.lab.sweep",
-    "lighttrain.lineage.migration",
     "lighttrain.models.surgery._embedding",
     "lighttrain.models.surgery._replace",
     "lighttrain.models.surgery._tie",
-    "lighttrain.prepgraph._fp",
-    "lighttrain.prepgraph.node",
     "lighttrain.trainers.base",
-    "lighttrain.utils.accelerate",
-    "lighttrain.utils.env_capture",
 ]
 ignore_errors = true

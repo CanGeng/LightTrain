@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 from lighttrain.builtin_plugins.losses.rl import GRPOLoss
 from lighttrain.builtin_plugins.rl.buffers import RolloutBuffer
-from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
+from lighttrain.builtin_plugins.rl.ref_policy import ReferencePolicy, freeze_as_ref
 from lighttrain.builtin_plugins.rl.rollout import (
     RolloutEngine,  # noqa: F401 — import also registers hf_generate
 )
@@ -28,6 +28,20 @@ from lighttrain.trainers._utils import _device_of, _move_batch, validate_batch
 from lighttrain.trainers.base import Trainer
 
 _log = logging.getLogger(__name__)
+
+
+def _effective_beta_kl(objective: Any) -> float:
+    """Read the KL coefficient from the *actually effective* GRPO loss.
+
+    Honors the ``loss:`` seam: unwrap a ``LossOnlyObjective`` to its ``loss_fn``
+    and read ``beta_kl``. Returns ``0.0`` when the bound loss exposes no such
+    knob (e.g. a custom non-GRPO loss) so we never build a reference policy the
+    effective loss can't consume.
+    """
+    from lighttrain.architectures.profile import LossOnlyObjective
+
+    loss_fn = objective.loss_fn if isinstance(objective, LossOnlyObjective) else objective
+    return float(getattr(loss_fn, "beta_kl", 0.0))
 
 
 @register("trainer", "grpo")
@@ -121,7 +135,8 @@ class GRPOTrainer(Trainer):
         self._stop_requested = False
 
         # Default RL loss (fallback when the recipe omits a `loss:` block). The
-        # `loss:` seam wins: see Trainer._recipe_loss_or in _grpo_step.
+        # `loss:` seam wins: the runtime binds a recipe `loss:`/`objective:` to
+        # self.objective, which _grpo_step re-asserts onto ctx each step.
         self._default_loss = GRPOLoss(clip_eps=clip_eps, beta_kl=beta_kl)
         self._rl_rule = RLUpdateRule(grad_clip=grad_clip)
         # F1: resolve the rollout backend via the rl_backend registry and forward
@@ -143,6 +158,10 @@ class GRPOTrainer(Trainer):
             max_size=int(buffer_max_size) if buffer_max_size is not None else 2048
         )
         self._lora_base_as_ref = bool(lora_base_as_ref)
+        # Reference policy for the KL penalty; built lazily in fit() only when the
+        # effective loss has beta_kl > 0. Declared here so direct _grpo_step()
+        # calls (tests / programmatic use, no fit()) see a defined attribute.
+        self._ref_policy: ReferencePolicy | None = None
 
     # ------------------------------------------------------------------ fit
 
@@ -154,10 +173,25 @@ class GRPOTrainer(Trainer):
         if self.reward_fn is None:
             raise RuntimeError("GRPOTrainer.fit: reward_fn is not set.")
 
-        # TODO(P3): ref_policy is computed but never consumed in fit() — GRPO KL
-        # reference may be wired elsewhere or this is a latent gap. Preserved as-is
-        # (behavior-neutral) for P0; investigate during P3 cleanup.
-        ref_policy = freeze_as_ref(self.model, lora_base_as_ref=self._lora_base_as_ref)  # noqa: F841
+        # Reference policy for the KL penalty. Reset first so re-running a trainer
+        # with a different objective/beta can't leave a stale ref behind; build it
+        # only when the *effective* loss actually uses KL (beta_kl > 0), so the
+        # default beta_kl=0 path pays no deep-copy cost.
+        self._ref_policy = None
+        eff_beta = (
+            _effective_beta_kl(self.objective)
+            if self.objective is not None
+            else self._default_loss.beta_kl
+        )
+        if eff_beta > 0:
+            if self._lora_base_as_ref:
+                raise RuntimeError(
+                    "GRPO KL penalty (beta_kl > 0) with lora_base_as_ref=True is "
+                    "not supported yet: the LoRA-base reference path needs adapter "
+                    "toggling + eval-state handling that is not wired. Use a "
+                    "deep-copy reference (lora_base_as_ref=False) or set beta_kl=0."
+                )
+            self._ref_policy = freeze_as_ref(self.model, lora_base_as_ref=False)
 
         target = int(steps) if steps is not None else self.max_steps
         loader = self.data_module.train_loader()
@@ -287,6 +321,10 @@ class GRPOTrainer(Trainer):
         out = self.model(**kwargs)
         logits = out.outputs["logits"] if isinstance(out, ModelOutput) else out["logits"]
 
+        # Clear any reference log-probs left in ctx.extras by a prior step before
+        # deciding whether to re-inject this step (GRPOLoss only checks presence).
+        self.ctx.extras.pop("log_probs_ref", None)
+
         if labels is not None:
             # NOTE: `labels` is used as a None-sentinel only; the actual next-token
             # targets come from input_ids[:, 1:]. Prompt positions are masked by
@@ -298,7 +336,20 @@ class GRPOTrainer(Trainer):
             log_probs_new = torch.cat(
                 [torch.zeros_like(log_probs_new[:, :1]), log_probs_new], dim=1
             )
+            # KL reference log-probs (per-token, aligned with log_probs_new).
+            # Only when fit() built a reference policy (effective beta_kl > 0).
+            if self._ref_policy is not None:
+                self.ctx.extras["log_probs_ref"] = self._ref_policy.log_probs(
+                    input_ids, attention_mask, labels, per_token=True
+                )
         else:
+            if self._ref_policy is not None:
+                raise RuntimeError(
+                    "GRPOTrainer: KL penalty is enabled (beta_kl > 0) but this "
+                    "batch has no 'labels', so per-token log-probs are all zero and "
+                    "no meaningful KL can be formed. Provide labels in KL-enabled "
+                    "rollouts (the rollout buffer always collates them)."
+                )
             log_probs_new = torch.zeros_like(log_probs_old)
 
         # Sequence-level advantages = per-sample rewards (group norm in GRPOLoss)

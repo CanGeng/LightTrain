@@ -54,7 +54,7 @@ class _Lion(torch.optim.Optimizer):
         super().__init__(params, defaults)
 
     @torch.no_grad()
-    def step(self, closure: Any = None) -> Any:  # type: ignore[override]
+    def step(self, closure: Any = None) -> Any:
         loss = closure() if closure is not None else None
         for group in self.param_groups:
             lr = group["lr"]

@@ -216,8 +216,9 @@ class LossAttributionCallback:
         self._dump(step=step, force_module=True)
 
     def _dump(self, *, step: int, force_module: bool) -> None:
-        if self._latest_outputs is None or self._latest_batch is None:
+        if self._latest_outputs is None or self._latest_batch is None or self._run_dir is None:
             return
+        run_dir = self._run_dir
         levels = list(self.levels)
         if force_module and "module" not in levels:
             levels.append("module")
@@ -231,7 +232,7 @@ class LossAttributionCallback:
             )
         except Exception:  # noqa: BLE001
             return
-        out_dir = self._run_dir / "diagnostics"
+        out_dir = run_dir / "diagnostics"
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / f"loss_attribution_{int(step)}.json").write_text(
             json.dumps(report, indent=2), encoding="utf-8"

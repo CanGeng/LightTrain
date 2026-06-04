@@ -116,7 +116,7 @@ def dtype_stable(*, model: Any = None, metrics: Any = None, **_: Any) -> bool:
         return True
     dt_str = str(first.dtype)
     prev = metrics.get("_invariant_dtype")
-    metrics["_invariant_dtype"] = dt_str  # type: ignore[assignment]
+    metrics["_invariant_dtype"] = dt_str
     if prev is None:
         return True
     return str(prev) == dt_str

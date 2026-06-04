@@ -54,7 +54,7 @@ def import_user_modules(modules: list[str]) -> None:
                 if spec is None or spec.loader is None:
                     raise ImportError(f"Cannot load spec from {p}")
                 m = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(m)  # type: ignore[union-attr]
+                spec.loader.exec_module(m)
             else:
                 importlib.import_module(mod)
         except (ImportError, FileNotFoundError) as exc:

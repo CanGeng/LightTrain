@@ -97,7 +97,9 @@ class PrepNode:
     # ----- identity --------------------------------------------------------
 
     def code_version(self) -> str:
-        return code_version_for(type(self))
+        # type objects are hashable at runtime; the lru_cache __call__ stub
+        # over-narrows its args to Hashable and rejects type[PrepNode].
+        return code_version_for(type(self))  # type: ignore[arg-type]
 
     def fingerprint(self, input_fps: Iterable[str] = ()) -> str:
         return compose_fingerprint(

@@ -21,7 +21,7 @@ import torch.nn as nn
 
 def _import_bnb():
     try:
-        import bitsandbytes as bnb  # type: ignore
+        import bitsandbytes as bnb
     except ImportError as e:
         raise ImportError(
             "bitsandbytes is required for 4-/8-bit quantization. "

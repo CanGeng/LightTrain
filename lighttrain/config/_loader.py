@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from omegaconf import DictConfig, OmegaConf
@@ -61,9 +61,9 @@ def _compose_defaults(path: Path, _seen: set[Path] | None = None) -> DictConfig:
             if not sub_path.exists():
                 raise ConfigError(f"defaults entry {ref!r} not found relative to {path}")
             sub = _compose_defaults(sub_path, seen)
-            base = OmegaConf.merge(base, sub)
+            base = cast(DictConfig, OmegaConf.merge(base, sub))
 
-        return OmegaConf.merge(base, cfg)
+        return cast(DictConfig, OmegaConf.merge(base, cfg))
     finally:
         seen.discard(path)
 
