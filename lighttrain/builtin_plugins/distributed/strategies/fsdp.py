@@ -98,7 +98,7 @@ class FSDPStrategy:
                     apply_activation_checkpointing,
                 )
                 apply_activation_checkpointing(wrapped)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         # Optimizer MUST be built after FSDP wrapping.

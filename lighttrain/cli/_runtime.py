@@ -727,7 +727,7 @@ def _open_lineage_store(run_dir: Path) -> Any:
         from ..lineage.store import LineageStore as _LineageStore
 
         return _LineageStore(run_dir / "lineage.sqlite")
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -1042,7 +1042,7 @@ def _wire_trainer_context(
     # Stash run_dir on the trainer so LineageRecorderCallback can read it.
     try:
         trainer._run_dir = run_dir  # type: ignore[attr-defined]
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     # Auto-attach default lab-mode callbacks (land at the *end* of the list so
     # user-declared ones still see their events first).

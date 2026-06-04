@@ -234,7 +234,7 @@ def fork(
                 slug="fork",
                 resolved_yaml=resolved_yaml,
             )
-        except Exception:  # pragma: no cover — graceful fallback
+        except Exception:  # pragma: no cover — graceful fallback  # noqa: BLE001
             import tempfile
 
             new_run_dir = Path(tempfile.mkdtemp(prefix="lighttrain_fork_"))
@@ -255,7 +255,7 @@ def fork(
         (new_run_dir / "config.yaml").write_text(
             _yaml.safe_dump(cfg_dict), encoding="utf-8"
         )
-    except Exception:  # pragma: no cover
+    except Exception:  # pragma: no cover  # noqa: BLE001
         pass
 
     forked_at_step = _parse_step_from_ckpt(from_checkpoint)

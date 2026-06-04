@@ -46,7 +46,7 @@ try:
     import pyarrow as pa
     import pyarrow.parquet as pq
     _HAS_PARQUET = True
-except Exception:  # pragma: no cover — optional
+except Exception:  # pragma: no cover — optional  # noqa: BLE001
     _HAS_PARQUET = False
 
 

@@ -119,7 +119,7 @@ class DynamicArtifactCallback:
                     {"metrics": dict(metrics or {}), "step": step},
                 ):
                     return
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return
         submission = {
             "step": int(step),
@@ -146,7 +146,7 @@ class DynamicArtifactCallback:
                 return
             try:
                 self._produce_one(item)
-            except Exception as exc:  # pragma: no cover — logging only
+            except Exception as exc:  # pragma: no cover — logging only  # noqa: BLE001
                 # Worker faults must not kill training.
                 if self._ctx_ref is not None and getattr(self._ctx_ref, "logger", None):
                     try:
@@ -154,7 +154,7 @@ class DynamicArtifactCallback:
                             f"[dynamic_artifact] worker error: {exc!r}",
                             int(item.get("step", -1)),
                         )
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         pass
             finally:
                 self._q.task_done()

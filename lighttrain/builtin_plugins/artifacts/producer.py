@@ -86,7 +86,7 @@ def _resolve_store(
     if isinstance(store, (str, Path)):
         try:
             return open_artifact_store(store, allow_stale=allow_stale)
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Not yet finalized — produce mode opens fresh shard store.
             return SafetensorsShardStore(store)
     return store  # already an ArtifactStore instance

@@ -65,7 +65,7 @@ def ab_test(
                 text=True,
                 timeout=trial_timeout_s,
             )
-        except (subprocess.TimeoutExpired, Exception):
+        except (subprocess.TimeoutExpired, Exception):  # noqa: BLE001
             pass
         rd = _find_run_dir(run_root_path / exp)
         metric = _read_final_metric(rd, metric_key) if rd else None

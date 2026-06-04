@@ -215,7 +215,7 @@ def doctor_cmd(run: Path = typer.Option(..., "--run")) -> None:
                 for line in cb_log.read_text(encoding="utf-8").splitlines()
                 if line.strip()
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             n_failures = 0
         if n_failures > 0:
             console.print(
@@ -362,7 +362,7 @@ def profile_cmd(
             if bundle.get("logger") is not None:
                 try:
                     bundle["logger"].close()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
 
     try:
@@ -415,7 +415,7 @@ def inspect_data_cmd(
             if tokenizer is not None and hasattr(tokenizer, "decode"):
                 try:
                     text = tokenizer.decode(ids)[:80]
-                except Exception:
+                except Exception:  # noqa: BLE001
                     text = "<decode error>"
             row.append(text.replace("\n", "\\n"))
         table.add_row(*row)

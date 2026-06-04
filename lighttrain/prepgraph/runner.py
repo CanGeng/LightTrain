@@ -486,5 +486,5 @@ def _rebind_store(store: Any, final_dir: Path) -> Any:
     cls = type(store)
     try:
         return cls(final_dir)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return store

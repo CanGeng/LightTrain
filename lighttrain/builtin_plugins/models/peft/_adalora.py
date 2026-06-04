@@ -228,7 +228,7 @@ class AdaLoRAAdapter(nn.Module):
             try:
                 from peft import get_peft_model_state_dict
                 return get_peft_model_state_dict(self.model)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         # Manual: collect adapter weights only
         if hasattr(self, "_adalora_layers"):
@@ -244,7 +244,7 @@ class AdaLoRAAdapter(nn.Module):
             try:
                 from peft import set_peft_model_state_dict
                 return set_peft_model_state_dict(self.model, state_dict)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         return self.model.load_state_dict(state_dict, strict=False)
 

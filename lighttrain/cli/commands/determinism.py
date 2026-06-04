@@ -71,7 +71,7 @@ def replay_cmd(
 
     try:
         import lighttrain.builtin_plugins.models.adapters  # noqa: F401 — populate registry
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     spec = _json.loads((target / "model_spec.json").read_text(encoding="utf-8"))
@@ -129,7 +129,7 @@ def freeze_step_cmd(
     for p in ckpts:
         try:
             n = int(p.name.split("_", 1)[1])
-        except Exception:
+        except Exception:  # noqa: BLE001
             continue
         if n <= step and (target is None or n > int(target.name.split("_", 1)[1])):
             target = p
@@ -151,7 +151,7 @@ def freeze_step_cmd(
         if bundle.get("logger") is not None:
             try:
                 bundle["logger"].close()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
     zips = sorted((run / "frozen_steps").glob("*.zip"))
     if zips:

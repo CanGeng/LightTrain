@@ -407,7 +407,7 @@ class LineageStore:
     def close(self) -> None:
         try:
             self.conn.close()
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     def __enter__(self) -> LineageStore:

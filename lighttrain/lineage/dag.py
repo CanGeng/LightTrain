@@ -85,7 +85,7 @@ def apply_cycle_policy(
         if logger is not None and hasattr(logger, "log_text"):
             try:
                 logger.log_text(msg, 0)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         return
     if self_feeding == "warn":

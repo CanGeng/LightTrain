@@ -466,7 +466,7 @@ def test_isolated_registry_does_not_share_state_with_global():
     finally:
         try:
             unregister("model", "global_only_xyz")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
 
@@ -487,5 +487,5 @@ def test_isolated_registry_can_be_cleared_independently():
     finally:
         try:
             unregister("model", "indep_test")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass

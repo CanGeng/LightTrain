@@ -193,7 +193,7 @@ def migrate_file(
                 old_id, new_id, "migrated_from",
                 {"from": payload.get("schema_version"), "to": migrated.get("schema_version")},
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass  # lineage is soft — never block migration on a DB hiccup
     return migrated
 

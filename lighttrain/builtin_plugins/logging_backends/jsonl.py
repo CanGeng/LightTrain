@@ -61,7 +61,7 @@ class JSONLLogger:
         try:
             self._fp.flush()
             self._fp.close()
-        except Exception:  # pragma: no cover
+        except Exception:  # pragma: no cover  # noqa: BLE001
             pass
 
 

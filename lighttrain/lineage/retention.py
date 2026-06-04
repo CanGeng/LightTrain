@@ -137,7 +137,7 @@ def _keep_best_by_metric(
                 import json
 
                 payload = json.loads(edge.get("payload") or "{}")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 payload = {}
             v = payload.get(metric)
             if isinstance(v, (int, float)):

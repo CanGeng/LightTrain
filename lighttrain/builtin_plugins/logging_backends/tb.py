@@ -50,7 +50,7 @@ class TensorBoardLogger:
         try:
             self._writer.flush()
             self._writer.close()
-        except Exception:  # pragma: no cover
+        except Exception:  # pragma: no cover  # noqa: BLE001
             pass
 
 

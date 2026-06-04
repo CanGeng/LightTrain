@@ -323,7 +323,7 @@ def _is_protocol_class(obj) -> bool:
     try:
         from typing import Protocol as _P
         return _P in obj.__mro__
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 

@@ -114,14 +114,14 @@ class OptunaSearcher:
     def best_params(self) -> dict[str, Any] | None:
         try:
             return self._study.best_params
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     @property
     def best_value(self) -> float | None:
         try:
             return self._study.best_value
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
 

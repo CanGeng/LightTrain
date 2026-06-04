@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.2.5"
+version = "0.3.0"
 description = "PyTorch LM training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -87,10 +87,13 @@ show_missing = true
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["F", "E", "W", "I", "UP", "B"]
+select = ["F", "E", "W", "I", "UP", "B", "BLE001"]
 # E501 (line length) is intentionally not gated — formatting is left to an
 # optional future `ruff format`; gating it now would mean a large manual rewrap.
 ignore = ["E501"]
+# BLE001 (blind `except Exception`) is now gated to catch NEW broad-excepts.
+# The pre-existing best-effort sites are frozen with `# noqa: BLE001` (P3 ratchet
+# baseline) — narrow + add reasons when each is revisited.
 
 [tool.ruff.lint.flake8-bugbear]
 # Typer's API *is* calling typer.Option/Argument in argument defaults; exempt

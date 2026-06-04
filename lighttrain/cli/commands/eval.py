@@ -57,7 +57,7 @@ def eval_cmd(
                     trainer.load_checkpoint(checkpoint)
                     console.print(f"[green]loaded checkpoint[/] {checkpoint}")
                     loaded_ckpt = True
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     console.print(f"[yellow]checkpoint load failed:[/] {exc}")
 
         # Loud guard: scoring init weights produces a meaningless (random)
@@ -95,7 +95,7 @@ def eval_cmd(
                     report = evaluator.run(model, step=0, device=device, force=True)
                     if report is not None:
                         metrics.update(report.metrics)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 console.print(f"[yellow]evaluator failed:[/] {exc}")
 
         # ---- display ----
@@ -156,7 +156,7 @@ def regression_gate_cmd(
         if ckpt_manager is not None:
             try:
                 trainer.load_checkpoint(checkpoint)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 console.print(f"[yellow]checkpoint load failed:[/] {exc}")
 
     model = getattr(trainer, "model", None)
@@ -170,7 +170,7 @@ def regression_gate_cmd(
             try:
                 mb = max_batches if max_batches > 0 else None
                 metrics["perplexity"] = perplexity(model, val_loader, device=device, max_batches=mb)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 console.print(f"[yellow]eval failed:[/] {exc}")
                 raise typer.Exit(code=1) from None
 
@@ -188,6 +188,6 @@ def regression_gate_cmd(
         console.print(
             f"[green]PASS[/] {metric} {op} {threshold}  (value={val})"
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         console.print(f"[red]FAIL[/] {exc}")
         raise typer.Exit(code=1) from None

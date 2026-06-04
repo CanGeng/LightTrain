@@ -120,7 +120,7 @@ def _leaf_exists(cfg: DictConfig, keys: list[str]) -> bool:
             return True
         try:
             node = node[k]
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Intermediate present but unresolved/missing — cannot descend.
             return False
     return True

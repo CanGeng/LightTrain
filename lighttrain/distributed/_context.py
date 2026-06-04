@@ -109,7 +109,7 @@ class ParallelContext:
             dp_rank = mesh.get_local_rank("dp")
             tp_rank = mesh.get_local_rank("tp")
             pp_rank = mesh.get_local_rank("pp")
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Fallback for older PyTorch or force_cpu=True
             mesh = None
             dp_rank, tp_rank, pp_rank = _compute_ranks(rank, dp, tp, pp)

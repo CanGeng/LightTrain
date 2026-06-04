@@ -176,7 +176,7 @@ def _parse_shape(shape_str: str) -> tuple[int, ...]:
             return tuple(int(x) for x in parsed)
         if isinstance(parsed, int):
             return (parsed,)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return ()
 

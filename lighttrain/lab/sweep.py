@@ -317,7 +317,7 @@ class SweepRunner:
             succeeded = proc.returncode == 0
         except subprocess.TimeoutExpired:
             return TrialResult(trial_id, overrides, None, "failed", None)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return TrialResult(trial_id, overrides, None, "failed", None)
 
         run_dir = _find_run_dir(sweep_run_root / trial_exp)

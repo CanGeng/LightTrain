@@ -203,10 +203,10 @@ def _safe_metrics(metrics: Any) -> dict[str, Any]:
     for k, v in metrics.items():
         try:
             out[str(k)] = float(v)
-        except Exception:
+        except Exception:  # noqa: BLE001
             try:
                 out[str(k)] = str(v)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 continue
     return out
 
