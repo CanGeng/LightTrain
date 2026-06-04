@@ -173,7 +173,7 @@ def _load_state_dict_into(model: torch.nn.Module, ckpt_path: str) -> None:
     if str(p).endswith(".safetensors"):
         from safetensors.torch import load_file
 
-        state = load_file(str(p))
+        state: Any = load_file(str(p))
     else:
         state = torch.load(str(p), map_location="cpu")
         if isinstance(state, dict) and "model" in state:
@@ -542,9 +542,9 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
                 FrozenStepCallback,
             )
 
-            cb = FrozenStepCallback(every=every)
-            bus.add(cb)
-            trainer.callbacks.append(cb)
+            fs_cb = FrozenStepCallback(every=every)
+            bus.add(fs_cb)
+            trainer.callbacks.append(fs_cb)
         except Exception as exc:  # noqa: BLE001 — non-critical, warn & skip
             warnings.warn(
                 f"auto-attach FrozenStepCallback failed, skipping: {exc}",
@@ -556,7 +556,7 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
     rt_enabled = True if mode == "lab" else False
     if isinstance(rt, Mapping) and "enabled" in rt:
         rt_enabled = bool(rt["enabled"])
-    elif hasattr(rt, "enabled"):
+    elif rt is not None and hasattr(rt, "enabled"):
         rt_enabled = bool(rt.enabled)
     if rt_enabled and "FileSignalsCallback" not in have:
         try:
@@ -567,7 +567,7 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
             poll_every = 10
             if isinstance(rt, Mapping):
                 poll_every = int(rt.get("poll_every", poll_every))
-            elif hasattr(rt, "poll_every"):
+            elif rt is not None and hasattr(rt, "poll_every"):
                 poll_every = int(rt.poll_every or poll_every)
             bus.add(FileSignalsCallback(poll_every=poll_every))
             trainer.callbacks.append(bus.callbacks[-1])
@@ -610,6 +610,446 @@ def _validate_mode_override(mode: str) -> str:
     return mode
 
 
+# ---------------------------------------------------------------------------
+# setup_run_from_config stages — extracted from the former ~430-line function.
+# Kept module-level (not nested) so tests that ``monkeypatch.setattr(_runtime,
+# <name>, ...)`` still bind, and so each phase is independently testable.
+# ---------------------------------------------------------------------------
+
+
+def _resolve_config(
+    config: str | Path | RootConfig,
+    overrides: list[str] | None,
+    mode: str | None,
+) -> tuple[RootConfig, Path | None, str, str]:
+    """Parse config (path or RootConfig), apply mode, seed, snapshot YAMLs."""
+    # Unconditional: covers the RootConfig branch that bypasses load_config; the
+    # path branch's load_config also does it, but the _DONE guard makes the
+    # second call ~free. Order: built-ins here, user_modules below.
+    import_all_components()
+    if isinstance(config, (str, Path)):
+        path = Path(config)
+        snapshot_yaml = path.read_text(encoding="utf-8")
+        # load_config is the chokepoint — it already imports cfg.user_modules.
+        loaded = load_config(path, overrides=overrides or [])
+        config_path: Path | None = path
+    else:
+        if not isinstance(config, RootConfig):
+            raise TypeError(
+                "config must be a str/Path to a YAML file or a parsed "
+                f"RootConfig; got {type(config).__name__}."
+            )
+        if overrides:
+            raise ValueError(
+                "Cannot apply `overrides` to an already-parsed RootConfig. "
+                "Pass a config path instead, or apply overrides via "
+                "load_config() before calling setup_run_from_config()."
+            )
+        loaded = config
+        config_path = None
+        snapshot_yaml = OmegaConf.to_yaml(OmegaConf.create(config.model_dump()))
+        # This branch bypasses load_config: a RootConfig may have been hand-built
+        # without going through the chokepoint, so import its user_modules here
+        # (idempotent — free if load_config already ran).
+        _import_user_modules(list(getattr(config, "user_modules", None) or []))
+    # setup_run_from_config always validates (load_config default validate=True),
+    # so the result is a RootConfig; narrow it for the typed _build_* helpers.
+    assert isinstance(loaded, RootConfig)
+    cfg = loaded
+    if mode is not None:
+        # _validate_mode_override returns a validated "lab"/"prod" (typed str);
+        # cfg.mode is a Literal and validate_assignment is off (see that helper).
+        cfg.mode = _validate_mode_override(mode)  # type: ignore[assignment]
+    seed_everything(int(cfg.seed))
+    resolved_yaml = OmegaConf.to_yaml(OmegaConf.create(cfg.model_dump()))
+    return cfg, config_path, snapshot_yaml, resolved_yaml
+
+
+def _preflight_parallel(cfg: RootConfig) -> tuple[Any | None, Any | None]:
+    """Validate TP/PP config *before* any run-dir side effects (fail clean).
+
+    Resolving here (rather than at apply time) means the precise ConfigError
+    beats _init_parallel's generic "RANK expected" when running without a
+    launcher, and a pure-config error never pollutes ``runs/``.
+    """
+    return _build_model_parallel_strategy(cfg), _build_pipeline_schedule(cfg)
+
+
+def _prepare_run_dir(
+    cfg: RootConfig,
+    *,
+    config_path: Path | None,
+    snapshot_yaml: str,
+    resolved_yaml: str,
+    existing_run_dir: Path | None,
+) -> Path:
+    """Create (or reuse) the run dir and capture a best-effort code snapshot."""
+    if existing_run_dir is not None:
+        run_dir = Path(existing_run_dir)
+        if not run_dir.exists():
+            raise FileNotFoundError(f"existing_run_dir {run_dir} does not exist")
+        # Don't rewrite snapshot/resolved/env — original run owns them. Resume
+        # is supposed to be additive.
+        return run_dir
+    run_dir = make_run_dir(
+        cfg.run_root,
+        cfg.exp,
+        slug=slugify(cfg.exp),
+        snapshot_yaml=snapshot_yaml,
+        resolved_yaml=resolved_yaml,
+        extra_env={
+            "lighttrain_version": __version__,
+            "config_path": (
+                str(config_path) if config_path is not None
+                else "<in-memory RootConfig>"
+            ),
+        },
+    )
+    # Code snapshot: best-effort; failures degrade to writing a plain
+    # ``code_snapshot_pointer.txt`` pointing to run_dir.
+    try:
+        from ..utils.code_snapshot import capture_code_snapshot
+
+        user_mods = getattr(cfg, "user_modules", None) or []
+        capture_code_snapshot(run_dir, user_modules=list(user_mods))
+    except Exception:  # noqa: BLE001 — must never block a training start
+        import warnings
+
+        warnings.warn(
+            "code snapshot failed (see logs); continuing without it", stacklevel=2
+        )
+    return run_dir
+
+
+def _open_lineage_store(run_dir: Path) -> Any:
+    """Per-run SQLite lineage store (soft dependency; None on failure)."""
+    try:
+        from ..lineage.store import LineageStore as _LineageStore
+
+        return _LineageStore(run_dir / "lineage.sqlite")
+    except Exception:
+        return None
+
+
+def _require_optim_spec(entry: dict[str, Any], optimizers_cfg: Any) -> Any:
+    """Resolve the optimizer spec for a trainable entry; raise if missing."""
+    spec = optim_spec_for(entry, optimizers_cfg)
+    if spec is None:
+        raise RuntimeError(
+            "recipe is missing an optimizer for a trainable model "
+            "(declare `optim:` or `optimizers:` and reference it via the "
+            "entry's `optimizer:` field)."
+        )
+    return spec
+
+
+def _build_primary_model(
+    cfg: RootConfig,
+    primary_entry: dict[str, Any],
+    *,
+    mp_strategy: Any | None,
+    pipeline_schedule: Any | None,
+    parallel_ctx: ParallelContext,
+) -> Any:
+    """Phase B/C: build the primary model, TP/SP/EP surgery, then PP split."""
+    # Phase B: model surgery (TP/SP/EP) — must run on bare model before FSDP/DDP.
+    model = _resolve(primary_entry["spec"], category="model")
+    if mp_strategy is not None:
+        try:
+            model = mp_strategy.apply(model, parallel_ctx)
+        except ConfigError:
+            raise
+        except Exception as exc:  # apply failed (e.g. missing device_mesh)
+            raise ConfigError(f"tensor-parallel apply failed: {exc}") from exc
+    # Phase C: pipeline splitting (PP) — after TP surgery, before DP wrap. PP is
+    # fail-loud: a requested pp>1 that cannot be applied raises ConfigError.
+    if pipeline_schedule is not None:
+        try:
+            model = pipeline_schedule.prepare(model, parallel_ctx)
+        except ConfigError:
+            raise
+        except Exception as exc:  # prepare failed
+            raise ConfigError(
+                f"pipeline parallel (pp={int(getattr(cfg.parallel, 'pp', 1))}) "
+                f"failed to prepare: {exc}"
+            ) from exc
+    return model
+
+
+def _build_trainable_core(
+    cfg: RootConfig,
+    model: Any,
+    *,
+    primary_optim_spec: Any,
+    n_trainable: int,
+    parallel_ctx: ParallelContext,
+    device: Any,
+    run_dir: Path,
+    allow_stale_artifact: bool,
+) -> tuple[Any, Any, Any, Any, Any | None]:
+    """Phase D: grad-sync wrap (DDP/FSDP/ZeRO) + data + optimizer + scheduler."""
+    grad_sync = _build_grad_sync_strategy(cfg)
+    if grad_sync is not None and n_trainable > 1:
+        raise ConfigError(
+            "multiple trainable models + a gradient-sync strategy (distributed "
+            "Axis-B) is not supported yet; multi-optimizer training is single-GPU "
+            "for now."
+        )
+    if grad_sync is not None:
+        def optimizer_factory(m: torch.nn.Module) -> Any:
+            return _build_optimizer_for(primary_optim_spec, m)
+
+        data_module = _build_data(
+            cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
+        )
+        _raw_loader = data_module.train_loader()
+        model, optimizer, _loader = grad_sync.prepare(
+            model, optimizer_factory, _raw_loader, parallel_ctx, device=device
+        )
+        # scheduler is built against the (possibly-wrapped) optimizer
+        scheduler = _build_scheduler(cfg, optimizer)
+    else:
+        model = model.to(device)
+        data_module = _build_data(
+            cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
+        )
+        optimizer = _build_optimizer_for(primary_optim_spec, model)
+        scheduler = _build_scheduler(cfg, optimizer)
+    return model, optimizer, scheduler, data_module, grad_sync
+
+
+def _build_aux_models(
+    models_cfg: dict[str, Any],
+    optimizers_cfg: Any,
+    *,
+    primary_name: str,
+    primary_model: Any,
+    primary_optimizer: Any,
+    device: Any,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build frozen aux models (Axis A) + extra trainable models (Axis B)."""
+    models: dict[str, Any] = {primary_name: primary_model}
+    optimizers: dict[str, Any] = {primary_name: primary_optimizer}
+    for _name, _entry in models_cfg.items():
+        if _name == primary_name:
+            continue
+        _aux = _resolve(_entry["spec"], category="model").to(device)
+        if _entry["checkpoint"]:
+            _load_state_dict_into(_aux, str(_entry["checkpoint"]))
+        if _entry["trainable"]:
+            optimizers[_name] = _build_optimizer_for(
+                _require_optim_spec(_entry, optimizers_cfg), _aux
+            )
+        else:
+            for _p in _aux.parameters():
+                _p.requires_grad_(False)
+            _aux.eval()
+        models[_name] = _aux
+    return models, optimizers
+
+
+def _build_update_rule(cfg: RootConfig) -> Any:
+    """Build the update rule (StandardUpdateRule fast-path or registry)."""
+    update_rule_spec = (
+        cfg.engine.update_rule if cfg.engine is not None else {"name": "standard"}
+    )
+    if isinstance(update_rule_spec, Mapping) and update_rule_spec.get("name") == "standard":
+        accumulate = cfg.trainer.accumulate if cfg.trainer is not None else 1
+        grad_clip = cfg.trainer.grad_clip if cfg.trainer is not None else 1.0
+        return StandardUpdateRule(
+            grad_clip=float(grad_clip),
+            accumulate_grad_batches=int(accumulate),
+        )
+    return _resolve(dict(update_rule_spec), category="update_rule")
+
+
+def _build_accelerator_from_cfg(cfg: RootConfig) -> Any:
+    """AMP / Accelerator. ``mixed_precision: 'no'`` keeps the no-AMP raw path."""
+    mp = cfg.engine.mixed_precision if cfg.engine is not None else "no"
+    accumulate = cfg.trainer.accumulate if cfg.trainer is not None else 1
+    return build_accelerator(str(mp), gradient_accumulation_steps=int(accumulate))
+
+
+def _build_engine(
+    cfg: RootConfig,
+    *,
+    update_rule: Any,
+    loss_fn: Any,
+    accelerator: Any,
+) -> Any:
+    """Build the engine. ``standard`` is direct; others dispatch via registry."""
+    engine_name = cfg.engine.name if cfg.engine is not None else "standard"
+    if engine_name == "standard":
+        return StandardEngine(
+            update_rule=update_rule,
+            loss_fn=loss_fn,
+            accelerator=accelerator,
+        )
+    engine_cls = _registry_get("engine", engine_name)
+    engine_kwargs: dict[str, Any] = {
+        "update_rule": update_rule,
+        "loss_fn": loss_fn,
+        "accelerator": accelerator,
+    }
+    # Forward every non-name field of cfg.engine as a kwarg (e.g. resident_layers
+    # / prefetch / storage / pin_memory). Unknown kwargs raise TypeError.
+    if cfg.engine is not None:
+        engine_raw = cfg.engine.model_dump() if hasattr(cfg.engine, "model_dump") else dict(cfg.engine)
+        for k, v in engine_raw.items():
+            if k in ("name", "mixed_precision", "update_rule"):
+                continue
+            engine_kwargs.setdefault(k, v)
+    return engine_cls(**engine_kwargs)
+
+
+def _build_trainer(
+    cfg: RootConfig,
+    *,
+    engine: Any,
+    data_module: Any,
+    optimizer: Any,
+    scheduler: Any,
+    callbacks: list[Any],
+    logger: LoggerBus,
+    ckpt_manager: Any,
+    model: Any,
+    models: dict[str, Any],
+    optimizers: dict[str, Any],
+    device: Any,
+) -> tuple[Any, str]:
+    """Resolve + construct the trainer (kwarg forwarding, reward adapter, sig filter)."""
+    trainer_name = cfg.trainer.name if cfg.trainer is not None else "pretrain"
+    # Keystone migration: the five offline-preference trainers collapsed into one
+    # ``preference`` trainer; the algorithm is now the ``loss:`` seam.
+    if trainer_name in _REMOVED_PREFERENCE_TRAINERS:
+        raise ConfigError(
+            f"trainer `{trainer_name}` was removed. The offline-preference trainers "
+            "(dpo/ipo/simpo/orpo/kto) are now one `preference` trainer; select the "
+            f"algorithm via the loss seam:\n"
+            f"    trainer: {{ name: preference, ... }}\n"
+            f"    loss:    {{ name: {trainer_name}, ... }}   # move beta/gamma/lam here"
+        )
+    trainer_cls = _registry_get("trainer", trainer_name)
+
+    trainer_kwargs: dict[str, Any] = {
+        "engine": engine,
+        "data_module": data_module,
+        "optimizer": optimizer,
+        "scheduler": scheduler,
+        "callbacks": callbacks,
+        "logger": logger,
+        "ckpt_manager": ckpt_manager,
+        "max_steps": int(cfg.trainer.max_steps) if cfg.trainer else 1000,
+        "val_every": int(cfg.trainer.val_every) if cfg.trainer else 0,
+        "ckpt_every": int(cfg.trainer.ckpt_every) if cfg.trainer else 500,
+        "log_every": int(cfg.trainer.log_every) if cfg.trainer else 50,
+        "model": model,
+        "models": models,
+        "optimizers": optimizers,
+        "device": device,
+    }
+
+    # Forward trainer-specific recipe fields (rollout_steps, ppo_epochs, beta, …).
+    # ``grad_clip`` is forwarded; the signature filter drops it for trainers that
+    # don't declare it. ``accumulate`` stays runtime-only (engine-layer field).
+    _RUNTIME_ONLY = {
+        "name", "max_steps", "val_every", "ckpt_every", "log_every", "accumulate",
+    }
+    if cfg.trainer is not None:
+        trainer_raw = (
+            cfg.trainer.model_dump()
+            if hasattr(cfg.trainer, "model_dump")
+            else dict(cfg.trainer)
+        )
+        for k, v in trainer_raw.items():
+            if k not in _RUNTIME_ONLY:
+                trainer_kwargs.setdefault(k, v)
+        # Resolve trainer.arch_profile (str → ArchitectureProfile).
+        _arch_profile = _build_arch_profile(cfg)
+        if _arch_profile is not None:
+            trainer_kwargs["arch_profile"] = _arch_profile
+
+    # Build judge and wrap as a tensor-aware reward_fn for RL trainers, via a
+    # registrable judge->reward adapter (F2).
+    judge = _build_judge(cfg)
+    if judge is not None and trainer_name in ("ppo", "grpo"):
+        from ..config._exceptions import ConfigResolveError as _ConfigResolveError
+
+        reward_kind = getattr(judge, "reward_kind", "pointwise")
+        adapter_spec = _to_dict(getattr(cfg, "reward_adapter", None)) or {"name": reward_kind}
+        try:
+            adapter = _resolve(
+                {**adapter_spec, "judge": judge, "tokenizer": data_module.tokenizer},
+                category="reward_adapter",
+            )
+        except Exception as exc:  # registry miss / construction error
+            raise _ConfigResolveError(
+                f"no usable reward_adapter for judge {type(judge).__name__!r} "
+                f"(reward_kind={reward_kind!r}): {exc}. Register a "
+                f"'{reward_kind}' reward_adapter, or set `reward_adapter:` in the "
+                f"recipe. (A 'pairwise' adapter is a deferred feature — see "
+                f"lighttrain/builtin_plugins/rl/reward_adapters.py.)"
+            ) from exc
+        trainer_kwargs["reward_fn"] = adapter
+
+    # VAR_KEYWORD detection: trainers with **kwargs (DPO/ORPO/…) accept all
+    # remaining trainer_kwargs; trainers without (PPO/GRPO) are signature-filtered.
+    _sig = inspect.signature(trainer_cls.__init__)
+    _has_var_kw = any(
+        p.kind == inspect.Parameter.VAR_KEYWORD
+        for p in _sig.parameters.values()
+    )
+    if _has_var_kw:
+        trainer = trainer_cls(**trainer_kwargs)
+    else:
+        _accepted = set(_sig.parameters) - {"self"}
+        trainer = trainer_cls(**{k: v for k, v in trainer_kwargs.items()
+                                 if k in _accepted})
+    return trainer, trainer_name
+
+
+def _wire_trainer_context(
+    trainer: Any,
+    *,
+    model: Any,
+    engine: Any,
+    recipe_objective: Any,
+    obj_source: str,
+    trainer_name: str,
+    accelerator: Any,
+    lineage_store: Any,
+    run_dir: Path,
+    cfg: RootConfig,
+    parallel_ctx: ParallelContext,
+    grad_sync: Any | None,
+    callbacks: list[Any],
+) -> Any:
+    """Wire ctx components the trainer didn't take in __init__; returns loss_fn."""
+    ctx: StepContext = trainer.ctx
+    ctx.model = model
+    # Bind the canonical objective to the trainer (resolving its default
+    # post-construction) and enforce the consume/require contract both ways.
+    loss_fn = _wire_objective(trainer, engine, recipe_objective, obj_source, trainer_name)
+    ctx.accelerator = accelerator
+    ctx.lineage_store = lineage_store
+    ctx.run_id = run_dir.name
+    # Diagnostics callbacks (nan_hunter, frozen_step, crash_bundle, …) read these.
+    ctx.run_dir = run_dir
+    ctx.mode = str(getattr(cfg, "mode", "lab") or "lab")
+    # Distributed fields — always set; single-GPU uses the defaults.
+    ctx.parallel_ctx = parallel_ctx
+    ctx.grad_sync = grad_sync
+    # Stash run_dir on the trainer so LineageRecorderCallback can read it.
+    try:
+        trainer._run_dir = run_dir  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    # Auto-attach default lab-mode callbacks (land at the *end* of the list so
+    # user-declared ones still see their events first).
+    _auto_attach_m4_callbacks(cfg, trainer, callbacks)
+    return loss_fn
+
+
 def setup_run_from_config(
     config: str | Path | RootConfig,
     *,
@@ -640,202 +1080,58 @@ def setup_run_from_config(
     scheduler, loss_fn, callbacks, logger, ckpt_manager, engine, accelerator,
     trainer.  Caller decides whether to ``trainer.fit()``.
     """
-    # Unconditional (before the path/RootConfig branch): covers the RootConfig
-    # branch that bypasses load_config; the path branch's load_config also does
-    # it, but the _DONE guard makes the second call ~free. Order: built-ins here,
-    # user_modules imported by load_config / the bypass branch below.
-    import_all_components()
-    if isinstance(config, (str, Path)):
-        config_path: Path | None = Path(config)
-        snapshot_yaml = config_path.read_text(encoding="utf-8")
-        # load_config is the chokepoint — it already imports cfg.user_modules.
-        cfg = load_config(config_path, overrides=overrides or [])
-    else:
-        if not isinstance(config, RootConfig):
-            raise TypeError(
-                "config must be a str/Path to a YAML file or a parsed "
-                f"RootConfig; got {type(config).__name__}."
-            )
-        if overrides:
-            raise ValueError(
-                "Cannot apply `overrides` to an already-parsed RootConfig. "
-                "Pass a config path instead, or apply overrides via "
-                "load_config() before calling setup_run_from_config()."
-            )
-        cfg = config
-        config_path = None
-        snapshot_yaml = OmegaConf.to_yaml(OmegaConf.create(cfg.model_dump()))
-        # This branch bypasses load_config: a RootConfig may have been hand-built
-        # without going through the chokepoint, so import its user_modules here
-        # (idempotent — free if load_config already ran).
-        _import_user_modules(list(getattr(cfg, "user_modules", None) or []))
-    if mode is not None:
-        cfg.mode = _validate_mode_override(mode)  # type: ignore[union-attr]
-
-    seed_everything(int(cfg.seed))
-
-    resolved_yaml = OmegaConf.to_yaml(OmegaConf.create(cfg.model_dump()))
+    cfg, config_path, snapshot_yaml, resolved_yaml = _resolve_config(config, overrides, mode)
     if print_config_only:
         return {"cfg": cfg, "resolved_yaml": resolved_yaml}
 
-    # Parallel-config preflight — validate before any run-dir / snapshot side
-    # effects so a pure-config error (sp/ep not wired, a missing TP block, or an
-    # unknown pipeline schedule) fails cleanly without polluting ``runs/``.
-    # Resolving here (rather than at apply time) also means the precise
-    # ConfigError beats _init_parallel's generic "RANK expected" when running
-    # without a launcher.
-    mp_strategy = _build_model_parallel_strategy(cfg)
-    pipeline_schedule = _build_pipeline_schedule(cfg)
+    # Parallel-config preflight runs *before* any run-dir side effects so a
+    # pure-config error never pollutes ``runs/``.
+    mp_strategy, pipeline_schedule = _preflight_parallel(cfg)
+    run_dir = _prepare_run_dir(
+        cfg,
+        config_path=config_path,
+        snapshot_yaml=snapshot_yaml,
+        resolved_yaml=resolved_yaml,
+        existing_run_dir=existing_run_dir,
+    )
 
-    if existing_run_dir is not None:
-        run_dir = Path(existing_run_dir)
-        if not run_dir.exists():
-            raise FileNotFoundError(f"existing_run_dir {run_dir} does not exist")
-        # Don't rewrite snapshot/resolved/env — original run owns them. Resume
-        # is supposed to be additive.
-    else:
-        run_dir = make_run_dir(
-            cfg.run_root,
-            cfg.exp,
-            slug=slugify(cfg.exp),
-            snapshot_yaml=snapshot_yaml,
-            resolved_yaml=resolved_yaml,
-            extra_env={
-                "lighttrain_version": __version__,
-                "config_path": (
-                    str(config_path) if config_path is not None
-                    else "<in-memory RootConfig>"
-                ),
-            },
-        )
-        # Code snapshot: best-effort; failures degrade to writing a plain
-        # ``code_snapshot_pointer.txt`` pointing to run_dir.
-        try:
-            from ..utils.code_snapshot import capture_code_snapshot
-
-            user_mods = getattr(cfg, "user_modules", None) or []
-            capture_code_snapshot(run_dir, user_modules=list(user_mods))
-        except Exception:  # noqa: BLE001 — must never block a training start
-            import warnings
-
-            warnings.warn("code snapshot failed (see logs); continuing without it", stacklevel=2)
-
-    # Phase A: distributed topology. The parallel-config preflight (mp_strategy /
-    # pipeline_schedule) already ran above, before the run dir was created.
-    # _init_parallel returns single_gpu() when cfg.parallel is absent,
-    # so all downstream code is topology-agnostic.
+    # Phase A: distributed topology (single_gpu() when cfg.parallel is absent).
     parallel_ctx = _init_parallel(cfg)
     device = parallel_ctx.local_device
+    lineage_store = _open_lineage_store(run_dir)
 
-    # ----- lineage store --------------------------------------------------
-    # Soft dependency. Per-run SQLite only — global aggregate is a
-    # documented hook on RootConfig.lineage.global_db.
-    lineage_store = None
-    try:
-        from ..lineage.store import LineageStore as _LineageStore
-
-        lineage_store = _LineageStore(run_dir / "lineage.sqlite")
-    except Exception:
-        lineage_store = None
-
-    # Normalise model/optimizer declaration into the internal set form. Single
-    # entry point — a lone model:/optim: desugars to a one-entry set, so the
-    # primary path below is bit-identical for single-model recipes.
+    # Normalise model/optimizer declaration into the internal set form (a lone
+    # model:/optim: desugars to a one-entry set).
     models_cfg, optimizers_cfg = normalize_model_set(cfg)
-    # The "primary" trainable model goes through model surgery / PP / grad_sync
-    # and is exposed as ``model=``; any further trainable models (Axis-B —
-    # GAN/actor-critic) get their own optimizer on the single-GPU path below.
-    # ``primary_trainable`` is the single owner of "first trainable + no-trainable
-    # error" (shared with build_primary_model).
     _primary_name, _primary_entry = primary_trainable(models_cfg)
     _n_trainable = sum(1 for e in models_cfg.values() if e["trainable"])
 
-    def _optim_spec_for(entry: dict[str, Any]) -> Any:
-        spec = optim_spec_for(entry, optimizers_cfg)
-        if spec is None:
-            raise RuntimeError(
-                "recipe is missing an optimizer for a trainable model "
-                "(declare `optim:` or `optimizers:` and reference it via the "
-                "entry's `optimizer:` field)."
-            )
-        return spec
-
-    # Phase B: model surgery (TP/SP/EP) — must run on bare model before FSDP/DDP.
-    # ``mp_strategy`` was resolved in the Phase-A preflight above.
-    model = _resolve(_primary_entry["spec"], category="model")
-    if mp_strategy is not None:
-        try:
-            model = mp_strategy.apply(model, parallel_ctx)
-        except ConfigError:
-            raise
-        except Exception as exc:  # apply failed (e.g. missing device_mesh)
-            raise ConfigError(f"tensor-parallel apply failed: {exc}") from exc
-
-    # Phase C: pipeline splitting (PP) — after TP surgery, before DP wrap.
-    # Requires builtin_plugins/distributed/. PP is fail-loud: a requested pp>1 that
-    # cannot be applied raises ConfigError rather than silently no-op'ing.
-    # ``pipeline_schedule`` was resolved in the Phase-A preflight above.
-    if pipeline_schedule is not None:
-        try:
-            model = pipeline_schedule.prepare(model, parallel_ctx)
-        except ConfigError:
-            raise
-        except Exception as exc:  # prepare failed
-            raise ConfigError(
-                f"pipeline parallel (pp={int(getattr(cfg.parallel, 'pp', 1))}) "
-                f"failed to prepare: {exc}"
-            ) from exc
-
-    # Phase D: gradient-sync wrap (DDP/FSDP/ZeRO).
-    # When grad_sync is None (single-GPU / noop), fall back to the plain path.
-    grad_sync = _build_grad_sync_strategy(cfg)
-    _primary_optim = _optim_spec_for(_primary_entry)
-    if grad_sync is not None and _n_trainable > 1:
-        raise ConfigError(
-            "multiple trainable models + a gradient-sync strategy (distributed "
-            "Axis-B) is not supported yet; multi-optimizer training is single-GPU "
-            "for now."
-        )
-    if grad_sync is not None:
-        def optimizer_factory(m: torch.nn.Module) -> Any:
-            return _build_optimizer_for(_primary_optim, m)
-
-        data_module = _build_data(
-            cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
-        )
-        _raw_loader = data_module.train_loader()
-        model, optimizer, _loader = grad_sync.prepare(
-            model, optimizer_factory, _raw_loader, parallel_ctx, device=device
-        )
-        # scheduler is built against the (possibly-wrapped) optimizer
-        scheduler = _build_scheduler(cfg, optimizer)
-    else:
-        model = model.to(device)
-        data_module = _build_data(
-            cfg, run_dir=run_dir, allow_stale_artifact=allow_stale_artifact
-        )
-        optimizer = _build_optimizer_for(_primary_optim, model)
-        scheduler = _build_scheduler(cfg, optimizer)
-
-    # Build the rest of the model set: frozen aux models (Axis A — teacher/ref/
-    # EMA) and any further TRAINABLE models with their own optimizer (Axis B —
-    # GAN/actor-critic). The primary's optimizer is keyed by ``optimizers``;
-    # each additional trainable entry gets its own (per-entry pairing).
-    models: dict[str, Any] = {_primary_name: model}
-    optimizers: dict[str, Any] = {_primary_name: optimizer}
-    for _name, _entry in models_cfg.items():
-        if _name == _primary_name:
-            continue
-        _aux = _resolve(_entry["spec"], category="model").to(device)
-        if _entry["checkpoint"]:
-            _load_state_dict_into(_aux, str(_entry["checkpoint"]))
-        if _entry["trainable"]:
-            optimizers[_name] = _build_optimizer_for(_optim_spec_for(_entry), _aux)
-        else:
-            for _p in _aux.parameters():
-                _p.requires_grad_(False)
-            _aux.eval()
-        models[_name] = _aux
+    model = _build_primary_model(
+        cfg,
+        _primary_entry,
+        mp_strategy=mp_strategy,
+        pipeline_schedule=pipeline_schedule,
+        parallel_ctx=parallel_ctx,
+    )
+    _primary_optim = _require_optim_spec(_primary_entry, optimizers_cfg)
+    model, optimizer, scheduler, data_module, grad_sync = _build_trainable_core(
+        cfg,
+        model,
+        primary_optim_spec=_primary_optim,
+        n_trainable=_n_trainable,
+        parallel_ctx=parallel_ctx,
+        device=device,
+        run_dir=run_dir,
+        allow_stale_artifact=allow_stale_artifact,
+    )
+    models, optimizers = _build_aux_models(
+        models_cfg,
+        optimizers_cfg,
+        primary_name=_primary_name,
+        primary_model=model,
+        primary_optimizer=optimizer,
+        device=device,
+    )
 
     # The single canonical seam. ``recipe_objective`` may be None (neither
     # loss: nor objective: given) — the trainer's ``default_objective()`` then
@@ -847,181 +1143,43 @@ def setup_run_from_config(
     logger = _build_logger(cfg, run_dir)
     ckpt_manager = CheckpointManager(run_dir)
 
-    update_rule_spec = (
-        cfg.engine.update_rule if cfg.engine is not None else {"name": "standard"}
-    )
-    if isinstance(update_rule_spec, Mapping) and update_rule_spec.get("name") == "standard":
-        accumulate = cfg.trainer.accumulate if cfg.trainer is not None else 1
-        grad_clip = cfg.trainer.grad_clip if cfg.trainer is not None else 1.0
-        update_rule = StandardUpdateRule(
-            grad_clip=float(grad_clip),
-            accumulate_grad_batches=int(accumulate),
-        )
-    else:
-        update_rule = _resolve(dict(update_rule_spec), category="update_rule")
+    update_rule = _build_update_rule(cfg)
+    accelerator = _build_accelerator_from_cfg(cfg)
 
-    # AMP / Accelerator. ``mixed_precision: 'no'`` short-circuits to ``None``
-    # so the no-AMP path stays raw torch.
-    mp = cfg.engine.mixed_precision if cfg.engine is not None else "no"
-    accumulate = cfg.trainer.accumulate if cfg.trainer is not None else 1
-    accelerator = build_accelerator(
-        str(mp), gradient_accumulation_steps=int(accumulate)
+    engine = _build_engine(
+        cfg, update_rule=update_rule, loss_fn=loss_fn, accelerator=accelerator
     )
 
-    # engine.name dispatches via the registry so plug-ins like
-    # ``layer_offload`` can replace the engine without touching the runtime.
-    # ``standard`` keeps the direct construction path.
-    engine_name = cfg.engine.name if cfg.engine is not None else "standard"
-    if engine_name == "standard":
-        engine = StandardEngine(
-            update_rule=update_rule,
-            loss_fn=loss_fn,
-            accelerator=accelerator,
-        )
-    else:
-        engine_cls = _registry_get("engine", engine_name)
-        engine_kwargs: dict[str, Any] = {
-            "update_rule": update_rule,
-            "loss_fn": loss_fn,
-            "accelerator": accelerator,
-        }
-        # Forward every non-name field of cfg.engine as a kwarg (e.g.
-        # resident_layers / prefetch / storage / pin_memory). The engine
-        # constructor decides what to accept; unknown kwargs raise TypeError.
-        if cfg.engine is not None:
-            engine_raw = cfg.engine.model_dump() if hasattr(cfg.engine, "model_dump") else dict(cfg.engine)
-            for k, v in engine_raw.items():
-                if k in ("name", "mixed_precision", "update_rule"):
-                    continue
-                engine_kwargs.setdefault(k, v)
-        engine = engine_cls(**engine_kwargs)
-
-    trainer_name = cfg.trainer.name if cfg.trainer is not None else "pretrain"
-    # Keystone migration (step 2): the five offline-preference trainers collapsed
-    # into one ``preference`` trainer; the algorithm is now the ``loss:`` seam.
-    if trainer_name in _REMOVED_PREFERENCE_TRAINERS:
-        raise ConfigError(
-            f"trainer `{trainer_name}` was removed. The offline-preference trainers "
-            "(dpo/ipo/simpo/orpo/kto) are now one `preference` trainer; select the "
-            f"algorithm via the loss seam:\n"
-            f"    trainer: {{ name: preference, ... }}\n"
-            f"    loss:    {{ name: {trainer_name}, ... }}   # move beta/gamma/lam here"
-        )
-    trainer_cls = _registry_get("trainer", trainer_name)
-
-    trainer_kwargs: dict[str, Any] = {
-        "engine": engine,
-        "data_module": data_module,
-        "optimizer": optimizer,
-        "scheduler": scheduler,
-        "callbacks": callbacks,
-        "logger": logger,
-        "ckpt_manager": ckpt_manager,
-        "max_steps": int(cfg.trainer.max_steps) if cfg.trainer else 1000,
-        "val_every": int(cfg.trainer.val_every) if cfg.trainer else 0,
-        "ckpt_every": int(cfg.trainer.ckpt_every) if cfg.trainer else 500,
-        "log_every": int(cfg.trainer.log_every) if cfg.trainer else 50,
-        "model": model,
-        "models": models,
-        "optimizers": optimizers,
-        "device": device,
-    }
-
-    # Forward trainer-specific recipe fields (rollout_steps, ppo_epochs, beta, …).
-    # ``grad_clip`` is forwarded (ppo/grpo/preference/rm/online_distill declare it
-    # and must receive it; the signature filter drops it for trainers that don't,
-    # and the StandardUpdateRule still reads it off cfg.trainer for the standard
-    # path). ``accumulate`` stays runtime-only — it's an engine-layer field no
-    # trainer constructor accepts (forwarding it would break **kwargs trainers
-    # that relay to the base ``Trainer.__init__``).
-    _RUNTIME_ONLY = {
-        "name", "max_steps", "val_every", "ckpt_every", "log_every", "accumulate",
-    }
-    if cfg.trainer is not None:
-        trainer_raw = (
-            cfg.trainer.model_dump()
-            if hasattr(cfg.trainer, "model_dump")
-            else dict(cfg.trainer)
-        )
-        for k, v in trainer_raw.items():
-            if k not in _RUNTIME_ONLY:
-                trainer_kwargs.setdefault(k, v)
-        # Resolve trainer.arch_profile (str → ArchitectureProfile), overriding the
-        # raw-string passthrough above so the stateful-reset path actually triggers.
-        _arch_profile = _build_arch_profile(cfg)
-        if _arch_profile is not None:
-            trainer_kwargs["arch_profile"] = _arch_profile
-
-    # Build judge and wrap as a tensor-aware reward_fn for RL trainers, via a
-    # registrable judge->reward adapter (F2). The judge declares its reward_kind
-    # ("pointwise" by default); a recipe `reward_adapter:` overrides it. Any
-    # registered pointwise judge can back an RL reward — no isinstance whitelist.
-    judge = _build_judge(cfg)
-    if judge is not None and trainer_name in ("ppo", "grpo"):
-        from ..config._exceptions import ConfigResolveError as _ConfigResolveError
-
-        reward_kind = getattr(judge, "reward_kind", "pointwise")
-        adapter_spec = _to_dict(getattr(cfg, "reward_adapter", None)) or {"name": reward_kind}
-        try:
-            adapter = _resolve(
-                {**adapter_spec, "judge": judge, "tokenizer": data_module.tokenizer},
-                category="reward_adapter",
-            )
-        except Exception as exc:  # registry miss / construction error
-            raise _ConfigResolveError(
-                f"no usable reward_adapter for judge {type(judge).__name__!r} "
-                f"(reward_kind={reward_kind!r}): {exc}. Register a "
-                f"'{reward_kind}' reward_adapter, or set `reward_adapter:` in the "
-                f"recipe. (A 'pairwise' adapter is a deferred feature — see "
-                f"lighttrain/builtin_plugins/rl/reward_adapters.py.)"
-            ) from exc
-        trainer_kwargs["reward_fn"] = adapter
-
-    # VAR_KEYWORD detection: trainers with **kwargs (DPO/ORPO/…) accept all
-    # remaining trainer_kwargs; trainers without (PPO/GRPO) are filtered by
-    # their explicit signature.
-    _sig = inspect.signature(trainer_cls.__init__)
-    _has_var_kw = any(
-        p.kind == inspect.Parameter.VAR_KEYWORD
-        for p in _sig.parameters.values()
+    trainer, trainer_name = _build_trainer(
+        cfg,
+        engine=engine,
+        data_module=data_module,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        callbacks=callbacks,
+        logger=logger,
+        ckpt_manager=ckpt_manager,
+        model=model,
+        models=models,
+        optimizers=optimizers,
+        device=device,
     )
-    if _has_var_kw:
-        trainer = trainer_cls(**trainer_kwargs)
-    else:
-        _accepted = set(_sig.parameters) - {"self"}
-        trainer = trainer_cls(**{k: v for k, v in trainer_kwargs.items()
-                                 if k in _accepted})
 
-    # Wire ctx components the trainer didn't take in __init__.
-    ctx: StepContext = trainer.ctx
-    ctx.model = model
-    # Bind the canonical objective to the trainer (resolving its default
-    # post-construction) and enforce the consume/require contract both ways.
-    # Sets trainer.objective / ctx.loss_fn / engine.loss_fn for consuming
-    # trainers; leaves them None for inline ones. Returns the final loss_fn.
-    loss_fn = _wire_objective(trainer, engine, recipe_objective, _obj_source, trainer_name)
-    ctx.accelerator = accelerator
-    ctx.lineage_store = lineage_store
-    ctx.run_id = run_dir.name
-    # Diagnostics callbacks (nan_hunter, frozen_step, crash_bundle,
-    # loss_attribution, file_signals) all read these off ctx.
-    ctx.run_dir = run_dir
-    ctx.mode = str(getattr(cfg, "mode", "lab") or "lab")
-    # Distributed fields — always set; single-GPU uses the defaults.
-    ctx.parallel_ctx = parallel_ctx
-    ctx.grad_sync = grad_sync
-    # Stash run_dir on the trainer so LineageRecorderCallback can read it.
-    try:
-        trainer._run_dir = run_dir  # type: ignore[attr-defined]
-    except Exception:
-        pass
-
-    # Auto-attach default callbacks when running in lab mode and the user
-    # hasn't explicitly opted out. The cfg.diagnostics / cfg.invariants /
-    # cfg.realtime_control blocks may carry overrides. All auto-attached
-    # callbacks land at the *end* of the callback list so user-declared
-    # ones still see their events first.
-    _auto_attach_m4_callbacks(cfg, trainer, callbacks)
+    loss_fn = _wire_trainer_context(
+        trainer,
+        model=model,
+        engine=engine,
+        recipe_objective=recipe_objective,
+        obj_source=_obj_source,
+        trainer_name=trainer_name,
+        accelerator=accelerator,
+        lineage_store=lineage_store,
+        run_dir=run_dir,
+        cfg=cfg,
+        parallel_ctx=parallel_ctx,
+        grad_sync=grad_sync,
+        callbacks=callbacks,
+    )
 
     return {
         "cfg": cfg,
@@ -1087,7 +1245,7 @@ def build_prep_runner(
         store_root=store_root,
         workers=workers,
         console=console,
-        pool_kind=pool_kind,
+        pool_kind=pool_kind,  # type: ignore[arg-type]
     )
     return {
         "cfg": cfg,

@@ -161,7 +161,6 @@ module = [
     "lighttrain.builtin_plugins.trainers.ppo",
     "lighttrain.builtin_plugins.trainers.rm",
     "lighttrain.cli._produce",
-    "lighttrain.cli._runtime",
     "lighttrain.config._loader",
     "lighttrain.data.cache._shards",
     "lighttrain.diagnostics.oom_report",

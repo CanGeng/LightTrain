@@ -303,3 +303,50 @@ def test_setup_run_tp_misconfig_raises_configerror_not_rank(tmp_path: Path):
     with pytest.raises(ConfigError, match="tensor_parallel"):
         setup_run_from_config(cfg)
     assert not run_root.exists(), "invalid parallel config must not create a run dir"
+
+
+# ---------------------------------------------------------------------------
+# Return-contract guardrail (P2 extraction): exact key set for BOTH return
+# paths, so splitting setup_run_from_config into stages can't silently drop or
+# add a programmatic-API key.
+# ---------------------------------------------------------------------------
+
+_REPO = Path(__file__).resolve().parent.parent.parent
+_RECIPE = _REPO / "recipes" / "pretrain_causal.yaml"
+
+_BUNDLE_KEYS = {
+    "cfg", "resolved_yaml", "run_dir", "model", "data", "optimizer", "scheduler",
+    "loss_fn", "callbacks", "logger", "ckpt_manager", "engine", "accelerator",
+    "trainer", "device", "lineage_store", "parallel_ctx", "grad_sync",
+}
+
+
+@pytest.mark.skipif(not _RECIPE.exists(), reason="pretrain_causal.yaml missing")
+def test_setup_run_from_config_print_only_keyset(tmp_path: Path):
+    """``print_config_only`` returns ONLY {cfg, resolved_yaml} (early-return)."""
+    out = setup_run_from_config(
+        _RECIPE,
+        overrides=[f"++run_root={tmp_path.as_posix()}"],
+        print_config_only=True,
+    )
+    assert set(out) == {"cfg", "resolved_yaml"}
+
+
+@pytest.mark.skipif(not _RECIPE.exists(), reason="pretrain_causal.yaml missing")
+def test_setup_run_from_config_bundle_keyset(tmp_path: Path):
+    """The full bundle returns exactly the documented programmatic-API key set."""
+    bundle = setup_run_from_config(
+        _RECIPE,
+        overrides=[
+            f"++run_root={tmp_path.as_posix()}",
+            "++trainer.max_steps=1",
+            "++trainer.val_every=0",
+            "++trainer.ckpt_every=0",
+            "++logger=[{name: jsonl}]",
+        ],
+    )
+    try:
+        assert set(bundle) == _BUNDLE_KEYS
+    finally:
+        if bundle.get("logger") is not None:
+            bundle["logger"].close()
