@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.builtin_plugins.artifacts.store``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.data.artifacts.store``.
 
 Three backends — ``safetensors-shards``, ``memmap-fixed``, ``parquet-rows`` —
 each parametrized in the common tests and given backend-specific tests for
@@ -27,7 +27,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.artifacts import (
+from lighttrain.builtin_plugins.data.artifacts import (
     ArtifactHeader,
     ArtifactIncompleteError,
     MemmapFixedStore,

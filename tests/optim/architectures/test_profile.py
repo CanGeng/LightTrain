@@ -1,5 +1,5 @@
 """Adversarial tests for ``lighttrain.optim.architectures.profile`` /
-``lighttrain.builtin_plugins.architectures.transformer``.
+``lighttrain.builtin_plugins.optim.architectures.transformer``.
 
 Layered on top of the flat ``tests/test_architectures_profile.py`` smoke
 tests (which cover the happy path: ``embed_tokens`` + ``layers`` + ``lm_head``).
@@ -26,7 +26,7 @@ from __future__ import annotations
 import pytest
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.architectures.transformer import (
+from lighttrain.builtin_plugins.optim.architectures.transformer import (
     _transformer_blocks,
     _transformer_embedding,
     _transformer_head,

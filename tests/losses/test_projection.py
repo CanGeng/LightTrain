@@ -164,7 +164,7 @@ def test_projection_registered_with_optimizer_via_standard_update_rule():
             projection params as a new optimizer param group and ``step()``
             actually updates them.
     """
-    from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
+    from lighttrain.builtin_plugins.engine.update_rules.standard import StandardUpdateRule
     from lighttrain.callbacks.base import EventBus
     from lighttrain.engine._context import StepContext
 

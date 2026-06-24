@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.builtin_plugins.logging_backends.jsonl.JSONLLogger``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.callbacks.logging.jsonl.JSONLLogger``.
 
 Layered on top of one round-trip smoke test in ``tests/test_logging_bus.py``.
 New coverage:
@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from lighttrain.builtin_plugins.logging_backends.jsonl import JSONLLogger, _coerce
+from lighttrain.builtin_plugins.callbacks.logging.jsonl import JSONLLogger, _coerce
 from tests._diagnostics import expect_exists
 
 # ---------------------------------------------------------------------------

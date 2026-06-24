@@ -1,7 +1,7 @@
 """Tests for TinyRWKV architecture (M7)."""
 import torch
 
-from lighttrain.builtin_plugins.architectures.rwkv import (
+from lighttrain.builtin_plugins.optim.architectures.rwkv import (
     TinyRWKVConfig,
     TinyRWKVModel,
     rwkv_profile,

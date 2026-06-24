@@ -1,4 +1,4 @@
-"""Tests for ``lighttrain.builtin_plugins.logging_backends.console.ConsoleLogger``.
+"""Tests for ``lighttrain.builtin_plugins.callbacks.logging.console.ConsoleLogger``.
 
 Layered alongside ``tests/callbacks/logging/test_bus.py`` (LoggerBus fan-out)
 and ``tests/callbacks/logging/test_jsonl_backend.py`` (JSONL records). This
@@ -10,7 +10,7 @@ the LoggerBus and JSONL portions are already subsumed by the sibling mirrors).
 
 from __future__ import annotations
 
-from lighttrain.builtin_plugins.logging_backends.console import ConsoleLogger
+from lighttrain.builtin_plugins.callbacks.logging.console import ConsoleLogger
 
 
 def test_invariant_console_backend_throttles_to_log_every(capsys):

@@ -15,11 +15,11 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.artifacts import (
+from lighttrain.builtin_plugins.data.artifacts import (
     ModelForwardProducer,
     SafetensorsShardStore,
 )
-from lighttrain.builtin_plugins.artifacts.producer import _coerce_model_output
+from lighttrain.builtin_plugins.data.artifacts.producer import _coerce_model_output
 from lighttrain.protocols import ModelOutput
 from tests._diagnostics import expect_exists
 
@@ -230,7 +230,7 @@ def test_producer_writes_topk_extra_and_hidden_states(tmp_path: Path) -> None:
         * ``hidden_states_layers`` has leading dim == n_layers + 1 (2 blocks +
           1 embedding layer = 3).
     """
-    from lighttrain.builtin_plugins.artifacts import open_artifact_store
+    from lighttrain.builtin_plugins.data.artifacts import open_artifact_store
     from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
     from lighttrain.models.extras import ExtraOutputSpec
 

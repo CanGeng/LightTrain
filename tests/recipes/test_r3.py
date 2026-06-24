@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.artifacts import (
+from lighttrain.builtin_plugins.data.artifacts import (
     ArtifactJoinedDataset,
     ModelForwardProducer,
     open_artifact_store,
@@ -23,7 +23,7 @@ from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from lighttrain.builtin_plugins.losses.core import CompositeLoss
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper
-from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
+from lighttrain.builtin_plugins.engine.update_rules.standard import StandardUpdateRule
 from lighttrain.callbacks.base import EventBus
 from lighttrain.engine._context import StepContext
 from lighttrain.models.extras import ExtraOutputSpec

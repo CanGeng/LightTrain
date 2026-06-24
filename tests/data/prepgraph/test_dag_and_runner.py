@@ -24,7 +24,7 @@ import pytest
 from lighttrain.builtin_plugins.data import (
     processors as _processors,  # noqa: F401 — registry side-effect
 )
-from lighttrain.builtin_plugins.prepgraph import (
+from lighttrain.builtin_plugins.data.prepgraph import (
     nodes as _nodes,  # noqa: F401 — registry side-effect
 )
 from lighttrain.data.prepgraph._fp import SCHEMA_VERSION

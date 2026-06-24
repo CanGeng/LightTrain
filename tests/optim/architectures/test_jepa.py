@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.builtin_plugins.architectures.jepa``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.optim.architectures.jepa``.
 
 Coverage beyond ``tests/test_architectures_jepa.py``:
 
@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.builtin_plugins.architectures.jepa import (
+from lighttrain.builtin_plugins.optim.architectures.jepa import (
     EMATargetEncoder,
     JEPAEncoder,
     JEPAModel,

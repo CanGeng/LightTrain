@@ -1,7 +1,7 @@
 """Distillation losses.
 
 All five losses read **teacher** tensors from the batch's ``aux.<namespace>.*``
-keys, populated by :class:`lighttrain.builtin_plugins.artifacts.ArtifactJoinedDataset`.
+keys, populated by :class:`lighttrain.builtin_plugins.data.artifacts.ArtifactJoinedDataset`.
 The losses never call the teacher model directly — that's the producer's job.
 
 Tensor naming convention

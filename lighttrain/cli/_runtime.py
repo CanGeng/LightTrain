@@ -17,7 +17,7 @@ import torch
 from omegaconf import OmegaConf
 
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
-from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
+from lighttrain.builtin_plugins.engine.update_rules.standard import StandardUpdateRule
 
 from .. import __version__
 from ..callbacks.logging._bus import LoggerBus

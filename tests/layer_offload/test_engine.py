@@ -19,7 +19,7 @@ import lighttrain.builtin_plugins.layer_offload  # noqa: F401
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
-from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
+from lighttrain.builtin_plugins.engine.update_rules.standard import StandardUpdateRule
 from lighttrain.callbacks.base import EventBus
 from lighttrain.engine._context import StepContext
 from lighttrain.registry import get as _registry_get

@@ -33,7 +33,7 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
-from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
+from lighttrain.builtin_plugins.engine.update_rules.rl import RLUpdateRule
 from lighttrain.callbacks.base import Signal
 from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.registry import register

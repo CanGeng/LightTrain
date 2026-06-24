@@ -9,7 +9,7 @@ import sys
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.diagnostics.nan_hunter import NanHunterCallback
+from lighttrain.builtin_plugins.observability.diagnostics.nan_hunter import NanHunterCallback
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.engine._context import StepContext

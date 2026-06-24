@@ -40,7 +40,7 @@ from typing import Any
 
 import torch
 
-from lighttrain.builtin_plugins.artifacts.store import open_artifact_store
+from lighttrain.builtin_plugins.data.artifacts.store import open_artifact_store
 from lighttrain.data.artifacts import ArtifactHeader
 from lighttrain.data.core._schema import derive_sample_id
 from lighttrain.data.prepgraph.node import NodeResult, PrepNode, RunContext
