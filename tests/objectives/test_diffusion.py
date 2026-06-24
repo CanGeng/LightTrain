@@ -86,6 +86,28 @@ def test_diffusion_noisy_x_equals_alpha_x0_plus_sigma_noise():
     torch.testing.assert_close(batch["noisy_x"], expected, atol=1e-5, rtol=1e-4)
 
 
+def test_diffusion_prepare_batch_exposes_noisy_x_noise_and_t():
+    """Goal: prepare_batch populates the keys the forward path consumes.
+
+    Invariant: ``noisy_x``, ``noise`` and ``t`` must all be present after
+    prepare_batch — the loss formula reads all three.
+    """
+    obj = DiffusionObjective(timesteps=10)
+    batch = {"x": torch.randn(4, 32)}
+    out = obj.prepare_batch(batch, step=0, device="cpu")
+    assert "noisy_x" in out and "noise" in out and "t" in out
+
+
+def test_diffusion_forward_stamps_loss_family_diffusion():
+    """Goal: forward stamps ctx.loss_family == 'diffusion' and yields finite loss."""
+    obj, batch = _seed_obj_batch(target="eps")
+    pred = torch.randn_like(batch["noise"])
+    ctx = LossContext()
+    out = obj(ModelOutput(outputs={"pred": pred}), batch, ctx)
+    assert torch.isfinite(out["loss"])
+    assert ctx.loss_family == "diffusion"
+
+
 def test_regression_diffusion_target_dispatch():
     """Regression pin for ``diffusion_target_dispatch``.
 

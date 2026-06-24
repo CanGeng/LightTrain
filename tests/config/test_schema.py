@@ -16,11 +16,60 @@ from pydantic import ValidationError
 
 from lighttrain.config import (
     ComponentSpec,
+    ConfigError,
     ConfigSchemaError,
     ParallelSection,
+    RootConfig,
     dump_resolved,
     load_config,
 )
+
+
+def test_basic_yaml_loads_into_root_config(tmp_yaml):
+    """A trivial YAML loads into a ``RootConfig`` with its fields populated.
+
+    Input: ``mode: lab, seed: 7``.
+    Expected: ``isinstance(cfg, RootConfig)``, ``cfg.mode == 'lab'``,
+    ``cfg.seed == 7``.
+    """
+    p = tmp_yaml("mode: lab\nseed: 7\n")
+    cfg = load_config(p)
+    assert isinstance(cfg, RootConfig)
+    assert cfg.mode == "lab"
+    assert cfg.seed == 7
+
+
+def test_mode_defaults_to_lab_when_absent(tmp_yaml):
+    """When ``mode`` is omitted, it defaults to ``'lab'``.
+
+    Input: ``seed: 1`` (no mode key).
+    Expected: ``cfg.mode == 'lab'``.
+    """
+    p = tmp_yaml("seed: 1\n")
+    cfg = load_config(p)
+    assert cfg.mode == "lab"
+
+
+def test_missing_file_raises_config_error():
+    """Loading a path that does not exist raises ConfigError.
+
+    Input: ``/no/such/path.yaml``.
+    Expected: ConfigError.
+    """
+    with pytest.raises(ConfigError):
+        load_config("/no/such/path.yaml")
+
+
+def test_user_modules_field_parses_without_importing(tmp_yaml):
+    """The ``user_modules`` list field parses; ``import_user_modules=False`` is
+    the escape hatch that skips importing the (fake) paths.
+
+    Input: ``user_modules: [./a.py, ./b.py]`` with import disabled.
+    Expected: ``list(cfg.user_modules) == ['./a.py', './b.py']``.
+    """
+    p = tmp_yaml("mode: lab\nuser_modules: [./a.py, ./b.py]\n")
+    cfg = load_config(p, import_user_modules=False)
+    assert list(cfg.user_modules) == ["./a.py", "./b.py"]
 
 
 def test_componentspec_xor_neither_raises():

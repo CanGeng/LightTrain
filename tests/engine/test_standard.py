@@ -195,3 +195,119 @@ def test_engine_constructor_stores_components_by_reference():
     assert engine.update_rule is rule
     assert engine.loss_fn is loss
     assert engine.accelerator is accel
+
+
+# --------------------------------------------------------------------------- #
+# End-to-end: StandardEngine + a REAL StandardUpdateRule + a toy model.       #
+# The stub-based tests above pin delegation; these pin that the wired-up      #
+# engine actually drives a training step (weights move, SKIP_STEP aborts,     #
+# accumulation holds off the optimizer) through the real update rule.         #
+# --------------------------------------------------------------------------- #
+
+import torch  # noqa: E402
+
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss  # noqa: E402
+from lighttrain.builtin_plugins.update_rules.standard import (  # noqa: E402
+    StandardUpdateRule,
+)
+from lighttrain.callbacks.base import EventBus  # noqa: E402
+from lighttrain.protocols import ModelOutput  # noqa: E402
+
+
+class _ToyLM(torch.nn.Module):
+    def __init__(self, vocab: int = 8, dim: int = 4) -> None:
+        super().__init__()
+        self.emb = torch.nn.Embedding(vocab, dim)
+        self.head = torch.nn.Linear(dim, vocab, bias=False)
+
+    def forward(self, input_ids, attention_mask=None, labels=None):
+        h = self.emb(input_ids)
+        return ModelOutput(outputs={"logits": self.head(h)})
+
+
+def _toy_batch(B: int = 2, T: int = 4, V: int = 8) -> dict[str, Any]:
+    return {
+        "input_ids": torch.randint(0, V, (B, T)),
+        "attention_mask": torch.ones(B, T, dtype=torch.long),
+        "labels": torch.randint(0, V, (B, T)),
+    }
+
+
+def test_engine_single_step_updates_params_and_reports_metrics():
+    """A wired-up engine step moves weights and surfaces loss/grad_norm/skipped.
+
+    End-to-end through the real StandardUpdateRule (not a stub): one step
+    must change ``head.weight`` and return ``loss>0``, a ``grad_norm`` key,
+    and ``skipped == 0.0``.
+    """
+    torch.manual_seed(0)
+    model = _ToyLM()
+    optim = torch.optim.AdamW(model.parameters(), lr=1e-2)
+    rule = StandardUpdateRule(grad_clip=1.0, accumulate_grad_batches=1)
+    engine = StandardEngine(update_rule=rule, loss_fn=CrossEntropyLoss())
+
+    ctx = StepContext(model=model, optimizer=optim, bus=EventBus([]))
+    ctx.loss_fn = CrossEntropyLoss()
+
+    before = model.head.weight.detach().clone()
+    metrics = engine.step(_toy_batch(), ctx)
+    after = model.head.weight.detach().clone()
+
+    assert "loss" in metrics
+    assert metrics["loss"] > 0
+    assert "grad_norm" in metrics
+    assert metrics["skipped"] == 0.0
+    assert not torch.equal(before, after)
+
+
+def test_engine_skip_step_signal_aborts_backward_end_to_end():
+    """A SKIP_STEP from ``on_loss_computed`` routed through the engine must
+    leave weights unchanged and report ``skipped == 1.0``.
+    """
+    from lighttrain.callbacks.base import Signal
+
+    torch.manual_seed(0)
+    model = _ToyLM()
+    optim = torch.optim.AdamW(model.parameters(), lr=1e-2)
+
+    class _Skipper:
+        def on_loss_computed(self, **_):
+            return Signal.SKIP_STEP
+
+    bus = EventBus([_Skipper()])
+    engine = StandardEngine(
+        update_rule=StandardUpdateRule(), loss_fn=CrossEntropyLoss()
+    )
+
+    ctx = StepContext(model=model, optimizer=optim, bus=bus)
+    ctx.loss_fn = CrossEntropyLoss()
+
+    before = model.head.weight.detach().clone()
+    metrics = engine.step(_toy_batch(), ctx)
+    after = model.head.weight.detach().clone()
+
+    assert metrics["skipped"] == 1.0
+    assert torch.equal(before, after)
+
+
+def test_engine_grad_accumulation_holds_off_optimizer_end_to_end():
+    """With ``accumulate_grad_batches=2``, the engine's first micro-step must
+    not update weights; the second (boundary) micro-step fires the optimizer.
+    """
+    torch.manual_seed(0)
+    model = _ToyLM()
+    optim = torch.optim.AdamW(model.parameters(), lr=1e-2)
+    rule = StandardUpdateRule(accumulate_grad_batches=2)
+    engine = StandardEngine(update_rule=rule, loss_fn=CrossEntropyLoss())
+
+    ctx = StepContext(model=model, optimizer=optim, bus=EventBus([]))
+    ctx.loss_fn = CrossEntropyLoss()
+
+    before = model.head.weight.detach().clone()
+    engine.step(_toy_batch(), ctx)
+    mid = model.head.weight.detach().clone()
+    assert torch.equal(before, mid)  # still accumulating
+
+    engine.step(_toy_batch(), ctx)
+    after = model.head.weight.detach().clone()
+    assert not torch.equal(before, after)  # optimizer fired at boundary

@@ -220,6 +220,22 @@ def test_pin_transformer_profile_is_stateless():
     assert p.state_mode == "stateless"
 
 
+def test_transformer_profile_get_embedding_and_head_wired_through_factory():
+    """End-to-end seam: a profile built by ``transformer_profile()`` resolves
+    ``get_embedding`` to the model's ``nn.Embedding`` and ``get_head`` to its
+    ``nn.Linear`` head on a canonical model (factory wiring, not the bare
+    ``_transformer_embedding`` / ``_transformer_head`` helpers tested above).
+    """
+    model = _make_canonical_transformer()
+    p = transformer_profile()
+    emb = p.get_embedding(model)
+    head = p.get_head(model)
+    assert isinstance(emb, nn.Embedding)
+    assert isinstance(head, nn.Linear)
+    assert emb is model.embed_tokens
+    assert head is model.lm_head
+
+
 # ---------------------------------------------------------------------------
 # _transformer_blocks — canonical name search at top level
 # ---------------------------------------------------------------------------

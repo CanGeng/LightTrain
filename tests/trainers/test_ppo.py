@@ -575,3 +575,49 @@ def test_ppo_stop_requested_breaks_outer_loop():
     trainer.fit()
 
     assert trainer.ctx.step == 1
+
+
+# ===========================================================================
+# Registry + constructor-config invariants (merged from
+# tests/test_trainer_ppo.py)
+# ===========================================================================
+
+
+def test_ppo_resolves_from_registry():
+    """The 'ppo' trainer name resolves to PPOTrainer through the registry."""
+    from lighttrain.registry import get as resolve
+
+    assert resolve("trainer", "ppo") is PPOTrainer
+
+
+def test_ppo_step_returns_finite_loss():
+    """A hand-crafted PPO minibatch produces a finite 'loss' metric."""
+    trainer = _make_ppo()
+    metrics = trainer._ppo_step(_ppo_batch())
+    assert "loss" in metrics
+    import math
+
+    assert math.isfinite(float(metrics["loss"]))
+
+
+def test_ppo_ref_policy_params_frozen_after_freeze_as_ref():
+    """freeze_as_ref produces a ref policy whose params have requires_grad=False."""
+    from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
+
+    trainer = _make_ppo()
+    trainer._ref_policy = freeze_as_ref(trainer.model)
+    for p in trainer._ref_policy.model.parameters():
+        assert not p.requires_grad
+
+
+def test_ppo_target_kl_stored_on_trainer():
+    """target_kl passed to the constructor is retained as an attribute."""
+    trainer = _make_ppo(target_kl=0.01)
+    assert trainer.target_kl == 0.01
+
+
+def test_ppo_clip_eps_propagated_to_default_loss():
+    """clip_eps feeds the default RL loss used when the recipe omits a `loss:`
+    block (the loss: seam wins when present — keystone step 3)."""
+    trainer = _make_ppo(clip_eps=0.3)
+    assert trainer._default_loss.clip_eps == 0.3

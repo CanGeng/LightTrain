@@ -18,7 +18,96 @@ from __future__ import annotations
 import pytest
 
 from lighttrain.config import ConfigResolveError, resolve
+from lighttrain.config._resolver import _import_target
 from lighttrain.registry import register
+
+# ===========================================================================
+# _import_target — multi-level dotted right-peel resolver
+# ===========================================================================
+
+
+def test_import_target_three_level_dotted_path():
+    """Three-level dotted ``_import_target`` resolves a function attribute.
+
+    Input: ``'os.path.join'``.
+    Expected: the callable is ``os.path.join`` (same result for ('a','b')).
+    """
+    import os.path
+
+    result = _import_target("os.path.join")
+    assert callable(result)
+    assert result("a", "b") == os.path.join("a", "b")
+
+
+def test_import_target_four_level_dotted_path():
+    """Four-level dotted ``_import_target`` resolves a deep first-party class.
+
+    Input: ``'lighttrain.builtin_plugins.data.core.collators.CausalLMCollator'``.
+    Expected: identity with the imported class.
+    """
+    from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
+
+    result = _import_target(
+        "lighttrain.builtin_plugins.data.core.collators.CausalLMCollator"
+    )
+    assert result is CausalLMCollator
+
+
+def test_import_target_transformers_three_level_resolves():
+    """Core regression: ``transformers.AutoTokenizer.from_pretrained`` (the
+    sft_chat_hf.yaml tokenizer _target_) must resolve without ConfigResolveError.
+
+    Input: ``'transformers.AutoTokenizer.from_pretrained'``.
+    Expected: a callable (the bound classmethod), NOT a raised error.
+    """
+    result = _import_target("transformers.AutoTokenizer.from_pretrained")
+    assert callable(result)
+
+
+def test_import_target_nonexistent_package_raises():
+    """A truly missing top-level package raises ConfigResolveError.
+
+    Input: ``'_nonexistent_pkg_xyz.Foo'``.
+    Expected: ConfigResolveError (not bare ModuleNotFoundError).
+    """
+    with pytest.raises(ConfigResolveError):
+        _import_target("_nonexistent_pkg_xyz.Foo")
+
+
+def test_import_target_nonexistent_attribute_raises():
+    """A valid module path with a missing trailing attribute raises
+    ConfigResolveError.
+
+    Input: ``'os.path.nonexistent_attr_xyz'``.
+    Expected: ConfigResolveError.
+    """
+    with pytest.raises(ConfigResolveError):
+        _import_target("os.path.nonexistent_attr_xyz")
+
+
+def test_sft_chat_hf_tokenizer_spec_resolves(monkeypatch):
+    """Recipe-level smoke: resolve the sft_chat_hf.yaml tokenizer spec without
+    hitting the network. Direct regression protection for the
+    ``_target_: transformers.AutoTokenizer.from_pretrained`` path — it must not
+    raise ConfigResolveError and must return whatever from_pretrained returns.
+    """
+    import transformers
+
+    class _StubTokenizer:
+        def __call__(self, *args, **kwargs):
+            return {}
+
+    stub = _StubTokenizer()
+    monkeypatch.setattr(
+        transformers.AutoTokenizer, "from_pretrained", lambda *a, **kw: stub
+    )
+
+    spec = {
+        "_target_": "transformers.AutoTokenizer.from_pretrained",
+        "pretrained_model_name_or_path": "Qwen/Qwen2.5-0.5B-Instruct",
+    }
+    result = resolve(spec)
+    assert result is stub
 
 
 def test_resolve_short_name_via_registry(clean_registry):

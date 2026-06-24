@@ -211,3 +211,67 @@ def test_producer_coerce_model_output_passthrough() -> None:
     """
     mo = ModelOutput(outputs={"logits": torch.tensor([1.0])})
     assert _coerce_model_output(mo) is mo
+
+
+# --------------------------------------------------------------------------- #
+# Extras (top-k) + hidden-states capture via the real TinyCausalLM adapter     #
+# --------------------------------------------------------------------------- #
+
+
+def test_producer_writes_topk_extra_and_hidden_states(tmp_path: Path) -> None:
+    """An ``ExtraOutputSpec`` top-k transform and ``collect_hidden_states`` both
+    land in the artifact store, readable after ``finalize`` + reopen.
+
+    Input: 3 deterministic samples through a real ``TinyCausalLM`` with
+    ``output_hidden_states=True`` and a ``logits_topk_8`` extra.
+    Analytical:
+        * ``logits_topk_8.values`` / ``.indices`` exist with last dim == 8.
+        * ``hidden_states_layers`` has leading dim == n_layers + 1 (2 blocks +
+          1 embedding layer = 3).
+    """
+    from lighttrain.builtin_plugins.artifacts import open_artifact_store
+    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+    from lighttrain.models.extras import ExtraOutputSpec
+
+    torch.manual_seed(0)
+    model = TinyCausalLM(
+        vocab_size=60, d_model=32, n_layers=2, n_heads=4, max_seq_len=8,
+        output_hidden_states=True,
+    )
+    samples = []
+    for i in range(3):
+        ids = torch.randint(0, 60, (8,))
+        samples.append({
+            "id": f"sample_{i:02d}",
+            "input_ids": ids,
+            "attention_mask": torch.ones_like(ids),
+            "labels": ids.clone(),
+        })
+
+    producer = ModelForwardProducer(
+        model=model,
+        store={
+            "name": "safetensors-shards",
+            "root": str(tmp_path / "art"),
+            "shard_size": 8,
+        },
+        extras=[ExtraOutputSpec(name="logits_topk_8", source="lm_head",
+                                transform={"topk": 8})],
+        collect_hidden_states=True,
+        header_overrides={"data_version": "tiny", "model_id": "test_tiny"},
+        artifact_name="art", artifact_version="v1",
+    )
+    producer.prepare()
+    for s in samples:
+        producer.produce(s)
+    manifest = producer.finalize()
+    assert manifest.exists()
+
+    store = open_artifact_store(tmp_path / "art")
+    assert sorted(store.iter_keys()) == ["sample_00", "sample_01", "sample_02"]
+    rec = store.get("sample_00")
+    assert "logits_topk_8.values" in rec
+    assert "logits_topk_8.indices" in rec
+    assert rec["logits_topk_8.values"].shape[-1] == 8
+    assert "hidden_states_layers" in rec
+    assert rec["hidden_states_layers"].shape[0] == 3  # 2 blocks + 1 emb

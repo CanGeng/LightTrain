@@ -130,6 +130,33 @@ def test_freeze_as_ref_creates_no_grad_copy():
         assert not p.requires_grad
 
 
+def test_freeze_as_ref_copy_is_independent_of_original_mutation():
+    """Goal: mutating the original model after freezing does NOT affect the ref.
+
+    Input: freeze a tiny model, then overwrite all original params with 999.
+    Analytical: deep copy means ref params stay at their original values and
+    must differ from the now-mutated originals.
+    """
+    model = _TinyLM(vocab=10, hidden=4)
+    ref = freeze_as_ref(model)
+    with torch.no_grad():
+        for p in model.parameters():
+            p.fill_(999.0)
+    for p_orig, p_ref in zip(model.parameters(), ref.model.parameters(), strict=False):
+        assert not torch.allclose(p_orig, p_ref)
+
+
+def test_ref_log_probs_are_finite():
+    """Goal: ref policy log_probs are all finite (no NaN/Inf)."""
+    torch.manual_seed(48)
+    model = _TinyLM(vocab=16, hidden=8)
+    ref = freeze_as_ref(model)
+    input_ids = torch.randint(0, 16, (2, 5))
+    labels = input_ids.clone()
+    out = ref_log_probs(ref, input_ids, attention_mask=None, labels=labels)
+    assert torch.isfinite(out).all()
+
+
 def test_ref_log_probs_returns_no_grad_tensor():
     """Goal: ref policy log_probs has requires_grad=False (the @no_grad guard).
 

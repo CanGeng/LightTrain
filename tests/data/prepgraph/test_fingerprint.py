@@ -385,3 +385,30 @@ def test_compose_fingerprint_payload_is_canonicalized() -> None:
     a = dict(_base_kwargs(), config={"x": (1, 2)})
     b = dict(_base_kwargs(), config={"x": [1, 2]})
     assert compose_fingerprint(**a) == compose_fingerprint(**b)
+
+
+# --------------------------------------------------------------------------- #
+# SCHEMA_VERSION table completeness                                            #
+# --------------------------------------------------------------------------- #
+
+
+def test_schema_version_table_has_every_leaf_node_schema() -> None:
+    """Every ``schema_kind`` produced by a leaf node has a ``SCHEMA_VERSION``
+    entry.
+
+    Pin: a missing entry means ``compose_fingerprint`` would silently fall
+    back to the ``"0.0"`` default for that schema, so bumping the real schema
+    could not invalidate caches. The expected set is the union of node output
+    schema kinds (DESIGN §7.7.4).
+    """
+    expected = {
+        "rows",
+        "tokenized_rows",
+        "packed_rows",
+        "validate_report",
+        "materialized",
+        "mixed_rows",
+        "chunked_rows",
+    }
+    for k in expected:
+        assert k in SCHEMA_VERSION, f"missing schema_version for {k!r}"

@@ -17,7 +17,11 @@ from pathlib import Path
 import pytest
 
 from lighttrain.observability.lineage import LineageStore
-from lighttrain.observability.lineage.retention import RetentionPolicy, gc_artifacts
+from lighttrain.observability.lineage.retention import (
+    RetentionPolicy,
+    gc_artifacts,
+    prune_orphans,
+)
 
 # --------------------------------------------------------------------------- #
 # Edges                                                                       #
@@ -93,6 +97,53 @@ def test_add_edge_rejects_unknown_kind(lineage_store_factory) -> None:
     b = store.upsert_node(kind="artifact", name="B")
     with pytest.raises(ValueError, match="edge kind"):
         store.add_edge(a, b, kind="totally_bogus")
+
+
+# --------------------------------------------------------------------------- #
+# Node upsert identity + tag/pin/invalidate lifecycle                          #
+# --------------------------------------------------------------------------- #
+
+
+def test_upsert_node_returns_stable_id_and_updates_hash(lineage_store_factory) -> None:
+    """Re-upserting the same (kind, name, version) returns the SAME id and
+    folds in newly-supplied fields (e.g. ``hash_``).
+
+    Invariant: upsert is keyed on identity, not append-only — a later call with
+    a hash patches the existing row rather than creating a duplicate.
+    """
+    store = lineage_store_factory()
+    first = store.upsert_node(
+        kind="artifact",
+        name="teacher_logits",
+        version="v1",
+        schema_kind="artifact_header",
+        schema_version="0.4",
+    )
+    again = store.upsert_node(
+        kind="artifact", name="teacher_logits", version="v1", hash_="x" * 64
+    )
+    assert first == again
+    node = store.get_node(first)
+    assert node["hash"] == "x" * 64
+
+
+def test_tag_untag_and_invalidate_lifecycle(lineage_store_factory) -> None:
+    """``tag`` is idempotent, ``untag`` removes the tag, ``pin`` sets pinned=1,
+    and ``invalidate`` marks ``deprecated=1`` directly.
+    """
+    store = lineage_store_factory()
+    nid = store.upsert_node(kind="artifact", name="A", version="v1")
+    store.tag(nid, "best_eval")
+    store.tag(nid, "best_eval")  # idempotent — still a single tag
+    assert "best_eval" in store._tags_of(nid)
+    store.untag(nid, "best_eval")
+    assert store._tags_of(nid) == []
+
+    store.pin(nid)
+    assert store.get_node(nid)["pinned"] == 1
+
+    store.invalidate(nid)
+    assert store.get_node(nid)["deprecated"] == 1
 
 
 # --------------------------------------------------------------------------- #
@@ -306,6 +357,21 @@ def test_resolve_ref_by_name_and_version(lineage_store_factory) -> None:
     assert store.resolve_ref("artifact:alpha:does-not-exist") is None
 
 
+def test_resolve_ref_latest_and_no_version_pick_newest(lineage_store_factory) -> None:
+    """``"<kind>:<name>"`` (no version) and ``"<kind>:<name>:latest"`` both
+    resolve to the newest version by ``ts``.
+
+    Input: two versions of "A"; v2 inserted last → highest ts.
+    """
+    store = lineage_store_factory()
+    v1 = store.upsert_node(kind="artifact", name="A", version="v1")
+    v2 = store.upsert_node(kind="artifact", name="A", version="v2")
+    assert store.resolve_ref("artifact:A:v1") == v1
+    assert store.resolve_ref("artifact:A:v2") == v2
+    assert store.resolve_ref("artifact:A") == v2
+    assert store.resolve_ref("artifact:A:latest") == v2
+
+
 # --------------------------------------------------------------------------- #
 # Transactions                                                                #
 # --------------------------------------------------------------------------- #
@@ -359,3 +425,31 @@ def test_transaction_rolls_back_on_exception(lineage_store_factory) -> None:
 
     post_edges = len(list(store.iter_edges()))
     assert post_edges == pre_edges
+
+
+# --------------------------------------------------------------------------- #
+# prune_orphans: drop nodes whose payload_path vanished                       #
+# --------------------------------------------------------------------------- #
+
+
+def test_prune_orphans_drops_missing_payload_path_nodes(
+    lineage_store_factory, tmp_path
+) -> None:
+    """``prune_orphans`` removes nodes whose ``payload_path`` no longer exists
+    on disk, and leaves nodes whose path is still present untouched.
+
+    Input: artifact A points at a real dir; artifact B points at a ghost path.
+    Expected: B is pruned, A is not.
+    """
+    store = lineage_store_factory()
+    real = tmp_path / "exists"
+    real.mkdir()
+    a = store.upsert_node(
+        kind="artifact", name="A", version="v1", payload_path=str(real)
+    )
+    b = store.upsert_node(
+        kind="artifact", name="A", version="v2", payload_path=str(tmp_path / "ghost")
+    )
+    removed = prune_orphans(store)
+    assert b in removed
+    assert a not in removed

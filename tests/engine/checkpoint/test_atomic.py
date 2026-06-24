@@ -376,6 +376,155 @@ def test_symlink_resolves_to_step_dir(tmp_run_dir) -> None:
     assert link.resolve() == target.resolve()
 
 
+def test_last_pointer_resolves_via_json_fallback(tmp_run_dir) -> None:
+    """``_read_pointer('last')`` resolves through ``last.json`` even when no
+    symlink is usable (the Windows / no-dev-mode fallback path).
+
+    Invariant: ``last.json`` records ``{"target": <step_dir_name>}`` and
+    ``_read_pointer`` must resolve it to the most-recent step dir regardless
+    of symlink availability.
+    """
+    mgr = CheckpointManager(tmp_run_dir)
+    mgr.save(1, _make_state())
+    target = mgr.save(2, _make_state())
+
+    last_json = tmp_run_dir / "checkpoints" / "last.json"
+    assert last_json.exists()
+    info = json.loads(last_json.read_text(encoding="utf-8"))
+    assert info["target"] == target.name
+
+    resolved = mgr._read_pointer("last")
+    assert resolved is not None
+    assert resolved.resolve() == target.resolve()
+
+
+def test_best_pointer_records_metric_extras(tmp_run_dir) -> None:
+    """A ``kind='best'`` save writes ``best.json`` carrying the metric extras
+    (``metric`` name + ``value``) so the model-of-record is self-describing.
+    """
+    mgr = CheckpointManager(tmp_run_dir)
+    mgr.save(
+        3,
+        _make_state(seed=3),
+        kind="best",
+        extras={"metric": "loss", "value": 0.42},
+    )
+    info = json.loads(
+        (tmp_run_dir / "checkpoints" / "best.json").read_text(encoding="utf-8")
+    )
+    assert info["target"] == "step_3"
+    assert info["extras"]["metric"] == "loss"
+    assert info["extras"]["value"] == 0.42
+
+
+def test_save_load_tied_weights(tmp_run_dir) -> None:
+    """CheckpointManager must not crash on tied weights (safetensors shared
+    storage) and must preserve both values and the tied-weight invariant.
+    """
+    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+
+    model = TinyCausalLM(
+        vocab_size=64, d_model=32, n_layers=1, n_heads=2,
+        max_seq_len=32, tie_weights=True,
+    )
+    assert model.lm_head.weight is model.tok_emb.weight, (
+        "pre-condition: weights are tied"
+    )
+
+    mgr = CheckpointManager(tmp_run_dir)
+    # Must not raise safetensors shared-storage error.
+    saved = mgr.save(0, {"model": model.state_dict()})
+    assert (saved / "manifest.json").exists()
+
+    # Load into a fresh tied model and verify values + tied-weight semantics.
+    fresh = TinyCausalLM(
+        vocab_size=64, d_model=32, n_layers=1, n_heads=2,
+        max_seq_len=32, tie_weights=True,
+    )
+    ckpt = mgr.load(saved)
+    fresh.load_state_dict(ckpt["model"])
+
+    assert torch.equal(fresh.lm_head.weight, model.tok_emb.weight), (
+        "loaded lm_head.weight must equal original tok_emb.weight"
+    )
+    assert fresh.lm_head.weight is fresh.tok_emb.weight, (
+        "tied-weight invariant must survive round-trip into a tied model"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Full-state persistence: data_module + full RNG, manifest-driven load        #
+# --------------------------------------------------------------------------- #
+
+
+def test_save_round_trips_data_module_and_full_rng(tmp_run_dir) -> None:
+    """A full save persists ``data_module`` + python/numpy/torch RNG, and the
+    manifest references both ``data_module.pt`` and ``rng.pt``.
+    """
+    mgr = CheckpointManager(tmp_run_dir, keep_last_n=3)
+
+    state = {
+        "model": {"w": torch.randn(2, 2)},
+        "optimizer": {"step": 1, "param_groups": []},
+        "scheduler": {"base_lrs": [1e-3]},
+        "rng": {
+            "python": (3, tuple(range(625)), None),
+            "numpy": ("MT19937", [0] * 624, 624, 0, 0.0),
+            "torch": torch.get_rng_state(),
+        },
+        "trainer": {"step": 5},
+        "data_module": {"sampler": {"epoch": 1, "consumed": 8}},
+    }
+
+    target = mgr.save(5, state, kind="step")
+
+    assert (target / "data_module.pt").exists()
+    manifest = json.loads((target / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["files"]["data_module"] == "data_module.pt"
+    assert manifest["files"]["rng"] == "rng.pt"
+
+    loaded = mgr.load(target)
+    assert "data_module" in loaded
+    assert loaded["data_module"]["sampler"]["consumed"] == 8
+    rng = loaded["rng"]
+    assert set(rng.keys()) >= {"python", "numpy", "torch"}
+
+
+def test_load_is_manifest_driven_not_file_existence(tmp_run_dir) -> None:
+    """``load()`` reads components strictly by ``manifest["files"]``; a stale
+    on-disk ``optimizer.pt`` from a prior save of the same step must not leak
+    into the loaded state when the new manifest no longer lists it.
+    """
+    mgr = CheckpointManager(tmp_run_dir, keep_last_n=3)
+
+    mgr.save(
+        5,
+        {"model": {"w": torch.zeros(2)}, "optimizer": {"OLD": 1}},
+        kind="step",
+    )
+    target = mgr.ckpt_dir / "step_5"
+    assert (target / "optimizer.pt").exists()
+
+    # Re-save the SAME step WITHOUT optimizer.
+    mgr.save(5, {"model": {"w": torch.ones(2)}}, kind="step")
+
+    manifest = json.loads((target / "manifest.json").read_text(encoding="utf-8"))
+    assert "optimizer" not in manifest["files"]
+
+    loaded = mgr.load(target)
+    # manifest-driven load ignores the stale optimizer.pt still on disk.
+    assert "optimizer" not in loaded
+
+
+def test_save_docstring_pins_not_crash_atomic_contract() -> None:
+    """Pin the documented same-step-overwrite crash-atomicity limitation so a
+    change to overwrite semantics consciously updates the docstring.
+    """
+    save_doc = CheckpointManager.save.__doc__ or ""
+    assert "not crash-atomic" in save_doc
+    assert "same-step overwrite" in save_doc
+
+
 # --------------------------------------------------------------------------- #
 # Rank-aware save                                                             #
 # --------------------------------------------------------------------------- #

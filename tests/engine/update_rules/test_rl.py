@@ -433,3 +433,68 @@ def test_rl_state_dict_roundtrip():
     rule2 = RLUpdateRule(grad_clip=9.9)
     rule2.load_state_dict(sd)
     assert rule2.grad_clip == 0.7
+
+
+# ===========================================================================
+# registry + grad-clip semantics
+# ===========================================================================
+
+
+def test_rl_update_rule_registered_under_rl_key():
+    """Goal: ``RLUpdateRule`` is resolvable via the registry as ``("update_rule",
+    "rl")`` — the config/CLI path depends on this binding.
+    """
+    from lighttrain.registry import get as resolve
+
+    assert resolve("update_rule", "rl") is RLUpdateRule
+
+
+def test_rl_grad_clip_scales_param_grads_below_threshold():
+    """Goal: with a tiny ``grad_clip``, clipping fires and the ACTUAL param
+    grads at optimizer-step time are scaled to <= grad_clip.
+
+    Note: ``clip_grad_norm_`` reports the PRE-clip norm via ``on_clip_grad``;
+    we capture the post-clip grad norm in ``on_optimizer_step_pre``.
+    """
+    reported_pre_clip: list[float] = []
+    grad_after: list[float] = []
+
+    def _big_loss(_out, _batch, ctx):
+        model = ctx.extras["model"]
+        return {"loss": (model.linear.weight * 1000).sum()}
+
+    class _NormRecorder:
+        def on_clip_grad(self, grad_norm=0.0, **_):
+            reported_pre_clip.append(grad_norm)
+
+        def on_optimizer_step_pre(self, **_):
+            g = model.linear.weight.grad
+            if g is not None:
+                grad_after.append(float(g.norm()))
+
+    ctx, model, _ = _build_ctx(callbacks=[_NormRecorder()], loss_fn=_big_loss)
+    ctx.extras["model"] = model
+
+    RLUpdateRule(grad_clip=0.01).step(model, {}, ctx)
+
+    assert reported_pre_clip, "on_clip_grad must have fired"
+    assert reported_pre_clip[0] > 0.01  # pre-clip norm is large
+    assert grad_after and grad_after[0] <= 0.011  # actual grad is clipped
+
+
+def test_rl_grad_clip_zero_disables_clipping():
+    """Goal: ``grad_clip=0`` skips clipping entirely; ``on_clip_grad`` reports
+    a ``grad_norm`` of 0.0 (clipping was a no-op).
+    """
+    reported: list[float] = []
+
+    class _NormRecorder:
+        def on_clip_grad(self, grad_norm=0.0, **_):
+            reported.append(grad_norm)
+
+    ctx, model, _ = _build_ctx(callbacks=[_NormRecorder()], loss_fn=_grad_loss_fn)
+    ctx.extras["model"] = model
+
+    RLUpdateRule(grad_clip=0.0).step(model, {}, ctx)
+
+    assert reported and reported[0] == 0.0

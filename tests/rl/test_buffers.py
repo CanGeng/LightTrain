@@ -50,6 +50,19 @@ def test_buffer_overflow_drops_oldest_fifo():
     )
 
 
+def test_buffer_clear_empties_buffer():
+    """Goal: ``buf.clear()`` removes all episodes → len(buf) == 0.
+
+    Input: add one episode, then clear.
+    Analytical: buffer length returns to zero.
+    """
+    buf = RolloutBuffer(max_size=10)
+    buf.add(_ep(4, 1.0))
+    assert len(buf) == 1
+    buf.clear()
+    assert len(buf) == 0
+
+
 def test_buffer_batches_pads_and_yields_correct_size():
     """Goal: ``buf.batches(batch_size=B)`` yields padded mini-batches whose
             input_ids tensor has shape (B, max_seq_in_batch) — and the values

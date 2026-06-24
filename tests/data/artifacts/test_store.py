@@ -33,6 +33,7 @@ from lighttrain.builtin_plugins.artifacts import (
     MemmapFixedStore,
     ParquetRowStore,
     SafetensorsShardStore,
+    StaleArtifactError,
     open_artifact_store,
 )
 
@@ -505,3 +506,66 @@ def test_parquet_reopen_corrupt_manifest_missing_index_fails_loud(tmp_path: Path
 
     with pytest.raises(ValueError, match="sample_to_row"):
         open_artifact_store(root)
+
+
+# --------------------------------------------------------------------------- #
+# open_artifact_store: stale-header detection (F5 / DESIGN §25.3)              #
+# --------------------------------------------------------------------------- #
+
+
+def test_open_artifact_store_rejects_stale_header_by_default(tmp_path: Path) -> None:
+    """When the caller passes an ``expected_header`` whose ``data_version`` does
+    not match the on-disk header, ``open_artifact_store`` raises
+    ``StaleArtifactError``.
+
+    Invariant (F5): a producer-version / data-version mismatch is fail-loud by
+    default so a training run never silently consumes artifacts produced by an
+    incompatible upstream.
+    """
+    root = tmp_path / "store"
+    store = SafetensorsShardStore(root)
+    store.header.producer_signature = "v1"
+    store.header.data_version = "alpha"
+    store.put("s", {"x": torch.zeros(2)})
+    store.finalize()
+
+    expected = ArtifactHeader(producer_signature="v1", data_version="beta")
+    with pytest.raises(StaleArtifactError):
+        open_artifact_store(root, expected_header=expected)
+
+
+def test_open_artifact_store_allow_stale_bypasses_mismatch(tmp_path: Path) -> None:
+    """``allow_stale=True`` opens a header-mismatched store anyway, returning a
+    populated store.
+
+    Escape hatch: an operator who knowingly accepts the version drift can
+    still read the artifacts.
+    """
+    root = tmp_path / "store"
+    store = SafetensorsShardStore(root)
+    store.header.producer_signature = "v1"
+    store.header.data_version = "alpha"
+    store.put("s", {"x": torch.zeros(2)})
+    store.finalize()
+
+    expected = ArtifactHeader(producer_signature="v1", data_version="beta")
+    opened = open_artifact_store(root, expected_header=expected, allow_stale=True)
+    assert "s" in list(opened.iter_keys())
+
+
+def test_open_artifact_store_no_expected_header_skips_stale_check(
+    tmp_path: Path,
+) -> None:
+    """With no ``expected_header`` argument, no staleness check runs and the
+    store opens normally.
+
+    Pin: the stale-check is opt-in; the common path (open without an
+    expectation) must not regress into a spurious raise.
+    """
+    root = tmp_path / "store"
+    store = SafetensorsShardStore(root)
+    store.put("s", {"x": torch.zeros(2)})
+    store.finalize()
+
+    opened = open_artifact_store(root)
+    assert opened.contains("s")

@@ -32,6 +32,41 @@ def _toy_model() -> torch.nn.Module:
 
 
 # ---------------------------------------------------------------------------
+# No-spec / fallback-bucket behavior
+# ---------------------------------------------------------------------------
+
+def test_none_specs_collapses_to_single_group_covering_all_params():
+    """With ``specs=None`` the splitter returns exactly one group carrying the
+    default options, and that group holds every model parameter.
+
+    Distinct from the ``.*`` first-match path: here no spec list exists at all,
+    so the fallback default-option bucket is the sole result.
+    """
+    model = _toy_model()
+    groups = _split_param_groups(model, None, {"lr": 0.01})
+    assert len(groups) == 1
+    assert groups[0]["lr"] == 0.01
+    assert sum(p.numel() for p in groups[0]["params"]) == sum(
+        p.numel() for p in model.parameters()
+    )
+
+
+def test_non_matching_spec_prunes_empty_bucket_and_keeps_fallback():
+    """A spec that matches nothing (on a fully-trainable model) → its empty
+    bucket is pruned, and the unmatched trainable params fall through to a
+    single fallback bucket carrying the default options.
+
+    Contrast with the all-frozen case (which raises): here trainable params
+    remain, so the fallback bucket is produced rather than an error.
+    """
+    model = _toy_model()
+    specs = [ParamGroupSpec(pattern=r"never_matches", options={"lr": 999.0})]
+    groups = _split_param_groups(model, specs, {"lr": 1e-3})
+    assert len(groups) == 1
+    assert groups[0]["lr"] == 1e-3
+
+
+# ---------------------------------------------------------------------------
 # First-match-wins
 # ---------------------------------------------------------------------------
 

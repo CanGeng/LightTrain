@@ -334,3 +334,52 @@ def test_pretrain_fit_raises_when_optimizer_is_none():
     trainer.optimizer = None
     with pytest.raises(RuntimeError, match="optimizer is not set"):
         trainer.fit()
+
+
+# ===========================================================================
+# Heavy end-to-end loss-decrease smoke (merged from tests/test_train_pretrain.py).
+# Marked ``heavy`` so the default run skips it: pytest -m heavy tests/trainers
+# ===========================================================================
+
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_PRETRAIN_RECIPE = _REPO_ROOT / "recipes" / "pretrain_causal.yaml"
+
+
+def _loss_windows(jsonl_path: Path, fraction: float = 0.25) -> tuple[float, float]:
+    """Return (first_window_mean, last_window_mean) loss across logged steps."""
+    losses = []
+    for line in jsonl_path.read_text(encoding="utf-8").splitlines():
+        rec = json.loads(line)
+        if rec.get("kind") == "scalar" and "loss" in rec:
+            losses.append(float(rec["loss"]))
+    n = len(losses)
+    if n < 4:
+        raise AssertionError(f"too few loss records to window ({n})")
+    win = max(2, int(n * fraction))
+    return sum(losses[:win]) / win, sum(losses[-win:]) / win
+
+
+@pytest.mark.heavy
+def test_pretrain_r1_loss_decreases_after_200_steps(tmp_path: Path):
+    """R1 acceptance: a real CPU/GPU training loop on tiny_corpus drives the
+    windowed-average loss clearly down over 200 steps."""
+    pytest.importorskip("torch")
+    from lighttrain.cli._runtime import setup_run_from_config
+
+    overrides = [
+        f"++run_root={(tmp_path / 'runs').as_posix()}",
+        "++trainer.max_steps=200",
+        "++trainer.val_every=0",
+        "++trainer.ckpt_every=0",
+        "++trainer.log_every=10",
+    ]
+    bundle = setup_run_from_config(_PRETRAIN_RECIPE, overrides=overrides)
+    bundle["trainer"].fit()
+    bundle["logger"].close()
+
+    jsonl = bundle["run_dir"] / "logs" / "metrics.jsonl"
+    first, last = _loss_windows(jsonl, fraction=0.25)
+    assert last < first * 0.7, f"R1 smoke: loss did not decrease ({first=}, {last=})"

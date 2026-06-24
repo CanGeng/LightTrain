@@ -24,6 +24,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from lighttrain.callbacks.base import EventBus
 from lighttrain.observability.diagnostics.callback_isolation import (
     CallbackIsolationSink,
@@ -45,6 +47,15 @@ class _Boomer:
 
     def on_step_end(self, **_):
         raise RuntimeError("boom")
+
+
+class _Critical:
+    """Critical raiser: the EventBus must re-raise rather than isolate."""
+
+    critical = True
+
+    def on_step_end(self, **_):
+        raise RuntimeError("critical boom")
 
 
 class _NewlineBoomer:
@@ -261,6 +272,23 @@ def test_install_wraps_original_on_error_and_chains_to_it(tmp_path):
     # Original on_error was also chained
     assert len(recorder_calls) == 1
     assert recorder_calls[0] == ("on_step_end", "_Boomer", "RuntimeError")
+
+
+# ---------------------------------------------------------------------------
+# Critical callbacks bypass isolation
+# ---------------------------------------------------------------------------
+
+def test_invariant_critical_callback_reraises_through_bus():
+    """A callback declaring ``critical = True`` is NOT isolated: its exception
+    propagates straight through ``bus.dispatch`` instead of being swallowed
+    into the JSONL sink.
+
+    Goal: pin the escape hatch — fatal callbacks (e.g. NaN hunters) must crash
+    the run rather than be quarantined like best-effort callbacks.
+    """
+    bus = EventBus([_Critical()])
+    with pytest.raises(RuntimeError, match="critical boom"):
+        bus.dispatch("on_step_end", step=0)
 
 
 # ---------------------------------------------------------------------------

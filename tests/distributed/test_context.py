@@ -21,6 +21,8 @@ from types import SimpleNamespace
 import pytest
 import torch
 
+from lighttrain.builtin_plugins.distributed._noop import NoopGradSyncStrategy
+from lighttrain.config._schema import ParallelSection
 from lighttrain.distributed._context import (
     ParallelContext,
     _compute_ranks,
@@ -378,3 +380,210 @@ def test_dp_times_tp_times_pp_mismatch_raises(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="world_size"):
         ParallelContext.from_env(cfg)
+
+
+# --------------------------------------------------------------------------- #
+# single_gpu() observable defaults + degenerate-property contract             #
+# (merged from tests/test_distributed_context.py TestSingleGpu/TestProperties)#
+# --------------------------------------------------------------------------- #
+
+
+def test_single_gpu_observable_defaults() -> None:
+    """``single_gpu()`` yields the documented trivial topology across all axes.
+
+    Beyond the purity check above, pin every observable field: all ranks 0,
+    all degrees 1, sp disabled, force_cpu off, and every group handle None.
+    """
+    ctx = ParallelContext.single_gpu()
+    assert ctx.rank == 0
+    assert ctx.local_rank == 0
+    assert ctx.world_size == 1
+    assert ctx.dp_rank == ctx.tp_rank == ctx.pp_rank == ctx.ep_rank == 0
+    assert ctx.dp_degree == ctx.tp_degree == ctx.pp_degree == ctx.ep_degree == 1
+    assert ctx.sp_enabled is False
+    assert ctx.force_cpu is False
+    assert ctx.device_mesh is None
+    assert ctx.dp_group is None
+    assert ctx.tp_group is None
+    assert ctx.pp_group is None
+    assert ctx.ep_group is None
+
+
+def test_single_gpu_degenerate_properties_all_true() -> None:
+    """On single-GPU, the three boundary-role properties are all True.
+
+    ``is_main_process`` (rank 0), ``is_dp_rank0`` (dp_rank 0), and
+    ``is_pp_last_stage`` (pp_rank 0 == pp_degree-1) all hold trivially.
+    """
+    ctx = ParallelContext.single_gpu()
+    assert ctx.is_main_process is True
+    assert ctx.is_dp_rank0 is True
+    assert ctx.is_pp_last_stage is True  # pp_rank=0, pp_degree=1 → 0==0
+
+
+def test_single_gpu_repr_encodes_topology() -> None:
+    """``repr`` surfaces the rank/dp/tp/pp coordinates as ``x=cur/degree``."""
+    r = repr(ParallelContext.single_gpu())
+    assert "rank=0/1" in r
+    assert "dp=0/1" in r
+    assert "tp=0/1" in r
+    assert "pp=0/1" in r
+
+
+def test_is_main_process_only_rank0() -> None:
+    """``is_main_process`` is True iff global rank == 0, for world_size>1."""
+    assert ParallelContext(rank=0, world_size=4).is_main_process is True
+    assert ParallelContext(rank=1, world_size=4).is_main_process is False
+    assert ParallelContext(rank=3, world_size=4).is_main_process is False
+
+
+def test_is_dp_rank0_only_dp_rank0() -> None:
+    """``is_dp_rank0`` is True iff dp_rank == 0, independent of dp_degree."""
+    assert ParallelContext(dp_rank=0, dp_degree=4).is_dp_rank0 is True
+    assert ParallelContext(dp_rank=1, dp_degree=4).is_dp_rank0 is False
+
+
+def test_is_pp_last_stage_is_final_pp_rank() -> None:
+    """``is_pp_last_stage`` is True iff pp_rank == pp_degree - 1."""
+    assert ParallelContext(pp_rank=0, pp_degree=1).is_pp_last_stage is True
+    assert ParallelContext(pp_rank=1, pp_degree=2).is_pp_last_stage is True
+    assert ParallelContext(pp_rank=0, pp_degree=2).is_pp_last_stage is False
+    assert ParallelContext(pp_rank=2, pp_degree=4).is_pp_last_stage is False
+    assert ParallelContext(pp_rank=3, pp_degree=4).is_pp_last_stage is True
+
+
+# --------------------------------------------------------------------------- #
+# local_device: CUDA-available branch (force_cpu=False)                       #
+# (merged from TestLocalDevice — force_cpu=True case already covered above)   #
+# --------------------------------------------------------------------------- #
+
+
+def test_local_device_no_force_cpu_uses_cuda_or_cpu_rank0() -> None:
+    """With ``force_cpu=False`` at local_rank 0: ``cuda:0`` if available else cpu."""
+    ctx = ParallelContext(force_cpu=False, local_rank=0)
+    if torch.cuda.is_available():
+        assert ctx.local_device == torch.device("cuda:0")
+    else:
+        assert ctx.local_device == torch.device("cpu")
+
+
+def test_local_device_no_force_cpu_indexes_local_rank() -> None:
+    """With ``force_cpu=False``, ``local_device`` indexes the given local_rank."""
+    ctx = ParallelContext(force_cpu=False, local_rank=2)
+    if torch.cuda.is_available():
+        assert ctx.local_device == torch.device("cuda:2")
+    else:
+        assert ctx.local_device == torch.device("cpu")
+
+
+# --------------------------------------------------------------------------- #
+# ParallelSection schema                                                       #
+# (merged from TestParallelSection)                                            #
+# --------------------------------------------------------------------------- #
+
+
+def test_parallel_section_defaults() -> None:
+    """A bare ``ParallelSection`` carries the documented single-GPU defaults."""
+    ps = ParallelSection()
+    assert ps.backend == "nccl"
+    assert ps.dp == ps.tp == ps.pp == ps.ep == 1
+    assert ps.sp is False
+    assert ps.force_cpu is False
+    assert ps.grad_sync.name == "noop"
+    assert ps.tensor_parallel is None
+    assert ps.pipeline is None
+
+
+def test_parallel_section_force_cpu_and_overrides() -> None:
+    """Explicit fields (backend/dp/force_cpu) round-trip onto the schema."""
+    ps = ParallelSection(backend="gloo", dp=4, force_cpu=True)
+    assert ps.force_cpu is True
+    assert ps.backend == "gloo"
+    assert ps.dp == 4
+
+
+def test_parallel_section_allows_extra_fields() -> None:
+    """Unknown experimental fields are accepted (extra fields allowed)."""
+    ps = ParallelSection(experimental_flag=True)
+    assert ps.experimental_flag is True  # type: ignore[attr-defined]
+
+
+# --------------------------------------------------------------------------- #
+# NoopGradSyncStrategy single-GPU contract                                     #
+# (merged from TestNoopGradSyncStrategy)                                        #
+# --------------------------------------------------------------------------- #
+
+
+def _noop_make_model():
+    import torch.nn as nn
+
+    return nn.Linear(4, 2)
+
+
+def test_noop_prepare_moves_model_to_device() -> None:
+    """``prepare`` moves the model to ``device``, builds an opt, passes loader through."""
+    strategy = NoopGradSyncStrategy()
+    model = _noop_make_model()
+    device = torch.device("cpu")
+    ctx = ParallelContext.single_gpu()
+    wrapped, opt, loader = strategy.prepare(
+        model,
+        optimizer_factory=lambda m: torch.optim.SGD(m.parameters(), lr=0.01),
+        loader=None,
+        parallel_ctx=ctx,
+        device=device,
+    )
+    assert next(wrapped.parameters()).device == device
+    assert opt is not None
+    assert loader is None  # passthrough
+
+
+def test_noop_accumulate_is_nullcontext() -> None:
+    """``accumulate`` returns a context manager that enters/exits without raising."""
+    strategy = NoopGradSyncStrategy()
+    model = _noop_make_model()
+    ctx = strategy.accumulate(model)
+    with ctx:
+        pass  # must not raise
+
+
+def test_noop_backward_computes_grad() -> None:
+    """``backward`` populates ``.grad`` on every parameter."""
+    strategy = NoopGradSyncStrategy()
+    model = _noop_make_model()
+    x = torch.randn(2, 4)
+    loss = model(x).sum()
+    strategy.backward(loss, model)
+    assert all(p.grad is not None for p in model.parameters())
+
+
+def test_noop_clip_grad_norm_returns_nonneg_float() -> None:
+    """``clip_grad_norm`` returns a non-negative float total norm."""
+    strategy = NoopGradSyncStrategy()
+    model = _noop_make_model()
+    x = torch.randn(2, 4)
+    model(x).sum().backward()
+    ctx = ParallelContext.single_gpu()
+    norm = strategy.clip_grad_norm(model, max_norm=1.0, parallel_ctx=ctx)
+    assert isinstance(norm, float)
+    assert norm >= 0.0
+
+
+def test_noop_unwrap_model_is_identity() -> None:
+    """``unwrap_model`` returns the same object (no wrapper in single-GPU)."""
+    strategy = NoopGradSyncStrategy()
+    model = _noop_make_model()
+    assert strategy.unwrap_model(model) is model
+
+
+def test_noop_optimizer_step_updates_params() -> None:
+    """``optimizer_step`` applies the gradient update so params change."""
+    strategy = NoopGradSyncStrategy()
+    model = _noop_make_model()
+    opt = torch.optim.SGD(model.parameters(), lr=1.0)
+    x = torch.randn(2, 4)
+    model(x).sum().backward()
+    before = [p.clone() for p in model.parameters()]
+    strategy.optimizer_step(opt, model)
+    for p_before, p_after in zip(before, model.parameters(), strict=False):
+        assert not torch.equal(p_before, p_after)

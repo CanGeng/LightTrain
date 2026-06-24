@@ -78,6 +78,33 @@ def test_jepa_ema_step_applies_known_decay():
     )
 
 
+def test_jepa_prepare_batch_splits_context_and_target_shapes():
+    """Goal: prepare_batch slices patches into the configured context/target counts.
+
+    Invariant: context_patches has num_context_patches rows, target_patches has
+    num_target_patches rows; the embedding dim is preserved.
+    """
+    obj = JEPAObjective(num_context_patches=6, num_target_patches=4)
+    batch = {"patches": torch.randn(2, 16, 32)}
+    out = obj.prepare_batch(batch, step=0, device="cpu")
+    assert out["context_patches"].shape == (2, 6, 32)
+    assert out["target_patches"].shape == (2, 4, 32)
+
+
+def test_jepa_forward_stamps_loss_family_jepa():
+    """Goal: forward stamps ctx.loss_family == 'jepa'."""
+    obj = JEPAObjective()
+    batch = {"patches": torch.randn(2, 16, 32)}
+    batch = obj.prepare_batch(batch, step=0, device="cpu")
+    ctx = LossContext()
+    mo = ModelOutput(
+        outputs={"pred_embeddings": batch["target_patches"]},
+        extras={"target_embeddings": batch["target_patches"]},
+    )
+    obj(mo, batch, ctx)
+    assert ctx.loss_family == "jepa"
+
+
 def test_regression_jepa_target_must_not_have_grad():
     """Regression pin for ``jepa_target_grad``.
 

@@ -335,3 +335,87 @@ def test_invariant_safe_name_escapes_dots_and_slashes(raw, expected):
     spurious subdirectories or hidden files on disk.
     """
     assert _safe_name(raw) == expected
+
+
+# ---------------------------------------------------------------------------
+# Repro-kit emission (DESIGN §18.3 / §18.7)
+#
+# These exercise the full callback path against a real ``TinyCausalLM`` (the
+# _ToyModel cases above only cover the hook/flatten/escaping units). When the
+# callback fires it must drop a self-contained repro kit alongside the module
+# dump.
+# ---------------------------------------------------------------------------
+
+
+class _LMTrainer:
+    def __init__(self, model, run_dir: Path) -> None:
+        self.model = model
+        self._run_dir = run_dir
+
+
+def _tiny_lm():
+    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+
+    return TinyCausalLM(
+        vocab_size=16, d_model=8, n_layers=1, n_heads=2, max_seq_len=8
+    )
+
+
+def test_invariant_repro_kit_written_on_nan_fire(tmp_path):
+    """When a NaN forward fires, the callback writes one ``repro_nan_*`` kit
+    containing ``repro.py``, ``batch.pt`` and ``model_state.safetensors``, plus
+    at least one module dump under ``nan_dumps``.
+    """
+    from lighttrain.engine._context import StepContext
+
+    model = _tiny_lm()
+    with torch.no_grad():
+        model.tok_emb.weight[0].fill_(float("nan"))
+    cb = NanHunterCallback()
+    ctx = StepContext(run_dir=tmp_path)
+    cb.on_train_start(trainer=_LMTrainer(model, tmp_path), ctx=ctx)
+    cb.on_step_begin(
+        step=1,
+        batch={
+            "input_ids": torch.zeros(1, 4, dtype=torch.long),  # row 0 ⇒ NaN
+            "attention_mask": torch.ones(1, 4, dtype=torch.long),
+        },
+    )
+    with pytest.raises(RuntimeError, match="NaN/Inf"):
+        model(input_ids=torch.zeros(1, 4, dtype=torch.long))
+    cb.on_train_end()
+
+    diag = tmp_path / "diagnostics"
+    repros = sorted(diag.glob("repro_nan_*"))
+    assert len(repros) == 1, f"expected one repro kit, got {repros}"
+    assert (repros[0] / "repro.py").exists()
+    assert (repros[0] / "batch.pt").exists()
+    assert (repros[0] / "model_state.safetensors").exists()
+    assert sorted((diag / "nan_dumps").rglob("*.pt")), "expected a module dump"
+
+
+def test_invariant_repro_py_is_under_80_lines(tmp_path):
+    """The emitted ``repro.py`` stays ≤80 lines (DESIGN §18.3)."""
+    from lighttrain.engine._context import StepContext
+
+    model = _tiny_lm()
+    with torch.no_grad():
+        model.tok_emb.weight[0].fill_(float("inf"))
+    cb = NanHunterCallback()
+    ctx = StepContext(run_dir=tmp_path)
+    cb.on_train_start(trainer=_LMTrainer(model, tmp_path), ctx=ctx)
+    cb.on_step_begin(
+        step=1,
+        batch={
+            "input_ids": torch.zeros(1, 4, dtype=torch.long),
+            "attention_mask": torch.ones(1, 4, dtype=torch.long),
+        },
+    )
+    with pytest.raises(RuntimeError):
+        model(input_ids=torch.zeros(1, 4, dtype=torch.long))
+    cb.on_train_end()
+
+    repros = sorted((tmp_path / "diagnostics").glob("repro_nan_*"))
+    assert repros
+    lines = (repros[0] / "repro.py").read_text(encoding="utf-8").splitlines()
+    assert len(lines) <= 80, f"repro.py is {len(lines)} lines, DESIGN §18.3 says ≤80"

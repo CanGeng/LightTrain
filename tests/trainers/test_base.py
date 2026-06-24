@@ -160,6 +160,25 @@ def test_train_step_raises_on_invalid_return_type():
         trainer.train_step({})
 
 
+def test_train_step_loss_is_none_when_dict_omits_loss_key():
+    """Goal (merged from tests/test_trainer_step_protocol.py): a dict result
+    without a 'loss' key normalizes to StepOutput.loss is None while the other
+    metrics survive — the loss is not fabricated.
+    """
+
+    class _NoLossTrainer(Trainer):
+        def fit(self, *, steps=None):  # pragma: no cover
+            ...
+
+        def _step(self, batch):
+            return {"acc": 0.5}
+
+    trainer = _NoLossTrainer(**_base_kwargs())
+    out = trainer.train_step({})
+    assert out.loss is None
+    assert "acc" in out.metrics
+
+
 # ===========================================================================
 # state_dict / load_state_dict
 # ===========================================================================
@@ -264,3 +283,68 @@ def test_pctx_property_falls_back_to_single_gpu():
     pctx = trainer._pctx
     assert isinstance(pctx, ParallelContext)
     assert pctx.is_main_process is True
+
+
+# ===========================================================================
+# Flat-trainer concreteness + interface coverage
+# (merged from tests/test_trainer_step_protocol.py — step protocol layers 1+2)
+# ===========================================================================
+
+
+def test_base_trainer_is_concrete_and_default_step_routes_to_engine():
+    """After the keystone refactor Trainer is the flat trainer: it instantiates
+    directly, exposes a concrete fit(), and its default forward_loss is None so
+    _step defers to the engine (no NotImplementedError stub)."""
+    trainer = Trainer(**_base_kwargs())
+    assert hasattr(trainer, "fit")
+    assert trainer.forward_loss({}) is None
+
+
+def test_subclass_without_step_inherits_base_default():
+    """A subclass that omits _step uses the inherited flat-trainer _step."""
+
+    class _MissingStep(Trainer):
+        pass
+
+    trainer = _MissingStep(**_base_kwargs())
+    assert trainer is not None
+    assert _MissingStep._step is Trainer._step
+
+
+def test_subclass_without_fit_inherits_base_concrete_fit():
+    """fit() is concrete on the base; subclasses inherit it for free."""
+
+    class _MissingFit(Trainer):
+        def _step(self, batch):
+            return {"loss": 0.0}
+
+    trainer = _MissingFit(**_base_kwargs())
+    assert trainer is not None
+    assert _MissingFit.fit is Trainer.fit
+
+
+def test_concrete_trainers_expose_step_and_train_step():
+    """Interface coverage: every concrete trainer family has _step + train_step."""
+    from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
+    from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
+    from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
+    from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
+    from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
+
+    for cls in (PretrainTrainer, PreferenceTrainer, RewardModelTrainer, PPOTrainer, GRPOTrainer):
+        assert hasattr(cls, "_step"), f"{cls.__name__} missing _step"
+        assert hasattr(cls, "train_step"), f"{cls.__name__} missing train_step"
+
+
+def test_pretrain_uses_base_default_step_other_paradigms_override():
+    """PretrainTrainer relies on the flat default _step; the legacy paradigm
+    trainers (preference/reward/RL) still override it."""
+    from lighttrain.builtin_plugins.trainers._preference_base import PreferenceTrainer
+    from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
+    from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
+    from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
+    from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
+
+    assert PretrainTrainer._step is Trainer._step
+    for cls in (PreferenceTrainer, RewardModelTrainer, PPOTrainer, GRPOTrainer):
+        assert cls._step is not Trainer._step, f"{cls.__name__}._step should override the base default"

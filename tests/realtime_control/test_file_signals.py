@@ -214,6 +214,23 @@ with open({repr(str(sentinel))}, 'w') as f:
     assert sentinel.read_text() == "ctx,model,trainer"
 
 
+def test_inject_success_mutates_ctx_and_records_inject_event(tmp_path):
+    """A successful inject.py mutates the live ``ctx`` and records an
+    ``inject`` (success) event.
+
+    Setup: inject.py writes ``ctx.diagnostics['injected'] = 42``.
+    Expected: the mutation lands on the real ctx object (not a sentinel
+    file) AND a realtime event of kind ``inject`` is logged (source line
+    133 — distinct from the ``inject_error`` path).
+    """
+    cb, ctx, _opt = _setup(tmp_path)
+    _write_control(tmp_path, "inject.py", "ctx.diagnostics['injected'] = 42")
+    cb.on_step_end(step=1)
+    assert ctx.diagnostics.get("injected") == 42
+    events = ctx.diagnostics.get("realtime_events", [])
+    assert any(e["event"] == "inject" for e in events)
+
+
 def test_inject_error_recorded_as_inject_error_event(tmp_path):
     """When inject.py raises, the failure is recorded as an event of kind
     ``inject_error`` with ``str(exc)`` (line 134-140 of source).

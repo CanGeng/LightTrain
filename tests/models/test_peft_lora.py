@@ -29,7 +29,11 @@ peft = pytest.importorskip("peft")  # whole file requires peft
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import (  # noqa: E402 — after importorskip
     TinyCausalLM,
 )
-from lighttrain.builtin_plugins.models.peft import LoRAAdapter  # noqa: E402
+from lighttrain.builtin_plugins.models.peft import (  # noqa: E402
+    LoRAAdapter,
+    dump_peft_spec,
+    is_peft_wrapped,
+)
 
 # Tiny base parameters chosen for fast tests AND deterministic shape math.
 _BASE_KW = {"vocab_size": 64, "d_model": 16, "n_layers": 2, "n_heads": 4, "max_seq_len": 32}
@@ -344,3 +348,104 @@ def test_lora_get_base_model_returns_underlying_base():
     assert isinstance(base_ref, torch.nn.Module)
     # Type name must be TinyCausalLM (auto_target_modules dispatches on it).
     assert type(base_ref).__name__ == "TinyCausalLM"
+
+
+# ---------------------------------------------------------------------------
+# Forward contract (ModelOutput shape)
+# ---------------------------------------------------------------------------
+
+def test_lora_forward_returns_modeloutput_with_logits_of_correct_shape():
+    """The wrapped forward returns a ``ModelOutput`` whose ``outputs['logits']``
+    has shape ``(B, T, vocab)``.
+
+    Goal: pin the basic forward contract — wrapping must not alter the output
+    container type or logits geometry.
+    """
+    from lighttrain.protocols import ModelOutput
+
+    model = _make_lora()
+    B, T = 2, 4
+    ids = torch.randint(0, _BASE_KW["vocab_size"], (B, T))
+    out = model(input_ids=ids)
+    assert isinstance(out, ModelOutput)
+    assert "logits" in out.outputs
+    assert out.outputs["logits"].shape == (B, T, _BASE_KW["vocab_size"])
+
+
+# ---------------------------------------------------------------------------
+# peft detection + spec round-trip + optim wrapper integration
+# ---------------------------------------------------------------------------
+
+def test_is_peft_wrapped_true_for_adapter_false_for_bare_base():
+    """``is_peft_wrapped`` discriminates a LoRA-wrapped model (True) from a
+    bare ``TinyCausalLM`` (False).
+    """
+    model = _make_lora()
+    assert is_peft_wrapped(model) is True
+    base = TinyCausalLM(**_BASE_KW)
+    assert is_peft_wrapped(base) is False
+
+
+def test_lora_dump_peft_spec_rebuilds_matching_adapter_key_set():
+    """``dump_peft_spec`` emits a spec that ``build_minimal_model`` can rebuild
+    into an equivalent ``LoRAAdapter`` with the SAME adapter state_dict keys.
+
+    Setup: dump spec from adapter A; assert name/params; rebuild B.
+    Expected: ``spec['name'] == 'lora'``, r/lora_alpha echoed, ``base`` present;
+    rebuilt B is a LoRAAdapter and ``set(A.keys()) == set(B.keys())``.
+    """
+    from lighttrain.observability.minimal import build_minimal_model
+
+    a = _make_lora(r=4, lora_alpha=8)
+    spec = dump_peft_spec(a)
+    assert spec["name"] == "lora"
+    assert spec["params"]["r"] == 4
+    assert spec["params"]["lora_alpha"] == 8
+    assert "base" in spec["params"]
+    b = build_minimal_model(spec)
+    assert isinstance(b, LoRAAdapter)
+    assert set(a.state_dict().keys()) == set(b.state_dict().keys())
+
+
+def test_lora_optim_wrapper_only_includes_trainable_lora_params():
+    """When an optimizer is built off the wrapped model via ``AdamWWrapper``,
+    only the LoRA params (requires_grad=True) land in its param groups.
+
+    Setup: build optimizer through the project's AdamWWrapper.
+    Expected: summed numel across param_groups is < 10% of total params,
+    reflecting that peft froze the base.
+    """
+    from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper
+
+    model = _make_lora()
+    inner = AdamWWrapper(lr=1e-3).build(model)
+    n_trainable = sum(p.numel() for g in inner.param_groups for p in g["params"])
+    n_total = sum(p.numel() for p in model.parameters())
+    assert n_trainable < n_total * 0.10
+
+
+# ---------------------------------------------------------------------------
+# QLoRA / gradient-checkpointing safety hooks
+# ---------------------------------------------------------------------------
+
+def test_lora_enable_input_require_grads_keeps_forward_backward_working():
+    """``enable_input_require_grads()`` (needed by QLoRA) is a safe no-op/hook
+    install — forward + backward still succeed afterward.
+    """
+    model = _make_lora()
+    model.enable_input_require_grads()
+    ids = torch.randint(0, _BASE_KW["vocab_size"], (1, 4))
+    out = model(input_ids=ids)
+    out.outputs["logits"].mean().backward()
+
+
+def test_lora_gradient_checkpointing_enable_does_not_crash_silently():
+    """``gradient_checkpointing_enable()`` either succeeds or raises a clear
+    ValueError/RuntimeError (peft may refuse when the inner — tiny_lm — lacks
+    support). The contract is "no AttributeError / silent crash".
+    """
+    model = _make_lora()
+    try:
+        model.gradient_checkpointing_enable()
+    except (ValueError, RuntimeError):
+        pass
