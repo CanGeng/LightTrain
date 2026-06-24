@@ -15,11 +15,11 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.architectures.profile import LossOnlyObjective
 from lighttrain.builtin_plugins.losses.rl import GRPOLoss
 from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
 from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer, _effective_beta_kl
 from lighttrain.callbacks.base import Signal
+from lighttrain.optim.architectures.profile import LossOnlyObjective
 from lighttrain.protocols import ModelOutput
 
 

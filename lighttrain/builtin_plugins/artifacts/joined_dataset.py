@@ -28,7 +28,7 @@ from typing import Any
 
 import torch
 
-from lighttrain.artifacts import (
+from lighttrain.data.artifacts import (
     ArtifactHeader,
     ArtifactStoreProtocol,
     StaleArtifactError,

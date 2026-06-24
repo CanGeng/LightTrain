@@ -20,8 +20,7 @@ from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
 
 from .. import __version__
-from ..architectures.profile import ArchitectureProfile, LossOnlyObjective
-from ..checkpoint.manager import CheckpointManager
+from ..callbacks.logging._bus import LoggerBus
 from ..config import ConfigError, RootConfig, load_config
 from ..config._components import import_all_components
 from ..config._models import (
@@ -42,7 +41,8 @@ from ..config._user_modules import _IMPORTED_USER_MODULES  # noqa: F401
 from ..config._user_modules import import_user_modules as _import_user_modules
 from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
-from ..logging._bus import LoggerBus
+from ..engine.checkpoint.manager import CheckpointManager
+from ..optim.architectures.profile import ArchitectureProfile, LossOnlyObjective
 from ..registry import get as _registry_get
 from ..utils.accelerate import build_accelerator
 from ..utils.run_dir import make_run_dir, slugify
@@ -583,7 +583,9 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
     # CallbackIsolationSink — writes callback_failures.jsonl.
     if "CallbackIsolationSink" not in have:
         try:
-            from ..diagnostics.callback_isolation import CallbackIsolationSink
+            from ..observability.diagnostics.callback_isolation import (
+                CallbackIsolationSink,
+            )
 
             bus.add(CallbackIsolationSink())
             trainer.callbacks.append(bus.callbacks[-1])
@@ -727,7 +729,7 @@ def _prepare_run_dir(
 def _open_lineage_store(run_dir: Path) -> Any:
     """Per-run SQLite lineage store (soft dependency; None on failure)."""
     try:
-        from ..lineage.store import LineageStore as _LineageStore
+        from ..observability.lineage.store import LineageStore as _LineageStore
 
         return _LineageStore(run_dir / "lineage.sqlite")
     except Exception:  # noqa: BLE001
@@ -1236,8 +1238,8 @@ def build_prep_runner(
     Returns a dict ``{cfg, runner, graph, store_root}``. Used by the
     ``prep`` family of CLI commands.
     """
-    from ..prepgraph.dag import PrepGraph
-    from ..prepgraph.runner import PrepRunner
+    from ..data.prepgraph.dag import PrepGraph
+    from ..data.prepgraph.runner import PrepRunner
 
     # load_config below populates the registry (register_components default True).
     cfg = load_config(config_path, overrides=overrides or [])

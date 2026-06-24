@@ -13,7 +13,12 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from lighttrain.prepgraph.node import NodeEstimate, NodeResult, PrepNode, RunContext
+from lighttrain.data.prepgraph.node import (
+    NodeEstimate,
+    NodeResult,
+    PrepNode,
+    RunContext,
+)
 from lighttrain.registry import register
 
 

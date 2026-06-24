@@ -16,7 +16,7 @@ lighttrain 定义五个清晰的缝，其余部分保持直白。
    [配置](../guide/configuration.zh-CN.md)。
 
 3. **Engine + UpdateRule** ([engine/](../../lighttrain/engine)、
-   [update_rules/](../../lighttrain/update_rules)) —— engine 拥有 accelerator
+   [update_rules/](../../lighttrain/engine/update_rules)) —— engine 拥有 accelerator
    （混合精度、设备），把每步数学（前向/反向/clip/step/scheduler）下放给可替换的
    `UpdateRule`，于是研究代码改训练数学无需动 engine。
 
@@ -31,7 +31,7 @@ lighttrain 定义五个清晰的缝，其余部分保持直白。
    （`STOP_TRAINING > RETRY_STEP > SKIP_STEP > CONTINUE`）。见
    [诊断](../operations/diagnostics.zh-CN.md)。
 
-5. **PrepGraph** ([prepgraph/](../../lighttrain/prepgraph)) —— 内容寻址的数据预处理
+5. **PrepGraph** ([prepgraph/](../../lighttrain/data/prepgraph)) —— 内容寻址的数据预处理
    DAG；fingerprint = `sha256(config + code_version + schema_version + 排序后的
    upstream_fps)`；结果原子落盘，`MANIFEST_COMPLETE.json` 最后写。见
    [数据与 PrepGraph](data-prepgraph.zh-CN.md)。

@@ -42,8 +42,8 @@ class PretrainTrainer(Trainer):
         of any concrete loss (DESIGN §3.3); ``CrossEntropyLoss`` is a registered
         impl in ``lighttrain.builtin_plugins.losses``.
         """
-        from lighttrain.architectures.profile import LossOnlyObjective
         from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
+        from lighttrain.optim.architectures.profile import LossOnlyObjective
 
         return LossOnlyObjective(CrossEntropyLoss(), loss_family="next_token")
 

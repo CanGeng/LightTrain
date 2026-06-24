@@ -17,8 +17,8 @@ from typing import Any
 from torch.utils.data import DataLoader
 
 from lighttrain.config._resolver import resolve as _resolve
-from lighttrain.prepgraph.dag import PrepGraph
-from lighttrain.prepgraph.runner import PrepRunner
+from lighttrain.data.prepgraph.dag import PrepGraph
+from lighttrain.data.prepgraph.runner import PrepRunner
 from lighttrain.registry import register
 
 from .collators import CausalLMCollator

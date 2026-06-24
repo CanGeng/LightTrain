@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from lighttrain.invariants import InvariantError, evaluate_check
+from lighttrain.callbacks.invariants import InvariantError, evaluate_check
 from lighttrain.registry import get as registry_get
 
 

@@ -19,7 +19,7 @@ from lighttrain.builtin_plugins.callbacks.builtins.lineage_recorder import (
     LineageRecorderCallback,
 )
 from lighttrain.callbacks.base import EventBus
-from lighttrain.lineage.store import LineageStore
+from lighttrain.observability.lineage.store import LineageStore
 
 
 def test_update_node_payload_merges_existing(tmp_path):
@@ -75,7 +75,7 @@ def test_checkpoint_events_dispatched_by_trainer(tmp_path):
     """PretrainTrainer must dispatch on_save_checkpoint_pre/post so the
     LineageRecorderCallback receives the path (REVIEW #7)."""
     from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
-    from lighttrain.checkpoint.manager import CheckpointManager
+    from lighttrain.engine.checkpoint.manager import CheckpointManager
 
     class _Spy:
         def __init__(self):

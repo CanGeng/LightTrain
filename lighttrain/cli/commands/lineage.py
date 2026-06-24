@@ -15,7 +15,7 @@ from lighttrain.cli._context import console
 
 def _open_lineage(db: Path) -> Any:
     """Open a LineageStore at ``db`` — caller closes."""
-    from lighttrain.lineage.store import LineageStore
+    from lighttrain.observability.lineage.store import LineageStore
 
     if not db.exists():
         console.print(f"[red]lineage db not found at {db}[/]")
@@ -91,7 +91,7 @@ def lineage_gc_cmd(
     keep_last: int = typer.Option(3, "--keep-last"),
     kind: str = typer.Option("artifact", "--kind", help="artifact|checkpoint|config|run"),
 ) -> None:
-    from lighttrain.lineage.retention import RetentionPolicy, gc_artifacts
+    from lighttrain.observability.lineage.retention import RetentionPolicy, gc_artifacts
 
     store = _open_lineage(db)
     try:
@@ -114,7 +114,7 @@ def lineage_prune_cmd(
     db: Path = typer.Option(..., "--db"),
     dry_run: bool = typer.Option(False, "--dry-run"),
 ) -> None:
-    from lighttrain.lineage.retention import prune_orphans
+    from lighttrain.observability.lineage.retention import prune_orphans
 
     store = _open_lineage(db)
     try:
@@ -131,7 +131,7 @@ def lineage_graph_cmd(
     out: Path | None = typer.Option(None, "--out", help="Write to file; ext=.dot or .mermaid."),
     fmt: str = typer.Option("mermaid", "--fmt", help="mermaid | dot"),
 ) -> None:
-    from lighttrain.lineage.dag import to_dot, to_mermaid
+    from lighttrain.observability.lineage.dag import to_dot, to_mermaid
 
     store = _open_lineage(db)
     try:

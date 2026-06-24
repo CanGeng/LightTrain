@@ -28,7 +28,7 @@ from typing import Any
 import torch
 import torch.nn as nn
 
-from lighttrain.architectures.profile import ArchitectureProfile
+from lighttrain.optim.architectures.profile import ArchitectureProfile
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
 

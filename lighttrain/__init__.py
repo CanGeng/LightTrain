@@ -6,7 +6,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
 from .callbacks.base import EventBus, Signal
-from .checkpoint.manager import CheckpointManager
+from .callbacks.logging._bus import LoggerBus
 from .config import (
     ComponentSpec,
     ConfigError,
@@ -19,7 +19,9 @@ from .config import (
 )
 from .distributed import ParallelContext
 from .engine._context import StepContext
-from .lineage import (
+from .engine.checkpoint.manager import CheckpointManager
+from .models.extras import ExtraOutputSpec, ExtrasHookManager
+from .observability.lineage import (
     LineageStore,
     SchemaMigrationError,
     content_hash,
@@ -27,8 +29,6 @@ from .lineage import (
     migrate_file,
     migrate_payload,
 )
-from .logging._bus import LoggerBus
-from .models.extras import ExtraOutputSpec, ExtrasHookManager
 from .registry import (
     KNOWN_CATEGORIES,
     NotRegisteredError,
@@ -48,7 +48,7 @@ from .trainers.base import Trainer
 try:
     __version__ = _pkg_version("lighttrain")
 except PackageNotFoundError:
-    __version__ = "0.3.2"
+    __version__ = "0.4.0"
 
 __all__ = [
     "CheckpointManager",

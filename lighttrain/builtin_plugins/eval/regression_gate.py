@@ -17,7 +17,7 @@ class RegressionGate:
     """Metric regression gate for CI / sweep early-stopping.
 
     On each call to :meth:`check`, evaluates ``metric <op> threshold``. When the
-    condition is violated, raises :class:`lighttrain.invariants.InvariantError`
+    condition is violated, raises :class:`lighttrain.callbacks.invariants.InvariantError`
     (``action="abort"``), warns (``action="warn"``), or skips (``action="skip"``).
 
     Parameters
@@ -90,7 +90,7 @@ class RegressionGate:
 
         if self.action == "abort":
             try:
-                from lighttrain.invariants import InvariantError
+                from lighttrain.callbacks.invariants import InvariantError
                 raise InvariantError(msg)
             except ImportError:
                 raise RuntimeError(msg) from None

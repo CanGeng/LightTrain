@@ -11,9 +11,9 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from lighttrain.checkpoint.manager import CheckpointManager
 from lighttrain.cli._app import app
-from lighttrain.lineage.store import LineageStore
+from lighttrain.engine.checkpoint.manager import CheckpointManager
+from lighttrain.observability.lineage.store import LineageStore
 
 
 def _make_min_run(tmp_path: Path) -> Path:

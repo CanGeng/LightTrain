@@ -19,10 +19,10 @@ import torch
 import torch.nn.functional as F
 import yaml
 
+from lighttrain.engine.update_rules._primitives import MicroState, apply_update
 from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.registry import register
 from lighttrain.trainers.base import Trainer
-from lighttrain.update_rules._primitives import MicroState, apply_update
 
 REPO = Path(__file__).resolve().parent.parent
 CORPUS = REPO / "tests" / "fixtures" / "tiny_corpus.txt"

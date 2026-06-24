@@ -30,15 +30,15 @@ from typing import Any
 import torch
 
 from lighttrain.callbacks.base import Signal
-from lighttrain.protocols import LossContext, ModelOutput
-from lighttrain.registry import register
-from lighttrain.update_rules._primitives import (  # noqa: F401  (_register_new_params re-exported for back-compat)
+from lighttrain.engine.update_rules._primitives import (  # noqa: F401  (_register_new_params re-exported for back-compat)
     MicroState,
     _current_lr,
     _register_new_params,
     apply_update,
     make_autocast,
 )
+from lighttrain.protocols import LossContext, ModelOutput
+from lighttrain.registry import register
 from lighttrain.utils.seed import restore_rng_state, rng_state
 
 _log = logging.getLogger(__name__)

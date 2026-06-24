@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from lighttrain.diagnostics.oom_report import is_oom_exception, write_oom_report
+from lighttrain.observability.diagnostics.oom_report import (
+    is_oom_exception,
+    write_oom_report,
+)
 
 
 def test_is_oom_exception_text_match():

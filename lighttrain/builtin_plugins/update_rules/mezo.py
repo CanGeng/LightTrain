@@ -27,9 +27,9 @@ from typing import Any
 
 import torch
 
+from lighttrain.engine.update_rules._primitives import make_autocast
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
-from lighttrain.update_rules._primitives import make_autocast
 
 
 def _to_metric(value: Any) -> float:

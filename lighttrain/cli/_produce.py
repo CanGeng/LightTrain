@@ -69,7 +69,7 @@ def run_produce(
         raise RuntimeError("data module has no `dataset`; produce-artifact needs one")
 
     # Lineage store on the run dir.
-    from ..lineage.store import LineageStore
+    from ..observability.lineage.store import LineageStore
 
     lineage_store = LineageStore(run_dir / "lineage.sqlite")
     run_node = lineage_store.upsert_node(

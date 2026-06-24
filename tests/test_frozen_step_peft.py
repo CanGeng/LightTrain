@@ -16,11 +16,11 @@ torch = pytest.importorskip("torch")
 peft = pytest.importorskip("peft")
 
 from lighttrain.builtin_plugins.models.peft import LoRAAdapter  # noqa: E402
-from lighttrain.diagnostics.frozen_step import (  # noqa: E402
+from lighttrain.observability.diagnostics.frozen_step import (  # noqa: E402
     FrozenStepWriter,
     read_frozen_step_bundle,
 )
-from lighttrain.minimal import build_minimal_model  # noqa: E402
+from lighttrain.observability.minimal import build_minimal_model  # noqa: E402
 
 
 def _spec_for_tiny() -> dict:

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from lighttrain.checkpoint.manager import CheckpointManager
+from lighttrain.engine.checkpoint.manager import CheckpointManager
 
 
 def _toy_state(value: float = 1.0) -> dict:

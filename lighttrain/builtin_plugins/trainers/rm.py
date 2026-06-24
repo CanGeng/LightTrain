@@ -15,10 +15,10 @@ from lighttrain.builtin_plugins.rl.value_heads import (
     LinearValueHead,  # re-exported; registers value_head/linear
 )
 from lighttrain.config._resolver import resolve as _resolve
+from lighttrain.engine.update_rules._primitives import apply_update
 from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.registry import register
 from lighttrain.trainers._utils import validate_batch
-from lighttrain.update_rules._primitives import apply_update
 
 from ._preference_base import PreferenceTrainer
 

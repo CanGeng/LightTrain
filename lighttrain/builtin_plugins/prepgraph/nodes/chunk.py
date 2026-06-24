@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from typing import Any
 
-from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.data.prepgraph.node import NodeResult, PrepNode, RunContext
 from lighttrain.registry import register
 
 

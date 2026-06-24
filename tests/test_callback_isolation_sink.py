@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lighttrain.callbacks.base import EventBus
-from lighttrain.diagnostics.callback_isolation import (
+from lighttrain.observability.diagnostics.callback_isolation import (
     CallbackIsolationSink,
     write_callback_report,
 )

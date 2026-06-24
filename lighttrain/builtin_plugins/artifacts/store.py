@@ -27,7 +27,7 @@ from typing import Any
 
 import torch
 
-from lighttrain.artifacts.base import (
+from lighttrain.data.artifacts.base import (
     ArtifactHeader,
     ArtifactIncompleteError,
     ArtifactStoreBase,

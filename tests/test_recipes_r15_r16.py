@@ -167,7 +167,7 @@ def test_r15_report_contains_sensitivity(sweep_setup, tmp_path: Path):
 
 
 def _make_gen1(tmp_path: Path):
-    from lighttrain.lineage.store import LineageStore
+    from lighttrain.observability.lineage.store import LineageStore
 
     gen1_dir = tmp_path / "gen1"
     gen1_dir.mkdir()
@@ -189,7 +189,7 @@ def test_r16_fork_gen2_from_gen1(tmp_path: Path):
 
 
 def test_r16_three_generation_lineage(tmp_path: Path):
-    from lighttrain.lineage.store import LineageStore
+    from lighttrain.observability.lineage.store import LineageStore
 
     gen1_dir, ckpt1 = _make_gen1(tmp_path)
 

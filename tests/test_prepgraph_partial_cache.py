@@ -20,8 +20,8 @@ from lighttrain.builtin_plugins.data import (
 from lighttrain.builtin_plugins.prepgraph import (
     nodes as _nodes,  # noqa: F401 — register
 )
-from lighttrain.prepgraph.dag import PrepGraph
-from lighttrain.prepgraph.runner import PrepRunner
+from lighttrain.data.prepgraph.dag import PrepGraph
+from lighttrain.data.prepgraph.runner import PrepRunner
 
 
 @pytest.fixture

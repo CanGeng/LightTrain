@@ -7,8 +7,8 @@ import json
 import pytest
 import yaml
 
-from lighttrain.lineage import LineageStore
-from lighttrain.lineage.migration import (
+from lighttrain.observability.lineage import LineageStore
+from lighttrain.observability.lineage.migration import (
     SchemaMigrationError,
     find_path,
     migrate_file,

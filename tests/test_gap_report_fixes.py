@@ -17,7 +17,6 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from lighttrain.architectures.profile import ArchitectureProfile, LossOnlyObjective
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.cli._runtime import (
     _build_arch_profile,
@@ -25,6 +24,10 @@ from lighttrain.cli._runtime import (
     _wire_objective,
 )
 from lighttrain.config import ConfigError, load_config
+from lighttrain.optim.architectures.profile import (
+    ArchitectureProfile,
+    LossOnlyObjective,
+)
 from lighttrain.protocols import ModelOutput
 
 

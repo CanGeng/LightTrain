@@ -1,7 +1,7 @@
 """Objective extensions.
 
 The ``objective`` abstraction (``ObjectiveProfile`` in
-``lighttrain.architectures.profile``) is for non-standard training objectives —
+``lighttrain.optim.architectures.profile``) is for non-standard training objectives —
 the default LM/MLM paths use ``loss:``, not ``objective:``, so *all* concrete
 objective implementations live here (DESIGN §3.3: protocol in core, impls in
 frontier). Registered via auto-discovery; import the submodule you need:

@@ -16,9 +16,9 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.architectures.profile import LossOnlyObjective
 from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
 from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
+from lighttrain.optim.architectures.profile import LossOnlyObjective
 from lighttrain.protocols import ModelOutput
 
 GRPO_GOLDEN = [0.26884612, 0.26883215, 0.26881814, 0.26880413, 0.2687901]

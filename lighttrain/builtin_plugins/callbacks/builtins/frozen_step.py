@@ -20,7 +20,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from lighttrain.diagnostics.frozen_step import FrozenStepWriter
+from lighttrain.observability.diagnostics.frozen_step import FrozenStepWriter
 from lighttrain.registry import register
 
 _log = logging.getLogger(__name__)

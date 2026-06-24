@@ -25,9 +25,13 @@ from typing import Any
 import torch
 
 from lighttrain.callbacks.base import Signal
+from lighttrain.engine.update_rules._primitives import (
+    MicroState,
+    _current_lr,
+    apply_update,
+)
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
-from lighttrain.update_rules._primitives import MicroState, _current_lr, apply_update
 
 
 @register("update_rule", "rl")

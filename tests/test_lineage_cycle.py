@@ -6,8 +6,8 @@ import warnings
 
 import pytest
 
-from lighttrain.lineage import LineageStore, cycle_check
-from lighttrain.lineage.dag import apply_cycle_policy
+from lighttrain.observability.lineage import LineageStore, cycle_check
+from lighttrain.observability.lineage.dag import apply_cycle_policy
 
 
 def _build_loop(store: LineageStore, run_id: str = "R1"):
@@ -39,7 +39,7 @@ def test_cycle_check_no_hit_on_external_run(tmp_path):
 
 
 def test_apply_cycle_policy_warn_emits_warning():
-    from lighttrain.lineage.dag import CycleHit
+    from lighttrain.observability.lineage.dag import CycleHit
 
     hits = [CycleHit(node_id=1, via_run_id="R1", depth=1)]
     with warnings.catch_warnings(record=True) as caught:
@@ -49,7 +49,7 @@ def test_apply_cycle_policy_warn_emits_warning():
 
 
 def test_apply_cycle_policy_forbid_raises():
-    from lighttrain.lineage.dag import CycleHit
+    from lighttrain.observability.lineage.dag import CycleHit
 
     hits = [CycleHit(node_id=1, via_run_id="R1", depth=1)]
     with pytest.raises(RuntimeError):
@@ -57,7 +57,7 @@ def test_apply_cycle_policy_forbid_raises():
 
 
 def test_apply_cycle_policy_allowed_is_silent():
-    from lighttrain.lineage.dag import CycleHit
+    from lighttrain.observability.lineage.dag import CycleHit
 
     hits = [CycleHit(node_id=1, via_run_id="R1", depth=1)]
     with warnings.catch_warnings(record=True) as caught:
