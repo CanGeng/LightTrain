@@ -20,7 +20,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.update_rules.standard import (
+from lighttrain.builtin_plugins.engine.update_rules.standard import (
     StandardUpdateRule,
     _register_new_params,
 )

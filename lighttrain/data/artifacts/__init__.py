@@ -3,7 +3,7 @@
 Header / errors / base class live in :mod:`lighttrain.data.artifacts.base`; the
 structural protocol is in :mod:`lighttrain.protocols`. Concrete store backends
 + producers + the joined dataset are registered impls in
-``lighttrain.builtin_plugins.artifacts`` (DESIGN §3.3).
+``lighttrain.builtin_plugins.data.artifacts`` (DESIGN §3.3).
 """
 
 from __future__ import annotations

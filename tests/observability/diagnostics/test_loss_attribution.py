@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.builtin_plugins.diagnostics.loss_attribution import (
-    compute_loss_attribution,
-)
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.observability.diagnostics.loss_attribution import (
+    compute_loss_attribution,
+)
 from lighttrain.protocols import LossContext
 
 

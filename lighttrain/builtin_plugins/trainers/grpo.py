@@ -14,13 +14,13 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
+from lighttrain.builtin_plugins.engine.update_rules.rl import RLUpdateRule
 from lighttrain.builtin_plugins.losses.rl import GRPOLoss
 from lighttrain.builtin_plugins.rl.buffers import RolloutBuffer
 from lighttrain.builtin_plugins.rl.ref_policy import ReferencePolicy, freeze_as_ref
 from lighttrain.builtin_plugins.rl.rollout import (
     RolloutEngine,  # noqa: F401 — import also registers hf_generate
 )
-from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
 from lighttrain.config._resolver import resolve as _resolve
 from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.registry import register

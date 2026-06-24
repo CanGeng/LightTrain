@@ -1,7 +1,7 @@
 """Tests for TinyMamba architecture (M7)."""
 import torch
 
-from lighttrain.builtin_plugins.architectures.mamba import (
+from lighttrain.builtin_plugins.optim.architectures.mamba import (
     TinyMambaConfig,
     TinyMambaModel,
     mamba_profile,

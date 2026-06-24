@@ -1,4 +1,4 @@
-"""Adversarial tests for ``lighttrain.builtin_plugins.realtime_control.file_signals.FileSignalsCallback``.
+"""Adversarial tests for ``lighttrain.builtin_plugins.callbacks.realtime_control.file_signals.FileSignalsCallback``.
 
 Coverage beyond ``tests/test_realtime_control.py`` (which tests the basic
 lr_scale / stop / eval_now / inject paths):
@@ -25,7 +25,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.realtime_control.file_signals import FileSignalsCallback
+from lighttrain.builtin_plugins.callbacks.realtime_control.file_signals import (
+    FileSignalsCallback,
+)
 from lighttrain.callbacks.base import Signal
 from lighttrain.engine._context import StepContext
 

@@ -7,7 +7,9 @@ import json
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.diagnostics.dead_neuron import DeadNeuronCallback
+from lighttrain.builtin_plugins.observability.diagnostics.dead_neuron import (
+    DeadNeuronCallback,
+)
 from lighttrain.engine._context import StepContext
 from tests._diagnostics import expect_nonempty
 

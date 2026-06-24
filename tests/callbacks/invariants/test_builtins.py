@@ -1,5 +1,5 @@
 """Tests for the built-in registered invariants in
-``lighttrain.builtin_plugins.invariants.builtins``.
+``lighttrain.builtin_plugins.callbacks.invariants.builtins``.
 
 Layered alongside ``tests/callbacks/invariants/test_dsl_sandbox.py`` (which
 covers the DSL sandbox / ``evaluate_check``). This module instead pins the
@@ -18,7 +18,7 @@ import torch
 # Importing the builtins module registers the seven default invariants under
 # the ``("invariant", ...)`` namespace as an import side effect. Import it
 # explicitly so this module is self-contained regardless of plugin-load order.
-import lighttrain.builtin_plugins.invariants.builtins  # noqa: F401
+import lighttrain.builtin_plugins.callbacks.invariants.builtins  # noqa: F401
 from lighttrain.registry import get as registry_get
 
 

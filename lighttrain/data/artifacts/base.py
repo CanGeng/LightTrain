@@ -2,7 +2,7 @@
 
 The concrete on-disk backends (safetensors-shards / memmap-fixed / parquet-rows)
 + the ``open_artifact_store`` factory are registered impls in
-``lighttrain.builtin_plugins.artifacts.store`` (DESIGN §3.3); they subclass
+``lighttrain.builtin_plugins.data.artifacts.store`` (DESIGN §3.3); they subclass
 ``ArtifactStoreBase`` and carry an :class:`ArtifactHeader`. The structural
 ``ArtifactStoreProtocol`` lives in :mod:`lighttrain.protocols`.
 """
@@ -88,7 +88,7 @@ class ArtifactHeader:
 class ArtifactStoreBase:
     """Shared bookkeeping for the on-disk store backends (the core base class).
 
-    Concrete backends (``lighttrain.builtin_plugins.artifacts.store``) subclass
+    Concrete backends (``lighttrain.builtin_plugins.data.artifacts.store``) subclass
     this and implement ``put / get / contains / iter_keys / finalize``
     (the structural ``ArtifactStoreProtocol`` in ``lighttrain.protocols``).
     """

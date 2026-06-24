@@ -5,7 +5,7 @@ masked-language-model Transformers backed by HuggingFace or TinyLM.
 
 Usage::
 
-    from lighttrain.builtin_plugins.architectures.transformer import transformer_profile
+    from lighttrain.builtin_plugins.optim.architectures.transformer import transformer_profile
 
     profile = transformer_profile()                   # next_token default
     profile = transformer_profile(loss_family="mlm")  # BERT-style

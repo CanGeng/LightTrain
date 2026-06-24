@@ -206,10 +206,10 @@ def test_engine_constructor_stores_components_by_reference():
 
 import torch  # noqa: E402
 
-from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss  # noqa: E402
-from lighttrain.builtin_plugins.update_rules.standard import (  # noqa: E402
+from lighttrain.builtin_plugins.engine.update_rules.standard import (  # noqa: E402
     StandardUpdateRule,
 )
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss  # noqa: E402
 from lighttrain.callbacks.base import EventBus  # noqa: E402
 from lighttrain.protocols import ModelOutput  # noqa: E402
 

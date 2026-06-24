@@ -247,11 +247,11 @@ class TinyCausalLM(nn.Module):
 | `lora` | LoRA PEFT 适配器（包装 base model） | [builtin_plugins/models/peft/_lora.py](../../lighttrain/builtin_plugins/models/peft/_lora.py) |
 | `ia3` | IA³ PEFT 适配器 | [builtin_plugins/models/peft/_ia3.py](../../lighttrain/builtin_plugins/models/peft/_ia3.py) |
 | `adalora` | AdaLoRA 自适应秩 PEFT | [builtin_plugins/models/peft/_adalora.py](../../lighttrain/builtin_plugins/models/peft/_adalora.py) |
-| `jepa` *(plugin)* | JEPA 架构（图像 / 语言 JEPA 训练） | [lighttrain/builtin_plugins/architectures/jepa.py](../../lighttrain/builtin_plugins/architectures/jepa.py) |
+| `jepa` *(plugin)* | JEPA 架构（图像 / 语言 JEPA 训练） | [lighttrain/builtin_plugins/optim/architectures/jepa.py](../../lighttrain/builtin_plugins/optim/architectures/jepa.py) |
 | `qlora` *(plugin)* | QLoRA（4-bit 量化 base + LoRA）PEFT | [lighttrain/builtin_plugins/quant/_qlora.py](../../lighttrain/builtin_plugins/quant/_qlora.py) |
-| `tiny_rwkv` *(plugin)* | RWKV 时间混合架构 | [lighttrain/builtin_plugins/architectures/rwkv/](../../lighttrain/builtin_plugins/architectures/rwkv/__init__.py) |
-| `tiny_mamba` *(plugin)* | Mamba / SSM 架构 | [lighttrain/builtin_plugins/architectures/mamba/](../../lighttrain/builtin_plugins/architectures/mamba/__init__.py) |
-| `tiny_unet` *(plugin)* | Diffusion U-Net | [lighttrain/builtin_plugins/architectures/diffusion_unet/](../../lighttrain/builtin_plugins/architectures/diffusion_unet/__init__.py) |
+| `tiny_rwkv` *(plugin)* | RWKV 时间混合架构 | [lighttrain/builtin_plugins/optim/architectures/rwkv/](../../lighttrain/builtin_plugins/optim/architectures/rwkv/__init__.py) |
+| `tiny_mamba` *(plugin)* | Mamba / SSM 架构 | [lighttrain/builtin_plugins/optim/architectures/mamba/](../../lighttrain/builtin_plugins/optim/architectures/mamba/__init__.py) |
+| `tiny_unet` *(plugin)* | Diffusion U-Net | [lighttrain/builtin_plugins/optim/architectures/diffusion_unet/](../../lighttrain/builtin_plugins/optim/architectures/diffusion_unet/__init__.py) |
 
 ---
 
@@ -330,7 +330,7 @@ def load_state_dict(self, sd) -> None: ...
 def optim_state_bytes(self, model) -> int: ...
 ```
 
-**调用时序**（[builtin_plugins/update_rules/standard.py:280-307](../../lighttrain/builtin_plugins/update_rules/standard.py#L280-L307)）：每步
+**调用时序**（[builtin_plugins/engine/update_rules/standard.py:280-307](../../lighttrain/builtin_plugins/engine/update_rules/standard.py#L280-L307)）：每步
 `clip_grad_norm_(...)` → `optimizer.step()` → `zero_grad()`。**`step()` 时梯度为全秩、未被框架
 改动**（无 closure、无预先 grad mutation）——梯度操纵型优化器（如 GaLore）可在 `.step()` 内
 安全读取并投影 `.grad`。
@@ -478,7 +478,7 @@ class LineFileTextDataset:
 |------|------|------|
 | `line_file_text` | 每行一条文本，byte tokenizer | [builtin_plugins/data/core/datasets.py](../../lighttrain/builtin_plugins/data/core/datasets.py) |
 | `preference_jsonl` | JSONL 偏好对（chosen/rejected input_ids + labels） | [builtin_plugins/data/core/datasets.py](../../lighttrain/builtin_plugins/data/core/datasets.py) |
-| `artifact_joined` | 从 ArtifactStore 读取预计算张量 | [builtin_plugins/artifacts/joined_dataset.py](../../lighttrain/builtin_plugins/artifacts/joined_dataset.py) |
+| `artifact_joined` | 从 ArtifactStore 读取预计算张量 | [builtin_plugins/data/artifacts/joined_dataset.py](../../lighttrain/builtin_plugins/data/artifacts/joined_dataset.py) |
 
 ---
 
@@ -719,7 +719,7 @@ def load_state_dict(self, sd: Mapping[str, Any]) -> None: ...
 
 **step 返回值要求**：dict，必须含 `"loss"` key，可选 `"grad_norm"` 等。
 
-**极简范例**：[lighttrain/builtin_plugins/update_rules/standard.py:45](../../lighttrain/builtin_plugins/update_rules/standard.py#L45)
+**极简范例**：[lighttrain/builtin_plugins/engine/update_rules/standard.py:45](../../lighttrain/builtin_plugins/engine/update_rules/standard.py#L45)
 
 ```python
 @register("update_rule", "standard")
@@ -737,13 +737,13 @@ class StandardUpdateRule:
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `standard` | 前向+反向+clip grad+optimizer step，支持梯度累积 | [builtin_plugins/update_rules/standard.py](../../lighttrain/builtin_plugins/update_rules/standard.py) |
-| `sam` | Sharpness-Aware Minimization（两次前向） | [builtin_plugins/update_rules/sam.py](../../lighttrain/builtin_plugins/update_rules/sam.py) |
-| `mezo` | Memory-Efficient Zeroth-Order Optimization | [builtin_plugins/update_rules/mezo.py](../../lighttrain/builtin_plugins/update_rules/mezo.py) |
-| `rl` | RL 更新规则（PPO/GRPO 内部用） | [builtin_plugins/update_rules/rl.py](../../lighttrain/builtin_plugins/update_rules/rl.py) |
-| `forward_forward` *(plugin)* | Forward-Forward 算法 | [builtin_plugins/update_rules/forward_forward/](../../lighttrain/builtin_plugins/update_rules/forward_forward/__init__.py) |
-| `pcn` *(plugin)* | 预测编码网络 | [builtin_plugins/update_rules/pcn/](../../lighttrain/builtin_plugins/update_rules/pcn/__init__.py) |
-| `dfa` *(plugin)* | Direct Feedback Alignment | [builtin_plugins/update_rules/dfa/](../../lighttrain/builtin_plugins/update_rules/dfa/__init__.py) |
+| `standard` | 前向+反向+clip grad+optimizer step，支持梯度累积 | [builtin_plugins/engine/update_rules/standard.py](../../lighttrain/builtin_plugins/engine/update_rules/standard.py) |
+| `sam` | Sharpness-Aware Minimization（两次前向） | [builtin_plugins/engine/update_rules/sam.py](../../lighttrain/builtin_plugins/engine/update_rules/sam.py) |
+| `mezo` | Memory-Efficient Zeroth-Order Optimization | [builtin_plugins/engine/update_rules/mezo.py](../../lighttrain/builtin_plugins/engine/update_rules/mezo.py) |
+| `rl` | RL 更新规则（PPO/GRPO 内部用） | [builtin_plugins/engine/update_rules/rl.py](../../lighttrain/builtin_plugins/engine/update_rules/rl.py) |
+| `forward_forward` *(plugin)* | Forward-Forward 算法 | [builtin_plugins/engine/update_rules/forward_forward/](../../lighttrain/builtin_plugins/engine/update_rules/forward_forward/__init__.py) |
+| `pcn` *(plugin)* | 预测编码网络 | [builtin_plugins/engine/update_rules/pcn/](../../lighttrain/builtin_plugins/engine/update_rules/pcn/__init__.py) |
+| `dfa` *(plugin)* | Direct Feedback Alignment | [builtin_plugins/engine/update_rules/dfa/](../../lighttrain/builtin_plugins/engine/update_rules/dfa/__init__.py) |
 
 ---
 
@@ -797,13 +797,13 @@ class EMACallback:
 | `frozen_step` | 前 N 步冻结指定模块参数 | [builtin_plugins/callbacks/builtins/frozen_step.py](../../lighttrain/builtin_plugins/callbacks/builtins/frozen_step.py) |
 | `lineage_recorder` | 记录训练 lineage 元信息 | [builtin_plugins/callbacks/builtins/lineage_recorder.py](../../lighttrain/builtin_plugins/callbacks/builtins/lineage_recorder.py) |
 | `invariants` | 在每步运行一组 invariant 检查 | [builtin_plugins/callbacks/invariants.py](../../lighttrain/builtin_plugins/callbacks/invariants.py) |
-| `dynamic_artifact` | 训练中动态收集模型输出张量 | [builtin_plugins/artifacts/dynamic_producer.py](../../lighttrain/builtin_plugins/artifacts/dynamic_producer.py) |
-| `dead_neuron` | 检测死亡神经元比例 | [builtin_plugins/diagnostics/dead_neuron.py](../../lighttrain/builtin_plugins/diagnostics/dead_neuron.py) |
-| `grad_flow` | 梯度流可视化（各层 grad norm） | [builtin_plugins/diagnostics/grad_flow.py](../../lighttrain/builtin_plugins/diagnostics/grad_flow.py) |
-| `loss_attribution` | loss 逐层归因分析 | [builtin_plugins/diagnostics/loss_attribution.py](../../lighttrain/builtin_plugins/diagnostics/loss_attribution.py) |
-| `nan_hunter` | NaN 溯源 hook（定位到具体层） | [builtin_plugins/diagnostics/nan_hunter.py](../../lighttrain/builtin_plugins/diagnostics/nan_hunter.py) |
-| `sample_preview` | 训练中采样输出预览 | [builtin_plugins/diagnostics/sample_preview.py](../../lighttrain/builtin_plugins/diagnostics/sample_preview.py) |
-| `file_signals` | 文件信号控制训练（动态调 lr / 暂停） | [builtin_plugins/realtime_control/file_signals.py](../../lighttrain/builtin_plugins/realtime_control/file_signals.py) |
+| `dynamic_artifact` | 训练中动态收集模型输出张量 | [builtin_plugins/data/artifacts/dynamic_producer.py](../../lighttrain/builtin_plugins/data/artifacts/dynamic_producer.py) |
+| `dead_neuron` | 检测死亡神经元比例 | [builtin_plugins/observability/diagnostics/dead_neuron.py](../../lighttrain/builtin_plugins/observability/diagnostics/dead_neuron.py) |
+| `grad_flow` | 梯度流可视化（各层 grad norm） | [builtin_plugins/observability/diagnostics/grad_flow.py](../../lighttrain/builtin_plugins/observability/diagnostics/grad_flow.py) |
+| `loss_attribution` | loss 逐层归因分析 | [builtin_plugins/observability/diagnostics/loss_attribution.py](../../lighttrain/builtin_plugins/observability/diagnostics/loss_attribution.py) |
+| `nan_hunter` | NaN 溯源 hook（定位到具体层） | [builtin_plugins/observability/diagnostics/nan_hunter.py](../../lighttrain/builtin_plugins/observability/diagnostics/nan_hunter.py) |
+| `sample_preview` | 训练中采样输出预览 | [builtin_plugins/observability/diagnostics/sample_preview.py](../../lighttrain/builtin_plugins/observability/diagnostics/sample_preview.py) |
+| `file_signals` | 文件信号控制训练（动态调 lr / 暂停） | [builtin_plugins/callbacks/realtime_control/file_signals.py](../../lighttrain/builtin_plugins/callbacks/realtime_control/file_signals.py) |
 
 ---
 
@@ -823,9 +823,9 @@ def flush(self) -> None: ...
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `console` | Rich 单行滚动输出 | [builtin_plugins/logging_backends/console.py](../../lighttrain/builtin_plugins/logging_backends/console.py) |
-| `jsonl` | JSON Lines 日志文件 | [builtin_plugins/logging_backends/jsonl.py](../../lighttrain/builtin_plugins/logging_backends/jsonl.py) |
-| `tensorboard` / `tb` | TensorBoard SummaryWriter | [builtin_plugins/logging_backends/tb.py](../../lighttrain/builtin_plugins/logging_backends/tb.py) |
+| `console` | Rich 单行滚动输出 | [builtin_plugins/callbacks/logging/console.py](../../lighttrain/builtin_plugins/callbacks/logging/console.py) |
+| `jsonl` | JSON Lines 日志文件 | [builtin_plugins/callbacks/logging/jsonl.py](../../lighttrain/builtin_plugins/callbacks/logging/jsonl.py) |
+| `tensorboard` / `tb` | TensorBoard SummaryWriter | [builtin_plugins/callbacks/logging/tb.py](../../lighttrain/builtin_plugins/callbacks/logging/tb.py) |
 
 ---
 
@@ -878,8 +878,8 @@ class NextTokenObjective:
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `transformer` | 标准 Transformer 架构 profile（core） | [builtin_plugins/architectures/transformer.py](../../lighttrain/builtin_plugins/architectures/transformer.py) |
-| `rwkv` *(plugin)* | RWKV 架构 profile | [builtin_plugins/architectures/rwkv/](../../lighttrain/builtin_plugins/architectures/rwkv/__init__.py) |
+| `transformer` | 标准 Transformer 架构 profile（core） | [builtin_plugins/optim/architectures/transformer.py](../../lighttrain/builtin_plugins/optim/architectures/transformer.py) |
+| `rwkv` *(plugin)* | RWKV 架构 profile | [builtin_plugins/optim/architectures/rwkv/](../../lighttrain/builtin_plugins/optim/architectures/rwkv/__init__.py) |
 
 ---
 
@@ -983,7 +983,7 @@ def finalize(self) -> Path: ...
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `model_forward` | eval 模式前向，捕获指定层的输出张量 | [builtin_plugins/artifacts/producer.py](../../lighttrain/builtin_plugins/artifacts/producer.py) |
+| `model_forward` | eval 模式前向，捕获指定层的输出张量 | [builtin_plugins/data/artifacts/producer.py](../../lighttrain/builtin_plugins/data/artifacts/producer.py) |
 
 ---
 
@@ -1002,9 +1002,9 @@ def iter_keys(self) -> Iterable[str]: ...
 
 | name | 存储格式 | 文件 |
 |------|---------|------|
-| `safetensors-shards` | safetensors 分片，变长张量 | [builtin_plugins/artifacts/store.py](../../lighttrain/builtin_plugins/artifacts/store.py) |
-| `memmap-fixed` | numpy memmap + header.json，定长张量 | [builtin_plugins/artifacts/store.py](../../lighttrain/builtin_plugins/artifacts/store.py) |
-| `parquet-rows` | PyArrow / Parquet 行存储 | [builtin_plugins/artifacts/store.py](../../lighttrain/builtin_plugins/artifacts/store.py) |
+| `safetensors-shards` | safetensors 分片，变长张量 | [builtin_plugins/data/artifacts/store.py](../../lighttrain/builtin_plugins/data/artifacts/store.py) |
+| `memmap-fixed` | numpy memmap + header.json，定长张量 | [builtin_plugins/data/artifacts/store.py](../../lighttrain/builtin_plugins/data/artifacts/store.py) |
+| `parquet-rows` | PyArrow / Parquet 行存储 | [builtin_plugins/data/artifacts/store.py](../../lighttrain/builtin_plugins/data/artifacts/store.py) |
 
 ---
 
@@ -1036,15 +1036,15 @@ class PrepNode:
 
 | name | 作用 | 文件 |
 |------|------|------|
-| `load` | 从磁盘加载原始文本/JSON 行 | [builtin_plugins/prepgraph/nodes/load.py](../../lighttrain/builtin_plugins/prepgraph/nodes/load.py) |
-| `tokenize` | 对行数据分词 | [builtin_plugins/prepgraph/nodes/tokenize.py](../../lighttrain/builtin_plugins/prepgraph/nodes/tokenize.py) |
-| `chunk` | 固定长度分块（含 stride） | [builtin_plugins/prepgraph/nodes/chunk.py](../../lighttrain/builtin_plugins/prepgraph/nodes/chunk.py) |
-| `pack` | 多文档打包至固定上下文窗口，`strategy: concat_chunk`（默认，padding-free 基线）/ `next_fit`（greedy-pad-flush）/ `best_fit`（BFD，opt-in），各自吐 `truncation_rate`/`token_utilization` 等指标 | [builtin_plugins/prepgraph/nodes/pack.py](../../lighttrain/builtin_plugins/prepgraph/nodes/pack.py) |
-| `mix` | 多 upstream 流按比例混合 | [builtin_plugins/prepgraph/nodes/mix.py](../../lighttrain/builtin_plugins/prepgraph/nodes/mix.py) |
-| `join` | 拼接多个 upstream 数据集 | [builtin_plugins/prepgraph/nodes/join.py](../../lighttrain/builtin_plugins/prepgraph/nodes/join.py) |
-| `index` | 为随机访问建索引 | [builtin_plugins/prepgraph/nodes/index.py](../../lighttrain/builtin_plugins/prepgraph/nodes/index.py) |
-| `validate` | 模式验证（schema 检查） | [builtin_plugins/prepgraph/nodes/validate.py](../../lighttrain/builtin_plugins/prepgraph/nodes/validate.py) |
-| `materialize` | 将流式数据写入磁盘分片 | [builtin_plugins/prepgraph/nodes/materialize.py](../../lighttrain/builtin_plugins/prepgraph/nodes/materialize.py) |
+| `load` | 从磁盘加载原始文本/JSON 行 | [builtin_plugins/data/prepgraph/nodes/load.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/load.py) |
+| `tokenize` | 对行数据分词 | [builtin_plugins/data/prepgraph/nodes/tokenize.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/tokenize.py) |
+| `chunk` | 固定长度分块（含 stride） | [builtin_plugins/data/prepgraph/nodes/chunk.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/chunk.py) |
+| `pack` | 多文档打包至固定上下文窗口，`strategy: concat_chunk`（默认，padding-free 基线）/ `next_fit`（greedy-pad-flush）/ `best_fit`（BFD，opt-in），各自吐 `truncation_rate`/`token_utilization` 等指标 | [builtin_plugins/data/prepgraph/nodes/pack.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/pack.py) |
+| `mix` | 多 upstream 流按比例混合 | [builtin_plugins/data/prepgraph/nodes/mix.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/mix.py) |
+| `join` | 拼接多个 upstream 数据集 | [builtin_plugins/data/prepgraph/nodes/join.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/join.py) |
+| `index` | 为随机访问建索引 | [builtin_plugins/data/prepgraph/nodes/index.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/index.py) |
+| `validate` | 模式验证（schema 检查） | [builtin_plugins/data/prepgraph/nodes/validate.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/validate.py) |
+| `materialize` | 将流式数据写入磁盘分片 | [builtin_plugins/data/prepgraph/nodes/materialize.py](../../lighttrain/builtin_plugins/data/prepgraph/nodes/materialize.py) |
 
 ---
 
@@ -1059,7 +1059,7 @@ def my_invariant(*, loss=None, batch=None, metrics=None, model=None,
     ...
 ```
 
-**极简范例**：[lighttrain/builtin_plugins/invariants/builtins.py:29](../../lighttrain/builtin_plugins/invariants/builtins.py#L29)
+**极简范例**：[lighttrain/builtin_plugins/callbacks/invariants/builtins.py:29](../../lighttrain/builtin_plugins/callbacks/invariants/builtins.py#L29)
 
 ```python
 @register("invariant", "loss_finite")
@@ -1075,14 +1075,14 @@ def loss_finite(*, loss: Any = None, **_) -> bool:
 
 | name | 检查内容 | 文件 |
 |------|---------|------|
-| `loss_finite` | loss 无 NaN / Inf | [builtin_plugins/invariants/builtins.py](../../lighttrain/builtin_plugins/invariants/builtins.py) |
-| `grad_norm_bounded` | `metrics["grad_norm"] < max`（默认 1000） | [builtin_plugins/invariants/builtins.py](../../lighttrain/builtin_plugins/invariants/builtins.py) |
-| `lr_nonneg` | 当前 lr ≥ 0 | [builtin_plugins/invariants/builtins.py](../../lighttrain/builtin_plugins/invariants/builtins.py) |
-| `label_mask_nonzero` | 至少一个 label 位置非 ignore_index | [builtin_plugins/invariants/builtins.py](../../lighttrain/builtin_plugins/invariants/builtins.py) |
-| `param_count_stable` | 参数量未在步间变化 | [builtin_plugins/invariants/builtins.py](../../lighttrain/builtin_plugins/invariants/builtins.py) |
-| `dtype_stable` | 参数 dtype 未发生意外转换 | [builtin_plugins/invariants/builtins.py](../../lighttrain/builtin_plugins/invariants/builtins.py) |
-| `batch_nonempty` | batch 非空 | [builtin_plugins/invariants/builtins.py](../../lighttrain/builtin_plugins/invariants/builtins.py) |
-| `regression_gate` | 当前 loss ≤ 历史基准（防退化） | [builtin_plugins/eval/regression_gate.py](../../lighttrain/builtin_plugins/eval/regression_gate.py) |
+| `loss_finite` | loss 无 NaN / Inf | [builtin_plugins/callbacks/invariants/builtins.py](../../lighttrain/builtin_plugins/callbacks/invariants/builtins.py) |
+| `grad_norm_bounded` | `metrics["grad_norm"] < max`（默认 1000） | [builtin_plugins/callbacks/invariants/builtins.py](../../lighttrain/builtin_plugins/callbacks/invariants/builtins.py) |
+| `lr_nonneg` | 当前 lr ≥ 0 | [builtin_plugins/callbacks/invariants/builtins.py](../../lighttrain/builtin_plugins/callbacks/invariants/builtins.py) |
+| `label_mask_nonzero` | 至少一个 label 位置非 ignore_index | [builtin_plugins/callbacks/invariants/builtins.py](../../lighttrain/builtin_plugins/callbacks/invariants/builtins.py) |
+| `param_count_stable` | 参数量未在步间变化 | [builtin_plugins/callbacks/invariants/builtins.py](../../lighttrain/builtin_plugins/callbacks/invariants/builtins.py) |
+| `dtype_stable` | 参数 dtype 未发生意外转换 | [builtin_plugins/callbacks/invariants/builtins.py](../../lighttrain/builtin_plugins/callbacks/invariants/builtins.py) |
+| `batch_nonempty` | batch 非空 | [builtin_plugins/callbacks/invariants/builtins.py](../../lighttrain/builtin_plugins/callbacks/invariants/builtins.py) |
+| `regression_gate` | 当前 loss ≤ 历史基准（防退化） | [builtin_plugins/callbacks/invariants/regression_gate.py](../../lighttrain/builtin_plugins/callbacks/invariants/regression_gate.py) |
 
 ---
 
@@ -1099,7 +1099,7 @@ def generate(self, model: Any, input_ids: torch.Tensor, **kwargs) -> torch.Tenso
 | name | 说明 | 文件 |
 |------|------|------|
 | `hf_generate` | 使用 HF `model.generate()` 采集 rollout（暴露 `temperature`/`top_p`/`do_sample`/`max_new_tokens`/`num_return_sequences`） | [builtin_plugins/rl/rollout.py](../../lighttrain/builtin_plugins/rl/rollout.py) |
-| `vllm` *(plugin)* | vLLM 高吞吐 rollout 后端（opt-in） | [lighttrain/builtin_plugins/generation_backends/vllm/](../../lighttrain/builtin_plugins/generation_backends/vllm/__init__.py) |
+| `vllm` *(plugin)* | vLLM 高吞吐 rollout 后端（opt-in） | [lighttrain/builtin_plugins/rl/backends/vllm/](../../lighttrain/builtin_plugins/rl/backends/vllm/__init__.py) |
 
 ppo/grpo 经 `rollout_backend:`（默认 `hf_generate`）从注册表解析后端并转发采样 knob，
 不再内联构造。

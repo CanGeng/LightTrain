@@ -11,7 +11,7 @@ import torch.nn as nn
 # ---------------------------------------------------------------------------
 
 def test_r7_rwkv_smoke():
-    from lighttrain.builtin_plugins.architectures.rwkv import (
+    from lighttrain.builtin_plugins.optim.architectures.rwkv import (
         TinyRWKVConfig,
         TinyRWKVModel,
     )
@@ -69,13 +69,13 @@ def test_r8_diffusion_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r9_jepa_smoke():
-    from lighttrain.builtin_plugins.architectures.jepa import (
+    from lighttrain.builtin_plugins.objectives.jepa import JEPAObjective
+    from lighttrain.builtin_plugins.optim.architectures.jepa import (
         EMATargetEncoder,
         JEPAEncoder,
         JEPAModelConfig,
         JEPAPredictor,
     )
-    from lighttrain.builtin_plugins.objectives.jepa import JEPAObjective
     from lighttrain.protocols import LossContext, ModelOutput
 
     cfg = JEPAModelConfig(patch_dim=16, embed_dim=32, num_heads=2, depth=2, predictor_depth=1)
@@ -115,7 +115,7 @@ def test_r9_jepa_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r10a_pcn_smoke():
-    from lighttrain.builtin_plugins.update_rules.pcn import PCNUpdateRule
+    from lighttrain.builtin_plugins.engine.update_rules.pcn import PCNUpdateRule
     from lighttrain.engine._context import StepContext
 
     model = nn.Sequential(nn.Linear(8, 16), nn.Linear(16, 4))
@@ -148,7 +148,7 @@ def test_r10a_pcn_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r10b_ff_smoke():
-    from lighttrain.builtin_plugins.update_rules.forward_forward import (
+    from lighttrain.builtin_plugins.engine.update_rules.forward_forward import (
         ForwardForwardUpdateRule,
     )
     from lighttrain.engine._context import StepContext
@@ -184,7 +184,7 @@ def test_r10b_ff_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r11_mezo_smoke():
-    from lighttrain.builtin_plugins.update_rules.mezo import MeZOUpdateRule
+    from lighttrain.builtin_plugins.engine.update_rules.mezo import MeZOUpdateRule
     from lighttrain.engine._context import StepContext
     from lighttrain.protocols import ModelOutput
 

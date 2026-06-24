@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.builtin_plugins.artifacts import DynamicArtifactCallback
+from lighttrain.builtin_plugins.data.artifacts import DynamicArtifactCallback
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.engine._context import StepContext
 

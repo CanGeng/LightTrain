@@ -19,7 +19,7 @@ import pytest
 from lighttrain.builtin_plugins.data import (
     processors as _processors,  # noqa: F401 — registry
 )
-from lighttrain.builtin_plugins.prepgraph import (
+from lighttrain.builtin_plugins.data.prepgraph import (
     nodes as _nodes,  # noqa: F401 — registry
 )
 from lighttrain.data.prepgraph import runner as runner_module

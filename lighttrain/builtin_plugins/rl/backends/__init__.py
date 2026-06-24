@@ -1,6 +1,7 @@
 """RL generation backends — HF generate (default) / vLLM (opt-in).
 
-vLLM integration is opt-in via ``builtin_plugins/generation_backends/``.
+vLLM integration is opt-in via the ``vllm/`` subpackage here
+(``builtin_plugins.rl.backends.vllm``); import it to register.
 """
 
 from ..rollout import HFGenerateBackend, RolloutEngine

@@ -2,7 +2,7 @@
 
 Extracted from the ``materialize`` PrepNode so the core ``PrepRunner`` /
 ``PrepGraphDataModule`` can read a shard cache without importing the (relocated)
-node implementations in ``lighttrain.builtin_plugins.prepgraph.nodes``
+node implementations in ``lighttrain.builtin_plugins.data.prepgraph.nodes``
 (DESIGN §3.3: the graph framework stays in core, node impls are builtin_plugins).
 """
 

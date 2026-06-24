@@ -1,7 +1,7 @@
 """EvalSuite framework — Evaluator / EvalTask / EvalReport.
 
 ``RegressionGate`` (the registered ``invariant`` gate) moved to
-``lighttrain.builtin_plugins.eval.regression_gate`` (DESIGN §3.3: framework in
+``lighttrain.builtin_plugins.callbacks.invariants.regression_gate`` (DESIGN §3.3: framework in
 core, concrete impl in builtin_plugins).
 """
 

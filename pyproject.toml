@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.4.0"
+version = "0.4.1"
 description = "PyTorch training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -139,13 +139,13 @@ ignore_missing_imports = true
 # TODO(lighttrain): ratchet down to empty.
 [[tool.mypy.overrides]]
 module = [
-    "lighttrain.builtin_plugins.architectures.diffusion_unet",
-    "lighttrain.builtin_plugins.architectures.jepa",
-    "lighttrain.builtin_plugins.architectures.mamba",
-    "lighttrain.builtin_plugins.architectures.rwkv",
-    "lighttrain.builtin_plugins.artifacts.joined_dataset",
-    "lighttrain.builtin_plugins.artifacts.producer",
-    "lighttrain.builtin_plugins.artifacts.store",
+    "lighttrain.builtin_plugins.optim.architectures.diffusion_unet",
+    "lighttrain.builtin_plugins.optim.architectures.jepa",
+    "lighttrain.builtin_plugins.optim.architectures.mamba",
+    "lighttrain.builtin_plugins.optim.architectures.rwkv",
+    "lighttrain.builtin_plugins.data.artifacts.joined_dataset",
+    "lighttrain.builtin_plugins.data.artifacts.producer",
+    "lighttrain.builtin_plugins.data.artifacts.store",
     "lighttrain.builtin_plugins.data.processors.image",
     "lighttrain.builtin_plugins.distributed.model_parallel.ep",
     "lighttrain.builtin_plugins.distributed.model_parallel.tp_aware",

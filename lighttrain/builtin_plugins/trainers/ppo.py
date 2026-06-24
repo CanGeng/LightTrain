@@ -23,6 +23,7 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
+from lighttrain.builtin_plugins.engine.update_rules.rl import RLUpdateRule
 from lighttrain.builtin_plugins.losses.rl import PPOSurrogateLoss
 from lighttrain.builtin_plugins.rl.buffers import RolloutBuffer
 from lighttrain.builtin_plugins.rl.gae import compute_gae, normalize_advantages
@@ -33,7 +34,6 @@ from lighttrain.builtin_plugins.rl.rollout import (
 from lighttrain.builtin_plugins.rl.value_heads import (
     LinearValueHead,  # re-exported; registers value_head/linear
 )
-from lighttrain.builtin_plugins.update_rules.rl import RLUpdateRule
 from lighttrain.config._resolver import resolve as _resolve
 from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.registry import register
@@ -407,7 +407,7 @@ class PPOTrainer(Trainer):
                 spec["hidden_size"] = hidden.shape[-1]
                 self._value_head = _resolve(spec, category="value_head").to(hidden.device)
                 # Register value head params with the inner optimizer (unwraps Accelerator)
-                from lighttrain.builtin_plugins.update_rules.standard import (
+                from lighttrain.builtin_plugins.engine.update_rules.standard import (
                     _register_new_params,
                 )
                 _register_new_params(self.optimizer, list(self._value_head.parameters()))

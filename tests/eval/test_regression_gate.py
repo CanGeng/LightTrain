@@ -23,7 +23,9 @@ import warnings
 
 import pytest
 
-from lighttrain.builtin_plugins.eval.regression_gate import RegressionGate
+from lighttrain.builtin_plugins.callbacks.invariants.regression_gate import (
+    RegressionGate,
+)
 from lighttrain.callbacks.invariants import InvariantError
 from lighttrain.eval.suite import EvalReport
 
