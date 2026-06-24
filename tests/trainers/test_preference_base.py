@@ -279,7 +279,7 @@ def _smoke_sample(seq_len: int = 6, ref_chosen: float = -1.5, ref_rejected: floa
 
 def test_preference_collator_preserves_aux_ref_keys():
     """PreferenceCollator must forward aux.ref.* keys (per-sample → (B,) tensor)."""
-    from lighttrain.builtin_plugins.data.core.collators import PreferenceCollator
+    from lighttrain.builtin_plugins.data.collators.text import PreferenceCollator
 
     collator = PreferenceCollator(pad_id=0, max_len=16)
     samples = [_smoke_sample(), _smoke_sample(ref_chosen=-0.8, ref_rejected=-1.2)]
@@ -300,8 +300,8 @@ def test_dpo_full_chain_collator_to_step_is_finite():
     without raising KeyError on the aux.ref.* lookups."""
     import math
 
-    from lighttrain.builtin_plugins.data.core.collators import PreferenceCollator
-    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+    from lighttrain.builtin_plugins.data.collators.text import PreferenceCollator
+    from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 
     model = TinyCausalLM(
         vocab_size=64, d_model=32, n_layers=1, n_heads=2,

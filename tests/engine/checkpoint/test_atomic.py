@@ -421,7 +421,7 @@ def test_save_load_tied_weights(tmp_run_dir) -> None:
     """CheckpointManager must not crash on tied weights (safetensors shared
     storage) and must preserve both values and the tied-weight invariant.
     """
-    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+    from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 
     model = TinyCausalLM(
         vocab_size=64, d_model=32, n_layers=1, n_heads=2,

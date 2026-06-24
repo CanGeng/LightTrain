@@ -17,12 +17,12 @@ from lighttrain.builtin_plugins.data.artifacts import (
     ModelForwardProducer,
     open_artifact_store,
 )
-from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
+from lighttrain.builtin_plugins.data.collators.text import CausalLMCollator
 from lighttrain.builtin_plugins.data.core.tokenizers import PAD_ID
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
 from lighttrain.builtin_plugins.engine.update_rules.standard import StandardUpdateRule
 from lighttrain.builtin_plugins.losses.core import CompositeLoss
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 from lighttrain.builtin_plugins.optim.wrappers import AdamWWrapper
 from lighttrain.callbacks.base import EventBus
 from lighttrain.engine._context import StepContext

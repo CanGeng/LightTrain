@@ -231,7 +231,7 @@ def test_producer_writes_topk_extra_and_hidden_states(tmp_path: Path) -> None:
           1 embedding layer = 3).
     """
     from lighttrain.builtin_plugins.data.artifacts import open_artifact_store
-    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+    from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
     from lighttrain.models.extras import ExtraOutputSpec
 
     torch.manual_seed(0)

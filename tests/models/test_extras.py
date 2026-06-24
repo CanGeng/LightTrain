@@ -21,7 +21,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 from lighttrain.models.extras import (
     ExtraOutputSpec,
     ExtrasHookManager,

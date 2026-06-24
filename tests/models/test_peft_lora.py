@@ -26,13 +26,13 @@ import pytest
 torch = pytest.importorskip("torch")
 peft = pytest.importorskip("peft")  # whole file requires peft
 
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import (  # noqa: E402 — after importorskip
-    TinyCausalLM,
-)
 from lighttrain.builtin_plugins.models.peft import (  # noqa: E402
     LoRAAdapter,
     dump_peft_spec,
     is_peft_wrapped,
+)
+from lighttrain.builtin_plugins.models.text.tiny_lm import (  # noqa: E402 — after importorskip
+    TinyCausalLM,
 )
 
 # Tiny base parameters chosen for fast tests AND deterministic shape math.

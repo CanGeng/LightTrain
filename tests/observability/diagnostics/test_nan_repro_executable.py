@@ -7,7 +7,7 @@ import sys
 
 import torch
 
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 from lighttrain.observability.diagnostics.nan_repro import write_nan_repro
 from tests._diagnostics import expect_exists
 

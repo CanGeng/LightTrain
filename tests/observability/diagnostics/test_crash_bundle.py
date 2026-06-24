@@ -9,7 +9,7 @@ import torch
 from lighttrain.builtin_plugins.callbacks.builtins.lineage_recorder import (
     LineageRecorderCallback,
 )
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 from lighttrain.engine._context import StepContext
 from lighttrain.observability.diagnostics.crash_bundle import write_crash_bundle
 from lighttrain.observability.lineage.store import LineageStore

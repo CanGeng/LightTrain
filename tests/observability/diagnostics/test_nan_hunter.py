@@ -357,7 +357,7 @@ class _LMTrainer:
 
 
 def _tiny_lm():
-    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+    from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 
     return TinyCausalLM(
         vocab_size=16, d_model=8, n_layers=1, n_heads=2, max_seq_len=8

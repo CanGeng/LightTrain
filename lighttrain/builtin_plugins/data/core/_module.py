@@ -55,7 +55,7 @@ class SimpleDataModule:
             collator, "collator", default_kwargs={"pad_id": getattr(self.tokenizer, "pad_id", PAD_ID)}
         )
         if self.collator is None:
-            from .collators import CausalLMCollator
+            from ..collators.text import CausalLMCollator
 
             self.collator = CausalLMCollator(pad_id=getattr(self.tokenizer, "pad_id", PAD_ID))
 

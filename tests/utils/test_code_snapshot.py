@@ -111,7 +111,7 @@ def test_frozen_step_pointer_uses_code_snapshot_when_present(tmp_path, monkeypat
     """
     import torch
 
-    from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+    from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
     from lighttrain.observability.diagnostics.frozen_step import FrozenStepWriter
 
     monkeypatch.setenv("LIGHTTRAIN_CODE_SNAPSHOT_STORE_DIR", str(tmp_path / "store"))

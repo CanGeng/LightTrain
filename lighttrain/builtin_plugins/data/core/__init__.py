@@ -4,9 +4,9 @@ data modules). The ``Sample`` schema stays in ``lighttrain.data.core`` (core).
 
 from __future__ import annotations
 
+from ..collators.text import CausalLMCollator, PreferenceCollator
 from ._module import SimpleDataModule
 from ._prep_module import PrepGraphDataModule
-from .collators import CausalLMCollator, PreferenceCollator
 from .datasets import LineFileTextDataset, PreferenceJsonlDataset
 from .samplers import SequentialSampler, ShuffleSampler
 from .tokenizers import (

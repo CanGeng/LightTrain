@@ -73,7 +73,7 @@ def replay_cmd(
     from lighttrain.protocols import LossContext
 
     try:
-        import lighttrain.builtin_plugins.models.adapters  # noqa: F401 — populate registry
+        import lighttrain.builtin_plugins.models.text  # noqa: F401 — populate registry
     except Exception:  # noqa: BLE001
         _log.warning(
             "cli replay-step: model adapter registry import failed; "

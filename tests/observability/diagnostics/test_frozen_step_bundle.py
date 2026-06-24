@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 from lighttrain.engine._context import StepContext
 from lighttrain.observability.diagnostics.frozen_step import (
     FrozenStepWriter,

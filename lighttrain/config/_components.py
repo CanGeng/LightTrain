@@ -4,7 +4,7 @@ component registry is fully populated before recipe specs are resolved.
 Replaces the hand-maintained import list that silently drifted (``info_nce`` /
 ``moe_balance`` went unregistered; ``export`` forgot to call the importer). A
 curated list of packages is walked **recursively** so nested registrables
-(``data.core.datasets``, ``models.adapters.tiny_lm``, ...) are found
+(``data.core.datasets``, ``models.text.tiny_lm``, ...) are found
 automatically; a brand-new *top-level* package is the one residual maintenance
 point — add a line to ``_FIRST_PARTY_PACKAGES``.
 

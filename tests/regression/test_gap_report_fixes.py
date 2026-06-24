@@ -199,7 +199,7 @@ def test_chunk_size_emits_doc_boundary():
 
 
 def test_causal_lm_collator_doc_boundary_passthrough_and_batch_guard():
-    from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
+    from lighttrain.builtin_plugins.data.collators.text import CausalLMCollator
 
     coll = CausalLMCollator(pad_id=0, max_len=16)
     out = coll([{"input_ids": [1, 2, 3], "labels": [1, 2, 3], "_doc_boundary": True}])
@@ -223,7 +223,7 @@ def test_rwkv_doc_boundary_resets_only_at_boundaries():
     import torch.nn as nn
     from torch.utils.data import DataLoader, SequentialSampler
 
-    from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
+    from lighttrain.builtin_plugins.data.collators.text import CausalLMCollator
     from lighttrain.builtin_plugins.data.core.datasets import LineFileTextDataset
     from lighttrain.builtin_plugins.data.core.tokenizers import ByteTokenizer
     from lighttrain.trainers.base import Trainer

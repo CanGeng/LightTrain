@@ -14,7 +14,7 @@ import logging
 import torch
 from omegaconf import OmegaConf
 
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 from lighttrain.config._loader import _leaf_exists
 from lighttrain.observability.diagnostics import frozen_step as fs_mod
 from lighttrain.observability.diagnostics.frozen_step import FrozenStepWriter
