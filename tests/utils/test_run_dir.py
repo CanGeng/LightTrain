@@ -14,6 +14,7 @@ Coverage:
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -136,3 +137,13 @@ def test_make_run_dir_uses_slug_override_when_provided(tmp_path):
     # parts: [ts_date, ts_time, "my_slug", ..., hash]
     # We use a more permissive check.
     assert "my_slug" in rd.name
+
+
+def test_invariant_make_run_dir_name_matches_ts_slug_hash_format(tmp_path):
+    """Run-dir basename pins the ``<YYYYMMDD>-<HHMMSS>-<slug>-<8hex>`` shape.
+
+    Setup: ``slug="smoke"``. Expected: full closed-form regex match (8-digit
+    date, 6-digit time, slug, 8-char hex hash).
+    """
+    rd = make_run_dir(tmp_path, exp="tiny_pretrain", slug="smoke")
+    assert re.match(r"^\d{8}-\d{6}-smoke-[0-9a-f]{8}$", rd.name)
