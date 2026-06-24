@@ -21,7 +21,6 @@ from lighttrain.config import ConfigResolveError, resolve
 from lighttrain.config._resolver import _import_target
 from lighttrain.registry import register
 
-
 # ===========================================================================
 # _import_target — multi-level dotted right-peel resolver
 # ===========================================================================
