@@ -86,7 +86,13 @@ def test_train_emits_frozen_step_then_replay_runs(tmp_path, caplog):
     assert res.exit_code == 0, res.stdout
 
     runs_root = tmp_path / "runs" / "m4_freeze_replay"
-    run_dirs = list(runs_root.iterdir())
+    # `runs/<exp>/` holds the timestamped run dir alongside shared, dot-prefixed
+    # stores (e.g. `.code_snapshot_store`). Exclude the dotted siblings — picking
+    # `iterdir()[0]` blindly is filesystem-order-dependent and selects the store
+    # dir on ext4 (CI) while passing on DrvFs (local).
+    run_dirs = [
+        d for d in runs_root.iterdir() if d.is_dir() and not d.name.startswith(".")
+    ]
     assert len(run_dirs) == 1, f"expected exactly one run dir, got {run_dirs}"
     run = run_dirs[0]
 
