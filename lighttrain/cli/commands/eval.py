@@ -160,7 +160,7 @@ def regression_gate_cmd(
         lighttrain regression-gate -c recipe.yaml --metric perplexity --threshold 50.0 --op "<"
     """
 
-    from lighttrain.builtin_plugins.eval.regression_gate import RegressionGate
+    from lighttrain.builtin_plugins.callbacks.invariants.regression_gate import RegressionGate
     from lighttrain.eval.metrics import perplexity
     from lighttrain.eval.suite import EvalReport
 
