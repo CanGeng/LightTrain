@@ -94,15 +94,15 @@ class StepOutput:
 
 ## Built-in entries (condensed)
 
-- **models**: `tiny_lm`, `hf_causal`, `lora`, `ia3`, `adalora`, and plugin `jepa`, `qlora`, `tiny_rwkv`, `tiny_mamba`, `tiny_unet`
+- **models**: `tiny_lm`, `hf_causal`, `lora`, `ia3`, `adalora`, and plugin `jepa`, `qlora`, `tiny_rwkv`, `tiny_mamba`, `tiny_unet`, `tiny_cnn` (vision classifier)
 - **objectives** (all plugin; the Protocol `ObjectiveProfile` is core): `next_token`, `masked_denoising`, `diffusion`, `flow_matching`, `jepa`
   - `objective:` is the **internal canonical training seam** (owns `prepare_batch` + loss). When present it replaces `loss:`; a plain `loss:` is wrapped into a `LossOnlyObjective` (identity `prepare_batch`) so there is one seam. `loss:` and top-level `objective:` are mutually exclusive (an objective may carry a *nested* `loss:`/`aux_losses:`). The default objective belongs to the **trainer** (`Trainer.default_objective()`), not the runtime.
 - **architectures** (profile factories, by `trainer.arch_profile`): `transformer` (core), `rwkv` (plugin) — resolve a string to an `ArchitectureProfile` (block/embedding/head seams + stateful reset).
-- **losses**: `cross_entropy`/`ce`, `mlm`, `z_loss`, `composite`, `dpo`, `bradley_terry`/`bt`, `ipo`, `simpo`, `orpo`, `kto`, `ppo_surrogate`, `grpo`, `info_nce`, `moe_balance`, `kl_topk`, `hidden_mse`, `hidden_cosine`, `attention_transfer`
+- **losses**: `cross_entropy`/`ce`, `classification` (supervised + top-1 acc), `mlm`, `z_loss`, `composite`, `dpo`, `bradley_terry`/`bt`, `ipo`, `simpo`, `orpo`, `kto`, `ppo_surrogate`, `grpo`, `info_nce`, `moe_balance`, `kl_topk`, `hidden_mse`, `hidden_cosine`, `attention_transfer`
 - **optimizers**: `adamw`, `lion`, and plugin `cpu_offload` · **schedulers**: `constant`, `linear`, `warmup_cosine`, `wsd`
 - **update_rules**: `standard`, `sam`, `mezo`, `rl` (internal), and plugin `forward_forward`, `pcn`, `dfa`
 - **trainers**: `pretrain`, `preference`, `reward_model`, `ppo`, `grpo`
-- **datasets**: `line_file_text`, `preference_jsonl`, `artifact_joined` · **collators**: `causal_lm`, `preference`, `multimodal` · **samplers**: `shuffle`, `sequential`, `length_grouped`, `curriculum`, `stateful_resumable` · **tokenizers**: `byte`
+- **datasets**: `line_file_text`, `preference_jsonl`, `artifact_joined` · **collators**: `causal_lm`, `preference`, `multimodal`, `image` · **samplers**: `shuffle`, `sequential`, `length_grouped`, `curriculum`, `stateful_resumable` · **tokenizers**: `byte`
 - **prep_node**: `load`, `tokenize`, `chunk`, `pack`, `mix`, `join`, `index`, `validate`, `materialize`
 - **callbacks**: `ema`, `best_ckpt`, `throughput`, `early_stop`, `nan_skip`, `invariants`, `nan_hunter`, `frozen_step`, `loss_attribution`, `dead_neuron`, `grad_flow`, `sample_preview`, `dynamic_artifact`, `lineage_recorder`, `file_signals`
 - **loggers**: `console`, `jsonl`, `tensorboard`/`tb` · **judges**: plugin `verifier`, `pairwise_llm` · **rl_backend**: `hf_generate`, and plugin `vllm`

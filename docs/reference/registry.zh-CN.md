@@ -223,7 +223,7 @@ def generate(self, input_ids: torch.Tensor, **kwargs: Any) -> torch.Tensor: ...
 - `forward` 接受 `**batch`（即 collator 返回的 dict 展开），返回 `ModelOutput`
 - `outputs` dict 中必须有下游 loss/objective 需要的 key（通常为 `"logits"`）
 
-**极简范例**：[lighttrain/builtin_plugins/models/adapters/tiny_lm.py:113](../../lighttrain/builtin_plugins/models/adapters/tiny_lm.py#L113)
+**极简范例**：[lighttrain/builtin_plugins/models/text/tiny_lm.py:113](../../lighttrain/builtin_plugins/models/text/tiny_lm.py#L113)
 
 ```python
 @register("model", "tiny_lm")
@@ -242,8 +242,9 @@ class TinyCausalLM(nn.Module):
 
 | name | 说明 | 文件 |
 |------|------|------|
-| `tiny_lm` | 轻量 Pre-norm Transformer，支持 tied weights | [builtin_plugins/models/adapters/tiny_lm.py](../../lighttrain/builtin_plugins/models/adapters/tiny_lm.py) |
-| `hf_causal` | HuggingFace CausalLM 适配器（支持任意 pretrained） | [builtin_plugins/models/adapters/hf_causal.py](../../lighttrain/builtin_plugins/models/adapters/hf_causal.py) |
+| `tiny_lm` | 轻量 Pre-norm Transformer，支持 tied weights | [builtin_plugins/models/text/tiny_lm.py](../../lighttrain/builtin_plugins/models/text/tiny_lm.py) |
+| `hf_causal` | HuggingFace CausalLM 适配器（支持任意 pretrained） | [builtin_plugins/models/text/hf_causal.py](../../lighttrain/builtin_plugins/models/text/hf_causal.py) |
+| `tiny_cnn` *(plugin)* | 卷积图像分类器（conv→自适应池化→线性头，分辨率无关） | [builtin_plugins/models/vision/tiny_cnn.py](../../lighttrain/builtin_plugins/models/vision/tiny_cnn.py) |
 | `lora` | LoRA PEFT 适配器（包装 base model） | [builtin_plugins/models/peft/_lora.py](../../lighttrain/builtin_plugins/models/peft/_lora.py) |
 | `ia3` | IA³ PEFT 适配器 | [builtin_plugins/models/peft/_ia3.py](../../lighttrain/builtin_plugins/models/peft/_ia3.py) |
 | `adalora` | AdaLoRA 自适应秩 PEFT | [builtin_plugins/models/peft/_adalora.py](../../lighttrain/builtin_plugins/models/peft/_adalora.py) |
@@ -290,6 +291,7 @@ class CrossEntropyLoss:
 | name | 说明 | 文件 |
 |------|------|------|
 | `cross_entropy` / `ce` | 标准 Causal-LM next-token CE | [builtin_plugins/losses/core.py](../../lighttrain/builtin_plugins/losses/core.py) |
+| `classification` | 监督分类 CE + top-1 准确率（rank-2 logits (B,C)，`loss_family="classification"`） | [builtin_plugins/losses/classification.py](../../lighttrain/builtin_plugins/losses/classification.py) |
 | `mlm` | Masked-LM CE | [builtin_plugins/losses/core.py](../../lighttrain/builtin_plugins/losses/core.py) |
 | `z_loss` | Z-loss 正则（防 logit 爆炸） | [builtin_plugins/losses/core.py](../../lighttrain/builtin_plugins/losses/core.py) |
 | `composite` | 多 loss 加权组合 | [builtin_plugins/losses/core.py](../../lighttrain/builtin_plugins/losses/core.py) |
@@ -533,7 +535,7 @@ def __call__(self, samples: list[Mapping[str, Any]]) -> dict[str, Any]: ...
 
 **返回值要求**：dict，值为 `torch.Tensor`，含 `input_ids` / `attention_mask` / `labels`（具体 key 由 model 决定）。
 
-**极简范例**：[lighttrain/builtin_plugins/data/core/collators.py:18](../../lighttrain/builtin_plugins/data/core/collators.py#L18)
+**极简范例**：[lighttrain/builtin_plugins/data/collators/text.py:18](../../lighttrain/builtin_plugins/data/collators/text.py#L18)
 
 ```python
 @register("collator", "causal_lm")
@@ -550,9 +552,10 @@ class CausalLMCollator:
 
 | name | 说明 |
 |------|------|
-| `causal_lm` | 右填充至批内最长，`labels` 右移 | [builtin_plugins/data/core/collators.py](../../lighttrain/builtin_plugins/data/core/collators.py) |
-| `preference` | 同时填充 chosen / rejected 序列对 | [builtin_plugins/data/core/collators.py](../../lighttrain/builtin_plugins/data/core/collators.py) |
+| `causal_lm` | 右填充至批内最长，`labels` 右移 | [builtin_plugins/data/collators/text.py](../../lighttrain/builtin_plugins/data/collators/text.py) |
+| `preference` | 同时填充 chosen / rejected 序列对 | [builtin_plugins/data/collators/text.py](../../lighttrain/builtin_plugins/data/collators/text.py) |
 | `multimodal` | 多模态字段合并（文本 + 图像/音频等） | [builtin_plugins/data/collators/multimodal.py](../../lighttrain/builtin_plugins/data/collators/multimodal.py) |
+| `image` | 堆叠 pixel_values (B,C,H,W) + 整数 labels (B,)（监督视觉） | [builtin_plugins/data/collators/image.py](../../lighttrain/builtin_plugins/data/collators/image.py) |
 
 ---
 
