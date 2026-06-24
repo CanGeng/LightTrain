@@ -21,7 +21,7 @@ from lighttrain.data.prepgraph.dag import PrepGraph
 from lighttrain.data.prepgraph.runner import PrepRunner
 from lighttrain.registry import register
 
-from .collators import CausalLMCollator
+from ..collators.text import CausalLMCollator
 from .tokenizers import PAD_ID
 
 

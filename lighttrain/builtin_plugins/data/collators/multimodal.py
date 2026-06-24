@@ -34,7 +34,7 @@ import torch
 
 from lighttrain.registry import register
 
-from ..core.collators import CausalLMCollator
+from .text import CausalLMCollator
 
 
 def _has_modality(samples: Sequence[Mapping[str, Any]]) -> bool:

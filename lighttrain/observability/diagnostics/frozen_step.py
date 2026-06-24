@@ -395,7 +395,7 @@ def replay_step_bundle(
     if "name" in bundle.model_spec or "_target_" in bundle.model_spec:
         # Adapters must be importable for short-name resolution.
         try:
-            import lighttrain.builtin_plugins.models.adapters  # noqa: F401
+            import lighttrain.builtin_plugins.models.text  # noqa: F401
         except Exception:  # noqa: BLE001
             _log.warning(
                 "replay: model adapter import failed; short-name model "

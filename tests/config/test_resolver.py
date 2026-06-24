@@ -42,13 +42,13 @@ def test_import_target_three_level_dotted_path():
 def test_import_target_four_level_dotted_path():
     """Four-level dotted ``_import_target`` resolves a deep first-party class.
 
-    Input: ``'lighttrain.builtin_plugins.data.core.collators.CausalLMCollator'``.
+    Input: ``'lighttrain.builtin_plugins.data.collators.text.CausalLMCollator'``.
     Expected: identity with the imported class.
     """
-    from lighttrain.builtin_plugins.data.core.collators import CausalLMCollator
+    from lighttrain.builtin_plugins.data.collators.text import CausalLMCollator
 
     result = _import_target(
-        "lighttrain.builtin_plugins.data.core.collators.CausalLMCollator"
+        "lighttrain.builtin_plugins.data.collators.text.CausalLMCollator"
     )
     assert result is CausalLMCollator
 

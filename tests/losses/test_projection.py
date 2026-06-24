@@ -21,7 +21,7 @@ import pytest
 import torch
 
 from lighttrain.builtin_plugins.losses.distill import HiddenStatesMSELoss
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 from lighttrain.protocols import LossContext
 
 

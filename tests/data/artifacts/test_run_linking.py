@@ -6,7 +6,7 @@ from __future__ import annotations
 import torch
 
 from lighttrain.builtin_plugins.data.artifacts import ModelForwardProducer
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
 from lighttrain.observability.lineage.store import LineageStore
 
 

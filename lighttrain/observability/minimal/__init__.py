@@ -34,7 +34,7 @@ def build_minimal_model(spec: Mapping[str, Any] | str | Path) -> torch.nn.Module
     the ``"model"`` registry — the same path the full Trainer uses, so any
     model that runs under lighttrain can also be rebuilt by ``repro.py``.
 
-    The repro script is allowed to ``import lighttrain.builtin_plugins.models.adapters`` first
+    The repro script is allowed to ``import lighttrain.builtin_plugins.models.text`` first
     to populate the registry; this function does not do that itself because
     importing adapters pulls in transformers (heavy) and the repro script
     typically only needs ``tiny_lm`` for inline NaN reproduction.
