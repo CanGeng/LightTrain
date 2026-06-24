@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -73,17 +74,34 @@ def _write_recipe(tmp_path: Path) -> Path:
     return cfg
 
 
-def test_train_emits_frozen_step_then_replay_runs(tmp_path):
+def test_train_emits_frozen_step_then_replay_runs(tmp_path, caplog):
     cfg = _write_recipe(tmp_path)
     runner = CliRunner()
-    res = runner.invoke(app, ["train", "-c", str(cfg)])
+    # Capture frozen_step's own lifecycle WARNINGs so that, if no bundle is
+    # produced, the failure message names the exact silent guard that fired
+    # (writer disabled / batch not a dict / no snapshot / ...) instead of an
+    # opaque empty list. See callbacks/builtins/frozen_step.py.
+    with caplog.at_level(logging.WARNING, logger="lighttrain"):
+        res = runner.invoke(app, ["train", "-c", str(cfg)])
     assert res.exit_code == 0, res.stdout
+
     runs_root = tmp_path / "runs" / "m4_freeze_replay"
     run_dirs = list(runs_root.iterdir())
-    assert run_dirs, "no run dir created"
+    assert len(run_dirs) == 1, f"expected exactly one run dir, got {run_dirs}"
     run = run_dirs[0]
+
     zips = sorted((run / "frozen_steps").glob("*.zip"))
-    assert zips, "frozen_step callback should have emitted at least one bundle"
+    if not zips:
+        tree = "\n".join(
+            sorted(str(p.relative_to(run)) for p in run.rglob("*"))
+        )
+        raise AssertionError(
+            "frozen_step callback should have emitted at least one bundle, "
+            "but frozen_steps/*.zip is empty.\n"
+            f"--- frozen_step WARNING logs ---\n{caplog.text or '(none)'}\n"
+            f"--- run dir tree ({run.name}) ---\n{tree}\n"
+            f"--- train stdout ---\n{res.stdout}"
+        )
 
     res2 = runner.invoke(app, ["replay-step", str(zips[0])])
     assert res2.exit_code == 0, res2.stdout
