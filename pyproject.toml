@@ -65,14 +65,14 @@ addopts = '-v -m "not heavy and not gpu"'
 source = [
     # core seams/plumbing (concrete impls now live in builtin_plugins, below)
     "lighttrain.callbacks",
-    "lighttrain.checkpoint",
+    "lighttrain.engine.checkpoint",
     "lighttrain.config",
     "lighttrain.data.core",
     "lighttrain.engine",
-    "lighttrain.logging",
+    "lighttrain.callbacks.logging",
     "lighttrain.registry",
     "lighttrain.trainers",
-    "lighttrain.update_rules",
+    "lighttrain.engine.update_rules",
     "lighttrain.utils",
     # all relocated concrete implementations (losses/optim/models/data/rl/...)
     "lighttrain.builtin_plugins",
@@ -164,7 +164,7 @@ module = [
     "lighttrain.builtin_plugins.trainers.grpo",
     "lighttrain.builtin_plugins.trainers.ppo",
     "lighttrain.builtin_plugins.trainers.rm",
-    "lighttrain.diagnostics.oom_report",
+    "lighttrain.observability.diagnostics.oom_report",
     "lighttrain.lab.sweep",
     "lighttrain.models.surgery._embedding",
     "lighttrain.models.surgery._replace",
