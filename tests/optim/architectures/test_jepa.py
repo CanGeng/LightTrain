@@ -25,6 +25,7 @@ from lighttrain.builtin_plugins.architectures.jepa import (
     JEPAEncoder,
     JEPAModel,
     JEPAModelConfig,
+    JEPAPredictor,
     jepa_profile,
 )
 
@@ -37,6 +38,31 @@ def _tiny_cfg(**overrides) -> JEPAModelConfig:
     )
     base.update(overrides)
     return JEPAModelConfig(**base)
+
+
+# ---------------------------------------------------------------------------
+# Component forward-shape contracts
+# ---------------------------------------------------------------------------
+
+def test_jepa_encoder_forward_output_shape():
+    """``JEPAEncoder(patches)`` maps ``(B, T, patch_dim)`` → ``(B, T, embed_dim)``."""
+    cfg = _tiny_cfg(patch_dim=16, embed_dim=32)
+    enc = JEPAEncoder(cfg)
+    patches = torch.randn(2, 10, 16)
+    out = enc(patches)
+    assert out.shape == (2, 10, 32)
+
+
+def test_jepa_predictor_forward_output_shape():
+    """``JEPAPredictor(context, target_pos)`` returns one embedding per target
+    position: ``(B, num_target, embed_dim)``.
+    """
+    cfg = _tiny_cfg(embed_dim=32, num_heads=2)
+    predictor = JEPAPredictor(cfg)
+    context = torch.randn(2, 6, 32)
+    target_pos = torch.randn(2, 4, 32)
+    out = predictor(context, target_pos)
+    assert out.shape == (2, 4, 32)
 
 
 # ---------------------------------------------------------------------------

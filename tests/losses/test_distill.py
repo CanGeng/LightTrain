@@ -16,6 +16,7 @@ from lighttrain.builtin_plugins.losses.distill import (
     HiddenStatesCosineLoss,
     HiddenStatesMSELoss,
     KLDivLoss,
+    LayerMapping,
 )
 from lighttrain.protocols import LossContext, ModelOutput
 
@@ -283,6 +284,19 @@ def test_regression_kl_temperature_not_linear(dummy_ctx):
 # ---------------------------------------------------------------------------
 # HiddenStatesMSELoss
 # ---------------------------------------------------------------------------
+
+
+def test_layer_mapping_coerce_dict_pairs_and_idempotent():
+    """Goal: ``LayerMapping.coerce`` accepts a dict, a list-of-pairs, or an
+            existing LayerMapping and yields the same canonical mapping.
+
+    Input: {1:2, 3:4}, [[1,2],[3,4]], and an already-coerced LayerMapping.
+    Analytical: all three coerce to mapping == {1: 2, 3: 4} (coerce is idempotent).
+    """
+    a = LayerMapping.coerce({1: 2, 3: 4})
+    b = LayerMapping.coerce([[1, 2], [3, 4]])
+    c = LayerMapping.coerce(a)
+    assert a.mapping == b.mapping == c.mapping == {1: 2, 3: 4}
 
 
 def _make_mo_with_hidden(hidden_states):

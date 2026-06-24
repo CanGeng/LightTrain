@@ -297,6 +297,13 @@ def test_regression_ppo_min_not_clipped_only():
     torch.testing.assert_close(out["loss"], torch.tensor(2.0), atol=1e-5, rtol=1e-4)
 
 
+def test_ppo_reports_loss_and_policy_loss_keys():
+    """Goal: PPO always exposes both ``loss`` and ``policy_loss`` metric keys."""
+    ctx = _ppo_ctx_simple(adv=1.0)
+    out = PPOSurrogateLoss()(_DUMMY, {}, ctx)
+    assert "loss" in out and "policy_loss" in out
+
+
 # ---------------------------------------------------------------------------
 # GRPOLoss
 # ---------------------------------------------------------------------------
@@ -474,6 +481,32 @@ def test_grpo_ratio_mean_equals_one_when_logprobs_match():
     })
     out = GRPOLoss()(_DUMMY, {}, ctx)
     assert abs(out["ratio_mean"] - 1.0) < 1e-6
+
+
+def test_grpo_labels_mask_excludes_prompt_positions():
+    """Goal: GRPO honors a labels-based mask — prompt positions (-100) are
+            excluded so the masked loss differs from the unmasked loss.
+
+    Input: prompt half uses lp_new == lp_old (ratio=1), response half uses
+           lp_new < lp_old (ratio<1); per-group advantages differ across groups.
+    Analytical: masking out the prompt half changes which positions contribute,
+                so the labeled and unlabeled losses must differ.
+    """
+    B, T = 4, 6
+    lp_new = torch.cat([torch.zeros(B, 3), torch.full((B, 3), -0.1)], dim=1)
+    lp_old = torch.zeros(B, T)
+    adv = torch.tensor([1.0, -1.0, 0.5, -0.5])
+    group_ids = torch.tensor([0, 0, 1, 1])
+    labels = torch.cat(
+        [torch.full((B, 3), -100), torch.ones(B, 3, dtype=torch.long)], dim=1
+    )
+    ctx = LossContext(extras={
+        "log_probs_new": lp_new, "log_probs_old": lp_old,
+        "advantages": adv, "group_ids": group_ids,
+    })
+    out_labeled = GRPOLoss()(_DUMMY, {"labels": labels}, ctx)
+    out_plain = GRPOLoss()(_DUMMY, {}, ctx)
+    assert float(out_labeled["loss"]) != float(out_plain["loss"])
 
 
 def test_regression_grpo_kl_sign():

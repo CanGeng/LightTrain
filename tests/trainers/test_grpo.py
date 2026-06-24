@@ -421,3 +421,37 @@ def test_grpo_step_beta_kl_zero_does_not_inject_ref():
     assert trainer._ref_policy is None
     assert "log_probs_ref" not in trainer.ctx.extras
     assert raw["kl"] == 0.0
+
+
+# ===========================================================================
+# Registry + constructor-config invariants (merged from
+# tests/test_trainer_grpo.py)
+# ===========================================================================
+
+
+def test_grpo_resolves_from_registry():
+    """The 'grpo' trainer name resolves to GRPOTrainer through the registry."""
+    from lighttrain.registry import get as resolve
+
+    assert resolve("trainer", "grpo") is GRPOTrainer
+
+
+def test_grpo_step_returns_finite_loss():
+    """A hand-crafted GRPO minibatch produces a finite 'loss' metric."""
+    trainer = _make_grpo()
+    metrics = trainer._grpo_step(_grpo_batch())
+    assert "loss" in metrics
+    assert math.isfinite(float(metrics["loss"]))
+
+
+def test_grpo_group_size_stored_on_trainer():
+    """group_size passed to the constructor is retained as an attribute."""
+    trainer = _make_grpo(group_size=2)
+    assert trainer.group_size == 2
+
+
+def test_grpo_clip_eps_propagated_to_default_loss():
+    """clip_eps feeds the default RL loss used when the recipe omits a `loss:`
+    block (the loss: seam wins when present — keystone step 3)."""
+    trainer = _make_grpo(clip_eps=0.15)
+    assert trainer._default_loss.clip_eps == 0.15

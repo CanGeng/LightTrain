@@ -66,6 +66,21 @@ def test_flow_matching_ot_coupling_permutes_x0():
     assert (diffs > 1e-8).all(), "OT coupling must produce 4 distinct x0 vectors (no duplicates)"
 
 
+def test_flow_matching_loss_exposes_scalar_flow_mse():
+    """Goal: forward returns a scalar ``flow_mse`` metric alongside finite loss.
+
+    Invariant: ``flow_mse`` must be a 0-d tensor (shape == ()).
+    """
+    torch.manual_seed(76)
+    obj = FlowMatchingObjective()
+    batch = {"x": torch.randn(3, 8)}
+    batch = obj.prepare_batch(batch, step=0, device="cpu")
+    v_pred = torch.randn_like(batch["ut"])
+    out = obj(ModelOutput(outputs={"v": v_pred}), batch, LossContext())
+    assert torch.isfinite(out["loss"])
+    assert out["flow_mse"].shape == ()
+
+
 def test_regression_flow_matching_velocity_sign():
     """Regression pin for ``flow_velocity_sign``.
 

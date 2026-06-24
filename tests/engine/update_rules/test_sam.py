@@ -481,3 +481,46 @@ def test_sam_step_end_fires_even_on_skip_signal(signal):
     assert cb.events == ["on_step_end"], (
         f"on_step_end missing for signal {signal}; got {cb.events}"
     )
+
+
+# ===========================================================================
+# metrics + grad-clip semantics
+# ===========================================================================
+
+
+def test_sam_step_returns_loss_and_grad_norm_metrics():
+    """Goal: a full SAM step surfaces both ``loss`` and ``grad_norm`` metric
+    keys (loggers depend on them).
+    """
+    ctx, model, _ = _build_ctx()
+    m = SAMUpdateRule(rho=0.05).step(model, _batch(), ctx)
+    assert "loss" in m
+    assert "grad_norm" in m
+
+
+def test_sam_grad_clip_bounds_post_clip_param_grad_norm():
+    """Goal: with ``grad_clip=1.0``, the ACTUAL param grad norm at
+    optimizer-step time is bounded by the clip value.
+
+    Note: ``m["grad_norm"]`` reports the PRE-clip norm
+    (``clip_grad_norm_`` return convention); we capture the post-clip norm
+    via ``on_optimizer_step_pre``.
+    """
+    torch.manual_seed(42)
+    post_clip_norms: list[float] = []
+
+    class _PostClipRecorder:
+        def on_optimizer_step_pre(self, **_):
+            params = [p for p in model.parameters() if p.grad is not None]
+            if params:
+                total = torch.stack([p.grad.norm(2) for p in params]).norm(2)
+                post_clip_norms.append(float(total))
+
+    ctx, model, _ = _build_ctx(callbacks=[_PostClipRecorder()])
+
+    SAMUpdateRule(rho=0.05, grad_clip=1.0).step(model, _batch(), ctx)
+
+    assert post_clip_norms, "on_optimizer_step_pre must have fired"
+    assert post_clip_norms[0] <= 1.01, (
+        f"post-clip grad norm {post_clip_norms[0]} exceeds 1.0"
+    )

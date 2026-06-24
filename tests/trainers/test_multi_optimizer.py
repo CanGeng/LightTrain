@@ -1,11 +1,11 @@
-"""Keystone step 5 (Axis B): two trainable models + two optimizers update
-jointly through the shared primitives.
+"""Multi-model / multi-optimizer joint update (relocated from
+tests/test_axis_b_multi_optimizer.py).
 
 A minimal dual-model paradigm (`dual_lm`) — the smallest thing that exercises
 the multi-optimizer machinery, not a real GAN. It overrides ``_step`` to run a
 forward+loss on EACH model and drive EACH model's own optimizer via
 ``apply_update`` (per-model MicroState). The runtime builds both models and both
-optimizers from a ``models:``/``optimizers:`` recipe; this test asserts both
+optimizers from a ``models:``/``optimizers:`` recipe; the test asserts both
 models' parameters actually change (joint update happened).
 """
 
@@ -24,7 +24,7 @@ from lighttrain.protocols import ModelOutput, StepOutput
 from lighttrain.registry import register
 from lighttrain.trainers.base import Trainer
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 CORPUS = REPO / "tests" / "fixtures" / "tiny_corpus.txt"
 
 
@@ -36,7 +36,6 @@ class _DualLMTrainer(Trainer):
     def __init__(self, *, grad_clip: float = 1.0, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.grad_clip = float(grad_clip)
-        # one accumulation cursor per trainable model (re-entrant primitive)
         self._micros = {name: MicroState() for name in self.models}
 
     def _ce(self, model: Any, input_ids: torch.Tensor) -> torch.Tensor:
@@ -53,7 +52,7 @@ class _DualLMTrainer(Trainer):
         total = 0.0
         for name in ("actor", "critic"):
             model = self.models[name]
-            optimizer = self.optimizers[name]   # paired by model name
+            optimizer = self.optimizers[name]
             loss = self._ce(model, input_ids)
             apply_update(
                 loss=loss, model=model, optimizer=optimizer, ctx=self.ctx,
@@ -94,7 +93,7 @@ def _recipe(tmp_path: Path) -> Path:
         "loss": {"name": "cross_entropy"},
         "engine": {"name": "standard", "mixed_precision": "no"},
         "trainer": {"name": "dual_lm", "max_steps": 3, "val_every": 0,
-                     "ckpt_every": 0, "log_every": 1, "grad_clip": 1.0},
+                    "ckpt_every": 0, "log_every": 1, "grad_clip": 1.0},
         "logger": [{"name": "jsonl"}],
     }
     p = tmp_path / "axis_b.yaml"
@@ -114,10 +113,12 @@ def test_two_models_two_optimizers_update_jointly(tmp_path):
     assert set(trainer.optimizers) == {"actor", "critic"}
     assert all(any(p.requires_grad for p in trainer.models[n].parameters())
                for n in ("actor", "critic"))
-    # distinct optimizer instances with the per-entry specs honoured (different
-    # types AND different lr) — proves each trainable model got its OWN optimizer
+
+    # Distinct optimizer instances with per-entry specs honoured (different
+    # types AND different lr) — each trainable model got its OWN optimizer.
     def inner(o):
         return getattr(o, "optimizer", o)
+
     oa, oc = inner(trainer.optimizers["actor"]), inner(trainer.optimizers["critic"])
     assert oa is not oc
     assert type(oa).__name__ != type(oc).__name__

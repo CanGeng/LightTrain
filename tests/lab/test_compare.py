@@ -268,6 +268,68 @@ def test_render_ascii_handles_no_diff_case(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
+# Three-run compare (merged from tests/test_lab_compare.py)
+# ---------------------------------------------------------------------------
+
+def test_diff_configs_three_runs_collects_all_values():
+    """Diff over 3 configs collects one value per run, in order
+    (merged from test_lab_compare.test_diff_three_runs).
+    """
+    diff = _diff_configs([{"lr": 1e-4}, {"lr": 3e-4}, {"lr": 3e-4}])
+    assert "lr" in diff
+    assert diff["lr"] == [1e-4, 3e-4, 3e-4]
+
+
+def test_compare_three_runs_produces_three_column_tables(tmp_path: Path):
+    """End-to-end compare over 3 runs yields 3-wide diff/metrics columns
+    (merged from test_lab_compare.test_compare_three_runs).
+    """
+    r1 = _make_run(tmp_path, "r1", cfg={"lr": 1e-4}, metrics=[{"step": 1, "loss": 3.0}])
+    r2 = _make_run(tmp_path, "r2", cfg={"lr": 3e-4}, metrics=[{"step": 1, "loss": 2.0}])
+    r3 = _make_run(tmp_path, "r3", cfg={"lr": 1e-3}, metrics=[{"step": 1, "loss": 2.5}])
+    report = compare([r1, r2, r3])
+    assert len(report.metrics_table["loss"]) == 3
+    assert len(report.config_diff["lr"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# Fork-ancestry detection + rendering (merged from tests/test_lab_compare.py)
+# ---------------------------------------------------------------------------
+
+def _make_run_with_fork(
+    base: Path, name: str, cfg: dict, metrics: list[dict], fork_of: str | None = None
+) -> Path:
+    rd = _make_run(base, name, cfg, metrics)
+    if fork_of:
+        (rd / "fork_meta.json").write_text(
+            json.dumps({"fork_of_run_dir": fork_of}), encoding="utf-8"
+        )
+    return rd
+
+
+def test_compare_detects_fork_ancestry_from_fork_meta(tmp_path: Path):
+    """A run with ``fork_meta.json`` pointing at a parent is reported in
+    ``fork_ancestry``; a non-forked run maps to None
+    (merged from test_lab_compare.test_compare_detects_fork_ancestry).
+    """
+    r1 = _make_run_with_fork(tmp_path, "run1", {}, [{"step": 1}])
+    r2 = _make_run_with_fork(tmp_path, "run2", {}, [{"step": 1}], fork_of=str(r1))
+    report = compare([r1, r2])
+    assert report.fork_ancestry[str(r2)] == str(r1)
+    assert report.fork_ancestry[str(r1)] is None
+
+
+def test_render_ascii_shows_fork_of_when_ancestry_present(tmp_path: Path):
+    """The rendered report surfaces a 'fork of' annotation when a run has a
+    parent (merged from test_lab_compare.test_render_ascii_shows_fork_ancestry).
+    """
+    r1 = _make_run_with_fork(tmp_path, "run1", {}, [{"step": 1}])
+    r2 = _make_run_with_fork(tmp_path, "run2", {}, [{"step": 1}], fork_of=str(r1))
+    text = render_ascii(compare([r1, r2]))
+    assert "fork of" in text.lower()
+
+
+# ---------------------------------------------------------------------------
 # CompareReport surface pin
 # ---------------------------------------------------------------------------
 

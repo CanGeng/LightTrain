@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import pytest
 import torch
 import torch.nn.functional as F
 
@@ -120,6 +121,18 @@ def test_regression_infonce_symmetric_not_one_sided(dummy_ctx, dummy_model_outpu
     )
 
 
+def test_infonce_missing_positive_key_raises(dummy_ctx, dummy_model_output):
+    """Goal: omitting ``embeddings_positive`` raises KeyError (no silent default).
+
+    Input: batch with only ``embeddings_anchor``.
+    Contract: the loss must fail loudly when a required paired tensor is absent.
+    """
+    with pytest.raises(KeyError):
+        InfoNCELoss()(
+            dummy_model_output, {"embeddings_anchor": torch.randn(2, 4)}, dummy_ctx
+        )
+
+
 # ---------------------------------------------------------------------------
 # MoEBalanceLoss
 # ---------------------------------------------------------------------------
@@ -223,3 +236,13 @@ def test_moe_balance_mask_vs_no_mask_distinguishable(dummy_model_output):
     torch.testing.assert_close(without_mask, torch.tensor(1.38), atol=1e-5, rtol=1e-4)
     # And the two must be materially different.
     assert abs(float(with_mask) - float(without_mask)) > 1e-3
+
+
+def test_moe_balance_missing_router_probs_raises(dummy_model_output):
+    """Goal: no ``router_probs`` in ctx.extras raises KeyError (no silent default).
+
+    Input: empty LossContext.
+    Contract: the balance loss requires router_probs and must fail loudly.
+    """
+    with pytest.raises(KeyError):
+        MoEBalanceLoss()(dummy_model_output, {}, LossContext())

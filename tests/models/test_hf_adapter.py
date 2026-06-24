@@ -1,4 +1,9 @@
-"""HF adapter dry-run: arg propagation + env-token plumbing without network."""
+"""HF adapter dry-run: arg propagation + env-token plumbing without network.
+
+Relocated from the flat ``tests/test_hf_adapter_dryrun.py``. No mirror under
+``tests/models/`` covered ``HFCausalLM`` argument forwarding, so the behaviors
+are preserved verbatim (transformers is stubbed; nothing touches the network).
+"""
 
 from __future__ import annotations
 
@@ -18,7 +23,18 @@ def _stub_transformers(fake_cls):
     return mock.patch.dict("sys.modules", {"transformers": fake_module})
 
 
-def test_hf_causal_passes_pretrained_and_token_to_from_pretrained(monkeypatch):
+def test_hf_causal_forwards_pretrained_revision_and_env_token(monkeypatch):
+    """Invariant: ``HFCausalLM(pretrained=..., revision=...)`` forwards the
+    model id and revision to ``AutoModelForCausalLM.from_pretrained`` and
+    plumbs the ``HF_TOKEN`` env var through as an auth/token kwarg.
+
+    Setup: stub transformers; set ``HF_TOKEN``; construct with
+    ``trust_remote_code=False``.
+    Expected: from_pretrained called once; model id matches (positional or
+    ``pretrained_model_name_or_path``); ``trust_remote_code`` stays False
+    (only forwarded when True); ``revision == "main"``; the env token appears
+    in some token/auth kwarg.
+    """
     monkeypatch.setenv("HF_TOKEN", "secret-token")
     HFCausalLM = _import_class()
 
@@ -47,7 +63,14 @@ def test_hf_causal_passes_pretrained_and_token_to_from_pretrained(monkeypatch):
     assert any(v == "secret-token" for v in forwarded.values()), forwarded
 
 
-def test_hf_causal_respects_explicit_use_auth_token(monkeypatch):
+def test_hf_causal_explicit_use_auth_token_takes_precedence_over_absent_env(monkeypatch):
+    """Invariant: an explicit ``use_auth_token`` argument is forwarded as the
+    token even when no env tokens are set.
+
+    Setup: stub transformers; clear ``HF_TOKEN`` and ``HUGGING_FACE_HUB_TOKEN``;
+    pass ``use_auth_token="explicit"``.
+    Expected: the explicit value reaches a token/auth kwarg.
+    """
     monkeypatch.delenv("HF_TOKEN", raising=False)
     monkeypatch.delenv("HUGGING_FACE_HUB_TOKEN", raising=False)
     HFCausalLM = _import_class()

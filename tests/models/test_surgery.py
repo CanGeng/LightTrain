@@ -1,4 +1,9 @@
-"""Model surgery — DESIGN §8.3 (M5)."""
+"""Model surgery — DESIGN §8.3 (M5).
+
+Relocated from the flat ``tests/test_surgery.py``. No mirror under
+``tests/models/`` covered ``lighttrain.models.surgery``, so the freeze /
+resize / replace / add / reinit / tie behaviors are preserved.
+"""
 
 from __future__ import annotations
 
@@ -195,8 +200,6 @@ def test_reinit_module_changes_weights_and_zeros_bias():
     after = model.blocks[0].mlp.fc1.weight
     assert not torch.allclose(after, before)
     assert torch.all(model.blocks[0].mlp.fc1.bias == 0.0)
-    # bias was non-zero before? Not guaranteed for fresh tiny_lm init; but we
-    # at minimum confirmed it ended up zero.
     _ = before_bias
 
 

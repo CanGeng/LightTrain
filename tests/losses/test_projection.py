@@ -1,16 +1,18 @@
-"""HiddenStatesMSELoss(project=True) — DESIGN §8.3 / §9.1 (M5).
+"""Lazy hidden-state projection lifecycle for HiddenStatesMSELoss(project=True).
 
-Verifies:
+Mirror of the flat ``tests/test_hidden_projection.py`` suite (DESIGN §8.3 / §9.1).
 
-* dim-mismatch with ``project=False`` still raises (M3 contract not regressed).
-* dim-mismatch with ``project=True`` lazy-creates an ``nn.Linear`` and the
-  projection lives under ``model._distill_projections.*`` so it follows
-  ``state_dict`` + ``to(device)``.
-* The fresh ``Linear`` parameters get auto-registered with the optimizer
-  via ``ctx.extras['_new_trainable_params']`` and actually get updated
-  during the next ``optimizer.step()``.
-* Overfit smoke: loss drops monotonically over 20 steps.
-* state_dict round-trips the projection (so a resume picks it up).
+These exercise the *integration* concerns of the projection path — not the
+loss math (covered in ``test_distill.py``) — so they build a real
+``TinyCausalLM`` student rather than the conftest dummy fixtures:
+
+* dim-mismatch with ``project=False`` still raises (the M3 contract).
+* ``project=True`` lazily creates an ``nn.Linear`` under
+  ``model._distill_projections.*`` so it follows ``state_dict`` + ``to(device)``.
+* the fresh ``Linear`` params get auto-registered for the optimizer via
+  ``ctx.extras['_new_trainable_params']`` and actually update on ``step()``.
+* overfit smoke: loss drops over 20 steps.
+* ``state_dict`` round-trips the projection (so a resume picks it up).
 """
 
 from __future__ import annotations
@@ -35,7 +37,12 @@ def _teacher_tensor(L=3, B=2, T=4, H_t=32, *, seed=0):
     return torch.randn(L, B, T, H_t, generator=g)
 
 
-def test_dim_mismatch_without_project_still_raises():
+def test_projection_dim_mismatch_without_project_raises_runtime_error():
+    """Goal: project=False on mismatched hidden dims raises the M3 contract error.
+
+    Input: student d=16 vs teacher H_t=32, mapping {1:1}, project=False.
+    Contract: must raise RuntimeError matching "hidden_mse hidden dim mismatch".
+    """
     student = _make_student(d=16)
     teacher = _teacher_tensor(H_t=32)
     loss_fn = HiddenStatesMSELoss(mapping={1: 1}, project=False)
@@ -51,7 +58,11 @@ def test_dim_mismatch_without_project_still_raises():
         loss_fn(out, batch, ctx)
 
 
-def test_project_true_creates_projection_under_model():
+def test_projection_lazily_attached_under_model_and_exposed_for_optimizer():
+    """Goal: project=True lazy-creates a Linear under ``model._distill_projections``,
+            pushes its params to ``ctx.extras['_new_trainable_params']``, and
+            includes it in ``state_dict``.
+    """
     student = _make_student(d=16)
     teacher = _teacher_tensor(H_t=32)
     loss_fn = HiddenStatesMSELoss(mapping={1: 1}, project=True)
@@ -72,13 +83,15 @@ def test_project_true_creates_projection_under_model():
     # The projection params got pushed to ctx.extras for optimizer registration.
     new_params = ctx.extras.get("_new_trainable_params", [])
     assert len(new_params) >= 1
-    # state_dict includes it
+    # state_dict includes it.
     sd = student.state_dict()
     assert any("_distill_projections" in k for k in sd)
 
 
-def test_project_true_overfit_loss_drops():
-    """Optimize a tiny student to match a fixed teacher target via projection."""
+def test_projection_overfit_loss_decreases_over_twenty_steps():
+    """Goal: optimizing a tiny student to a fixed teacher via the projection
+            drives the loss down (final < 0.9 * initial) over 20 steps.
+    """
     torch.manual_seed(0)
     student = _make_student(d=16)
     teacher = _teacher_tensor(H_t=32, seed=42)
@@ -112,7 +125,10 @@ def test_project_true_overfit_loss_drops():
     )
 
 
-def test_project_true_state_dict_round_trip():
+def test_projection_round_trips_through_state_dict():
+    """Goal: a projection created on one student round-trips through ``state_dict``
+            into a freshly-projected student (so a resume restores it exactly).
+    """
     student = _make_student(d=16)
     teacher = _teacher_tensor(H_t=32)
     loss_fn = HiddenStatesMSELoss(mapping={1: 1}, project=True)
@@ -143,9 +159,11 @@ def test_project_true_state_dict_round_trip():
         assert torch.allclose(sd[k], sd2[k], atol=1e-6), f"{k} did not round-trip"
 
 
-def test_project_true_via_standard_update_rule_registers_with_optimizer():
-    """Full integration: the update rule's drain step adds the projection
-    params to the optimizer and step() actually updates them."""
+def test_projection_registered_with_optimizer_via_standard_update_rule():
+    """Goal: full integration — the StandardUpdateRule drain step adds the
+            projection params as a new optimizer param group and ``step()``
+            actually updates them.
+    """
     from lighttrain.builtin_plugins.update_rules.standard import StandardUpdateRule
     from lighttrain.callbacks.base import EventBus
     from lighttrain.engine._context import StepContext
@@ -171,7 +189,7 @@ def test_project_true_via_standard_update_rule_registers_with_optimizer():
         bus=EventBus(),
     )
     metrics = update_rule.step(student, batch, ctx)
-    # Loss reported
+    # Loss reported.
     assert "loss" in metrics
     # Optimizer grew a param group with the projection.
     assert len(optimizer.param_groups) == initial_n_groups + 1

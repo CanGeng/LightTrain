@@ -375,3 +375,103 @@ def test_preference_collator_aux_keys_preserved():
     batch = coll(samples)
     assert "aux.ref.chosen_logprobs" in batch
     assert batch["aux.ref.chosen_logprobs"].shape == (2, 2)
+
+
+def test_preference_collator_registered_under_preference():
+    """``PreferenceCollator`` is registered as ``('collator', 'preference')``.
+
+    Goal: pin the registry name — recipes use ``collator.name = preference``
+    (e.g. dpo_offline.yaml).
+    """
+    from lighttrain.registry import get
+    assert get("collator", "preference") is PreferenceCollator
+
+
+def test_preference_collator_emits_exact_output_key_set():
+    """The batch dict carries exactly the six chosen_/rejected_ keys.
+
+    Pin: ``{chosen,rejected}_{input_ids,attention_mask,labels}`` and nothing
+    else when no aux keys are present — downstream DPO loss indexes these by
+    name, so a renamed/dropped key must surface as a test failure.
+    """
+    coll = PreferenceCollator(pad_id=PAD_ID, max_len=16)
+    batch = coll([
+        {
+            "chosen_input_ids": list(range(5)), "chosen_labels": list(range(5)),
+            "rejected_input_ids": list(range(7)), "rejected_labels": list(range(7)),
+        }
+    ])
+    expected = {
+        "chosen_input_ids", "chosen_attention_mask", "chosen_labels",
+        "rejected_input_ids", "rejected_attention_mask", "rejected_labels",
+    }
+    assert set(batch.keys()) == expected
+
+
+def test_preference_collator_truncates_both_sides_at_max_len():
+    """Chosen and rejected are independently truncated to ``max_len``.
+
+    Setup: chosen + rejected both length 10, ``max_len=4``.
+    Expected: both sides have shape (1, 4).
+    """
+    coll = PreferenceCollator(pad_id=PAD_ID, max_len=4)
+    batch = coll([
+        {
+            "chosen_input_ids": list(range(10)), "chosen_labels": list(range(10)),
+            "rejected_input_ids": list(range(10)), "rejected_labels": list(range(10)),
+        }
+    ])
+    assert batch["chosen_input_ids"].shape == (1, 4)
+    assert batch["rejected_input_ids"].shape == (1, 4)
+
+
+def test_preference_collator_configurable_pad_id_and_ignore_index():
+    """``pad_id`` fills input pad slots and ``ignore_index`` fills label pad
+    slots — both configurable away from the defaults.
+
+    Closed form: row 0 chosen length 3 in a batch padded to 5, ``pad_id=99``,
+    ``ignore_index=-100`` → mask=[1,1,1,0,0]; input_ids[3]==99; labels[3]==-100.
+    """
+    coll = PreferenceCollator(pad_id=99, max_len=16, ignore_index=-100)
+    samples = [
+        {
+            "chosen_input_ids": [1, 2, 3], "chosen_labels": [1, 2, 3],
+            "rejected_input_ids": [1, 2, 3], "rejected_labels": [1, 2, 3],
+        },
+        {
+            "chosen_input_ids": [4, 5, 6, 7, 8], "chosen_labels": [4, 5, 6, 7, 8],
+            "rejected_input_ids": [4, 5, 6, 7, 8], "rejected_labels": [4, 5, 6, 7, 8],
+        },
+    ]
+    batch = coll(samples)
+    assert batch["chosen_attention_mask"][0].tolist() == [1, 1, 1, 0, 0]
+    assert batch["chosen_attention_mask"][1].tolist() == [1, 1, 1, 1, 1]
+    assert batch["chosen_input_ids"][0, 3].item() == 99
+    assert batch["chosen_labels"][0, 3].item() == -100
+
+
+def test_preference_collator_scalar_aux_logprobs_passthrough():
+    """0-d (scalar) ``aux.ref.*`` logprobs survive collation, stacked to (B,).
+
+    Pin (REVIEW_ROUND3 #3): per-sample scalar reference logprobs are stacked
+    along the batch dim, not dropped. Distinct from the (B, T) token-level
+    aux case already pinned in ``test_preference_collator_aux_keys_preserved``.
+    """
+    samples = [
+        {
+            "chosen_input_ids": [1, 2, 3], "chosen_labels": [1, 2, 3],
+            "rejected_input_ids": [4, 5], "rejected_labels": [4, 5],
+            "aux.ref.chosen_logprobs": torch.tensor(-1.5),
+            "aux.ref.rejected_logprobs": torch.tensor(-2.0),
+        },
+        {
+            "chosen_input_ids": [6, 7], "chosen_labels": [6, 7],
+            "rejected_input_ids": [8, 9, 10], "rejected_labels": [8, 9, 10],
+            "aux.ref.chosen_logprobs": torch.tensor(-1.2),
+            "aux.ref.rejected_logprobs": torch.tensor(-1.8),
+        },
+    ]
+    coll = PreferenceCollator(pad_id=PAD_ID, max_len=16)
+    batch = coll(samples)
+    assert batch["aux.ref.chosen_logprobs"].shape == (2,)
+    assert batch["aux.ref.rejected_logprobs"].shape == (2,)

@@ -1,4 +1,4 @@
-"""PPO/GRPO runtime wiring tests — REVIEW_ROUND3 finding #4.
+"""PPO/GRPO runtime wiring (relocated from tests/test_ppo_grpo_wiring.py).
 
 Unit layer:
   - GRPOTrainer / PPOTrainer accept val_every without TypeError.
@@ -7,8 +7,9 @@ Unit layer:
 Runtime integration layer (setup_run_from_config):
   - GRPO recipe: trainer.reward_fn is not None; grad_clip/accumulate filtered.
   - PPO recipe: same.
-  - DPO recipe: no TypeError (grad_clip/accumulate not leaked to _PreferenceBase).
-  - Negative: PPO + pairwise_llm judge raises ConfigResolveError.
+  - preference recipe: no grad_clip/accumulate leak to the trainer __init__.
+  - Migration: removed per-algo preference trainers raise a clear error.
+  - Negative: PPO/GRPO + pairwise_llm judge raises ConfigResolveError.
 """
 
 from __future__ import annotations
@@ -19,12 +20,9 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-_RECIPES = Path(__file__).parent.parent / "recipes"
+_RECIPES = Path(__file__).resolve().parents[2] / "recipes"
+_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
-
-# ---------------------------------------------------------------------------
-# Unit layer — constructor compat
-# ---------------------------------------------------------------------------
 
 def _stub_engine():
     e = MagicMock()
@@ -32,26 +30,27 @@ def _stub_engine():
     return e
 
 
+# ===========================================================================
+# Unit layer — constructor compat
+# ===========================================================================
+
+
 def test_grpo_trainer_accepts_val_every():
     from lighttrain.builtin_plugins.trainers.grpo import GRPOTrainer
+
     trainer = GRPOTrainer(
-        val_every=0,
-        engine=_stub_engine(),
-        data_module=MagicMock(),
-        optimizer=MagicMock(),
-        max_steps=1,
+        val_every=0, engine=_stub_engine(), data_module=MagicMock(),
+        optimizer=MagicMock(), max_steps=1,
     )
     assert trainer is not None
 
 
 def test_ppo_trainer_accepts_val_every():
     from lighttrain.builtin_plugins.trainers.ppo import PPOTrainer
+
     trainer = PPOTrainer(
-        val_every=0,
-        engine=_stub_engine(),
-        data_module=MagicMock(),
-        optimizer=MagicMock(),
-        max_steps=1,
+        val_every=0, engine=_stub_engine(), data_module=MagicMock(),
+        optimizer=MagicMock(), max_steps=1,
     )
     assert trainer is not None
 
@@ -64,21 +63,15 @@ def test_reward_fn_adapter_decodes_and_scores():
     tok = ByteTokenizer()
     judge = VerifierJudge(verify_pattern=r"\d+")
 
-    # Simulate the _reward_fn closure from _runtime.py.
     def _reward_fn(prompt_ids: torch.Tensor, response_ids: torch.Tensor) -> list[float]:
         prompts = [tok.decode(ids.tolist(), skip_special_tokens=True) for ids in prompt_ids]
         responses = [tok.decode(ids.tolist(), skip_special_tokens=True) for ids in response_ids]
         return judge.score(list(zip(prompts, responses, strict=False)))
 
-    # Use same-length tensors (as the rollout engine would produce).
-    resp_with_digit = torch.tensor(
-        list(b"hello 42\x00"), dtype=torch.long  # 9 bytes
-    )
-    resp_no_digit = torch.tensor(
-        list(b"worldword"), dtype=torch.long  # 9 bytes, no digits
-    )
+    resp_with_digit = torch.tensor(list(b"hello 42\x00"), dtype=torch.long)
+    resp_no_digit = torch.tensor(list(b"worldword"), dtype=torch.long)
     prompts = torch.zeros((2, 3), dtype=torch.long)
-    responses = torch.stack([resp_with_digit, resp_no_digit])  # (2, 9)
+    responses = torch.stack([resp_with_digit, resp_no_digit])
 
     scores = _reward_fn(prompts, responses)
     assert len(scores) == 2
@@ -86,13 +79,13 @@ def test_reward_fn_adapter_decodes_and_scores():
     assert scores[1] == 0.0, "response without digit must score 0.0"
 
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
 # Runtime integration — setup_run_from_config
-# ---------------------------------------------------------------------------
+# ===========================================================================
+
 
 @pytest.mark.skipif(not (_RECIPES / "grpo.yaml").exists(), reason="grpo.yaml missing")
 def test_grpo_runtime_reward_fn_injected():
-    """GRPO recipe: trainer.reward_fn must be wired from judge config."""
     from lighttrain.cli._runtime import setup_run_from_config
 
     bundle = setup_run_from_config(
@@ -100,13 +93,11 @@ def test_grpo_runtime_reward_fn_injected():
         overrides=["++trainer.max_steps=1", "++trainer.ckpt_every=0"],
         mode="lab",
     )
-    trainer = bundle["trainer"]
-    assert trainer.reward_fn is not None, "reward_fn must be injected from judge config"
+    assert bundle["trainer"].reward_fn is not None
 
 
 @pytest.mark.skipif(not (_RECIPES / "ppo_online.yaml").exists(), reason="ppo_online.yaml missing")
 def test_ppo_runtime_reward_fn_injected():
-    """PPO recipe: trainer.reward_fn must be wired from judge config."""
     from lighttrain.cli._runtime import setup_run_from_config
 
     bundle = setup_run_from_config(
@@ -114,8 +105,7 @@ def test_ppo_runtime_reward_fn_injected():
         overrides=["++trainer.max_steps=1", "++trainer.ckpt_every=0"],
         mode="lab",
     )
-    trainer = bundle["trainer"]
-    assert trainer.reward_fn is not None, "reward_fn must be injected from judge config"
+    assert bundle["trainer"].reward_fn is not None
 
 
 def _write_minimal_preference_recipe(tmp_path, fixture, *, trainer_name: str) -> Path:
@@ -198,7 +188,7 @@ def test_preference_runtime_no_grad_clip_leak(tmp_path):
     __init__ (the runtime keeps them engine-only). Hermetic; no artifact store."""
     from lighttrain.cli._runtime import setup_run_from_config
 
-    fixture = Path(__file__).parent / "fixtures" / "tiny_preference.jsonl"
+    fixture = _FIXTURES / "tiny_preference.jsonl"
     if not fixture.exists():
         pytest.skip("tiny_preference.jsonl fixture not found")
 
@@ -213,7 +203,7 @@ def test_removed_preference_trainer_raises_migration_error(tmp_path):
     from lighttrain.cli._runtime import setup_run_from_config
     from lighttrain.config import ConfigError
 
-    fixture = Path(__file__).parent / "fixtures" / "tiny_preference.jsonl"
+    fixture = _FIXTURES / "tiny_preference.jsonl"
     if not fixture.exists():
         pytest.skip("tiny_preference.jsonl fixture not found")
 
@@ -223,29 +213,22 @@ def test_removed_preference_trainer_raises_migration_error(tmp_path):
 
 
 def test_pairwise_llm_judge_with_grpo_raises():
-    """Non-VerifierJudge with PPO/GRPO must raise a clear error, not silently produce
-    wrong rewards. Two failure modes are acceptable:
-    (a) ConfigResolveError at judge-construction time (recipe has incompatible params),
-    (b) ConfigResolveError / RuntimeError at reward_fn-injection time (our check).
+    """Non-VerifierJudge with PPO/GRPO must raise a clear error, not silently
+    produce wrong rewards. Two failure modes are acceptable:
+    (a) ConfigResolveError at judge-construction time,
+    (b) ConfigResolveError / RuntimeError at reward_fn-injection time.
     Either way, the framework must refuse rather than silently break.
     """
+    import tempfile
     import textwrap
 
     from lighttrain.cli._runtime import setup_run_from_config
     from lighttrain.config._exceptions import ConfigResolveError
 
-    fixture = Path(__file__).parent / "fixtures" / "tiny_corpus.txt"
+    fixture = _FIXTURES / "tiny_corpus.txt"
     if not fixture.exists():
         pytest.skip("tiny_corpus.txt fixture not found")
 
-    # Build a minimal GRPO recipe that references a pairwise_llm judge.
-    # PairwiseLLMJudge.score() is 3-tuple based and incompatible with the
-    # RL rollout's 2-tensor adapter. The framework must raise before training starts.
-    #
-    # Note: pairwise_llm requires judge_model_fn (a callable). Providing a
-    # path string triggers a ConfigResolveError from the resolver itself,
-    # which is still the correct failure mode for the constraint test.
-    import tempfile
     with tempfile.NamedTemporaryFile(suffix=".yaml", mode="w", delete=False) as f:
         f.write(textwrap.dedent(f"""
             mode: lab

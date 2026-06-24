@@ -1,4 +1,12 @@
-"""Tests for AdaLoRAAdapter (M7, M5 defer)."""
+"""AdaLoRAAdapter + AdaLoRALinear — DESIGN §8.4 (M7, M5 defer).
+
+Relocated from the flat ``tests/test_peft_adalora.py``. No mirror under
+``tests/models/`` covered AdaLoRA, so behaviors are preserved. ``AdaLoRALinear``
+is always manual (no PEFT dependency); ``AdaLoRAAdapter`` is path-agnostic.
+"""
+
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
 
@@ -20,7 +28,10 @@ def _make_model():
 # AdaLoRALinear (always manual — no PEFT dependency)
 # ---------------------------------------------------------------------------
 
-def test_adalora_linear_output_shape():
+def test_invariant_adalora_linear_preserves_base_output_shape():
+    """Invariant: wrapping ``nn.Linear(16, 32)`` in ``AdaLoRALinear`` leaves the
+    output feature dimension intact — forward of a (2, 16) input yields (2, 32).
+    """
     base = nn.Linear(16, 32)
     ada = AdaLoRALinear(base, r=4, lora_alpha=8)
     x = torch.randn(2, 16)
@@ -28,15 +39,23 @@ def test_adalora_linear_output_shape():
     assert out.shape == (2, 32)
 
 
-def test_adalora_linear_has_lambda():
+def test_invariant_adalora_linear_exposes_lambda_of_rank_length():
+    """Invariant: ``AdaLoRALinear`` holds a learnable ``lora_Lambda`` vector
+    whose length equals the rank ``r``.
+    """
     base = nn.Linear(8, 16)
     ada = AdaLoRALinear(base, r=4, lora_alpha=4)
     assert hasattr(ada, "lora_Lambda")
     assert ada.lora_Lambda.shape == (4,)
 
 
-def test_adalora_rank_pruning():
-    """prune_rank should zero out low-importance lambdas."""
+def test_invariant_adalora_prune_rank_keeps_at_most_k_nonzero_lambdas():
+    """Invariant: ``prune_rank(keep=k)`` zeros all but (at most) the ``k``
+    highest-importance lambdas.
+
+    Setup: set Lambda to a single dominant entry; prune to keep=1.
+    Expected: at most one lambda remains non-zero.
+    """
     base = nn.Linear(8, 16)
     ada = AdaLoRALinear(base, r=4, lora_alpha=4)
     with torch.no_grad():
@@ -45,7 +64,10 @@ def test_adalora_rank_pruning():
     assert (ada.lora_Lambda.abs() > 1e-6).sum() <= 1
 
 
-def test_adalora_linear_importance_scores():
+def test_invariant_adalora_importance_scores_are_nonnegative_rank_length():
+    """Invariant: ``importance_scores()`` returns a length-``r`` vector of
+    non-negative values.
+    """
     base = nn.Linear(4, 8)
     ada = AdaLoRALinear(base, r=3, lora_alpha=3)
     scores = ada.importance_scores()
@@ -57,15 +79,20 @@ def test_adalora_linear_importance_scores():
 # AdaLoRAAdapter (path-agnostic — PEFT or manual)
 # ---------------------------------------------------------------------------
 
-def test_adalora_adapter_creates_without_error():
+def test_adalora_adapter_constructs_over_sequential_targets():
+    """``AdaLoRAAdapter`` constructs without error over a plain ``nn.Sequential``
+    base when targeting submodules ``"0"`` and ``"2"``.
+    """
     model = _make_model()
     adapter = AdaLoRAAdapter(base=model, r=4, target_modules=["0", "2"], total_step=100)
     assert adapter is not None
 
 
-def test_adalora_state_dict_has_keys():
+def test_adalora_state_dict_is_nonempty_on_either_path():
+    """Invariant: regardless of the PEFT-or-manual code path, the adapter's
+    ``state_dict()`` carries at least one tensor.
+    """
     model = _make_model()
     adapter = AdaLoRAAdapter(base=model, r=4, target_modules=["0", "2"], total_step=100)
     sd = adapter.state_dict()
-    # Should have some keys regardless of PEFT or manual path
     assert len(sd) > 0

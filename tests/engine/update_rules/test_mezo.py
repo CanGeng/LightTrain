@@ -346,3 +346,35 @@ def test_mezo_state_dict_roundtrip():
     assert rule2.eps == 2e-4
     assert rule2.seed_per_step is False
     assert rule2._step_count == 7
+
+
+def test_mezo_metrics_expose_loss_grad_est_and_lr():
+    """Goal: a MeZO step returns a metrics dict carrying ``loss``, ``grad_est``
+    and ``lr`` — the keys loggers/schedulers rely on.
+
+    Catches a refactor that renames or drops one of these metric keys.
+    """
+    ctx, model, _ = _build_ctx()
+    metrics = MeZOUpdateRule(eps=1e-3).step(model, _batch(), ctx)
+    assert "loss" in metrics
+    assert "grad_est" in metrics
+    assert "lr" in metrics
+
+
+def test_mezo_loss_does_not_diverge_over_many_steps():
+    """Goal: repeated MeZO steps on a fixed batch optimize (or at least do not
+    explode) — the zeroth-order estimator drives the loss down, not up.
+
+    Pins end-to-end optimization behavior rather than a single-step contract.
+    """
+    torch.manual_seed(0)
+    ctx, model, _ = _build_ctx(loss_fn=_quadratic_loss, init_value=1.0)
+
+    rule = MeZOUpdateRule(eps=1e-2)
+    losses: list[float] = []
+    for _ in range(30):
+        m = rule.step(model, _batch(), ctx)
+        losses.append(float(m["loss"]))
+        ctx.step += 1
+
+    assert losses[-1] < losses[0] or abs(losses[-1] - losses[0]) < 1.0

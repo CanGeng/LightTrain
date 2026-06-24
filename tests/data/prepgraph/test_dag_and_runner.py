@@ -373,3 +373,208 @@ def test_cache_hit_reason_codes(tmp_path: Path, jsonl_corpus: Path, monkeypatch)
     # At least one rows-schema node must now report the bump.
     bumped = [e for e in plan3 if e.reason == "schema_version_bumped"]
     assert bumped, f"no node reported schema_version_bumped: {[(e.name, e.reason) for e in plan3]}"
+
+
+# --------------------------------------------------------------------------- #
+# Runner: dry-run, config-change reason codes, orphan cleanup                  #
+# --------------------------------------------------------------------------- #
+
+
+def test_dry_run_writes_nothing_to_store(tmp_path: Path, jsonl_corpus: Path) -> None:
+    """``dry_run`` plans without materializing any artifact to the store dir.
+
+    Contract: a dry-run is side-effect-free on disk; the store dir is either
+    absent or empty afterwards.
+    """
+    store = tmp_path / "store"
+    runner = PrepRunner(
+        PrepGraph.from_config(_partial_cache_spec(jsonl_corpus, p99_max=4096)),
+        store_root=store,
+    )
+    runner.dry_run()
+    assert not store.exists() or not any(store.iterdir())
+
+
+def test_config_change_reports_config_changed_and_propagates_upstream(
+    tmp_path: Path, jsonl_corpus: Path
+) -> None:
+    """Changing one node's config flips its reason to ``config_changed`` and
+    its descendants to an upstream-driven miss reason.
+
+    Setup: run once, then tighten ``validated``'s ``p99_length_max``. Only
+    ``validated``'s own fingerprint changes.
+    Analytical: ``validated`` misses with ``reason == "config_changed"``;
+    ``raw``/``tok`` remain hits (their fingerprints are unchanged).
+    """
+    store = tmp_path / "store"
+    PrepRunner(
+        PrepGraph.from_config(_partial_cache_spec(jsonl_corpus, p99_max=4096)),
+        store_root=store,
+    ).run()
+
+    plan = PrepRunner(
+        PrepGraph.from_config(_partial_cache_spec(jsonl_corpus, p99_max=2048)),
+        store_root=store,
+    ).plan()
+    by_name = {e.name: e for e in plan}
+    assert by_name["raw"].hit
+    assert by_name["tok"].hit
+    assert not by_name["validated"].hit
+    assert by_name["validated"].reason == "config_changed"
+
+
+def test_cleanup_orphans_dry_run_keeps_live_fingerprints(
+    tmp_path: Path, jsonl_corpus: Path
+) -> None:
+    """``cleanup_orphans(dry_run=True)`` on an unchanged graph flags nothing.
+
+    Regression: cleanup on a graph whose nodes have inputs used to raise
+    ``KeyError`` because ``_fp_cache`` was not populated before ``_resolve``.
+    All current fingerprints are live → the removal list is empty and no
+    exception is raised.
+    """
+    store = tmp_path / "store"
+    spec = _partial_cache_spec(jsonl_corpus, p99_max=4096)
+    PrepRunner(PrepGraph.from_config(spec), store_root=store).run()
+    removed = PrepRunner(
+        PrepGraph.from_config(spec), store_root=store
+    ).cleanup_orphans(dry_run=True)
+    assert removed == []
+
+
+def test_cleanup_orphans_removes_stale_fingerprint_dirs(
+    tmp_path: Path, jsonl_corpus: Path
+) -> None:
+    """After a config change re-run, the prior fingerprint dirs are orphaned
+    and ``cleanup_orphans`` removes them.
+
+    Setup: run with one threshold, then run with a tightened threshold (which
+    re-materializes ``validated`` under a new fingerprint), then sweep.
+    The original ``validated`` fp dir is no longer live → it is removed.
+    """
+    store = tmp_path / "store"
+    PrepRunner(
+        PrepGraph.from_config(_partial_cache_spec(jsonl_corpus, p99_max=4096)),
+        store_root=store,
+    ).run()
+    runner2 = PrepRunner(
+        PrepGraph.from_config(_partial_cache_spec(jsonl_corpus, p99_max=2048)),
+        store_root=store,
+    )
+    runner2.run()
+    removed = runner2.cleanup_orphans()
+    assert removed
+
+
+# --------------------------------------------------------------------------- #
+# Node behaviors: validate report, chunk splitting, mix round-robin            #
+# --------------------------------------------------------------------------- #
+
+
+def test_validate_node_persists_report_json(tmp_path: Path, jsonl_corpus: Path) -> None:
+    """A ``validate`` node writes a ``report.json`` with a positive row count
+    and the histogram/keep-ratio diagnostic keys.
+
+    Pin: the validate node materializes its report to disk so ``prep-status``
+    can surface it.
+    """
+    spec = {
+        "nodes": [
+            {
+                "name": "raw",
+                "kind": "load",
+                "source": f"jsonl:{jsonl_corpus}",
+                "raw_data_version": "v0",
+            },
+            {
+                "name": "tok",
+                "kind": "tokenize",
+                "inputs": ["raw"],
+                "processor": {
+                    "name": "chat_template",
+                    "tokenizer": {"name": "byte"},
+                },
+            },
+            {
+                "name": "checked",
+                "kind": "validate",
+                "inputs": ["tok"],
+                "vocab_size": 260,
+                "min_rows": 1,
+            },
+        ],
+        "terminals": ["checked"],
+    }
+    runner = PrepRunner(PrepGraph.from_config(spec), store_root=tmp_path / "store")
+    runner.run()
+    final_dir = next((tmp_path / "store" / "validate" / "checked").iterdir())
+    report = json.loads((final_dir / "report.json").read_text(encoding="utf-8"))
+    assert report["rows"] >= 1
+    assert "length_histogram" in report
+    assert "label_keep_ratio" in report
+
+
+def test_chunk_node_splits_long_rows_within_max_len(tmp_path: Path) -> None:
+    """A ``chunk`` node splits an over-long tokenized row into multiple rows,
+    each no longer than ``max_len``.
+
+    Setup: one 500-char doc, ``max_len=64``, ``overlap=8``.
+    Expected: more than one output row, every row length <= 64.
+    """
+    p = tmp_path / "long.jsonl"
+    p.write_text(json.dumps({"text": "x" * 500}), encoding="utf-8")
+    spec = {
+        "nodes": [
+            {"name": "raw", "kind": "load", "source": f"jsonl:{p}"},
+            {
+                "name": "tok",
+                "kind": "tokenize",
+                "inputs": ["raw"],
+                "tokenizer": {"name": "byte"},
+                "text_field": "text",
+            },
+            {
+                "name": "chunked",
+                "kind": "chunk",
+                "inputs": ["tok"],
+                "max_len": 64,
+                "overlap": 8,
+            },
+        ],
+        "terminals": ["chunked"],
+    }
+    results = PrepRunner(PrepGraph.from_config(spec), store_root=tmp_path / "store").run()
+    rows = results["chunked"].rows
+    assert len(rows) > 1
+    assert all(len(r["input_ids"]) <= 64 for r in rows)
+
+
+def test_mix_node_round_robin_interleaves_sources(tmp_path: Path) -> None:
+    """A ``mix`` node with ``strategy='round_robin'`` interleaves its two
+    upstream sources a0 b0 a1 b1 ...
+
+    Setup: two 3-row sources. Expected: 6 rows total, row 0 from src_a, row 1
+    from src_b.
+    """
+    p1 = tmp_path / "a.jsonl"
+    p2 = tmp_path / "b.jsonl"
+    p1.write_text("\n".join(json.dumps({"text": f"a{i}"}) for i in range(3)), encoding="utf-8")
+    p2.write_text("\n".join(json.dumps({"text": f"b{i}"}) for i in range(3)), encoding="utf-8")
+    spec = {
+        "nodes": [
+            {"name": "src_a", "kind": "load", "source": f"jsonl:{p1}"},
+            {"name": "src_b", "kind": "load", "source": f"jsonl:{p2}"},
+            {
+                "name": "mixed",
+                "kind": "mix",
+                "inputs": ["src_a", "src_b"],
+                "strategy": "round_robin",
+            },
+        ],
+        "terminals": ["mixed"],
+    }
+    results = PrepRunner(PrepGraph.from_config(spec), store_root=tmp_path / "store").run()
+    rows = results["mixed"].rows
+    assert len(rows) == 6
+    assert rows[0]["text"].startswith("a")
+    assert rows[1]["text"].startswith("b")

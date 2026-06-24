@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import pytest
 import torch
 import torch.nn.functional as F
 
@@ -228,6 +229,38 @@ def test_regression_dpo_sign_direction(dummy_ctx, dummy_model_output):
     assert abs(correct - flipped) > 0.15, "Margin large enough to catch a sign bug."
 
 
+def test_dpo_accuracy_key_present_and_in_unit_range(dummy_ctx, dummy_model_output):
+    """Goal: DPO always reports ``dpo_accuracy`` and it stays within [0, 1].
+
+    Input: random-ish chosen/rejected with a reference.
+    Contract: the metric key must exist and be a valid fraction.
+    """
+    chosen = torch.tensor([0.3, -0.2, 1.1, -0.7])
+    rejected = torch.tensor([-0.5, 0.1, 0.4, 0.2])
+    ref_chosen = torch.zeros(4)
+    ref_rejected = torch.zeros(4)
+    batch = {
+        "chosen_logps": chosen, "rejected_logps": rejected,
+        "ref_chosen_logps": ref_chosen, "ref_rejected_logps": ref_rejected,
+    }
+    out = DPOLoss()(dummy_model_output, batch, dummy_ctx)
+    assert "dpo_accuracy" in out
+    assert 0.0 <= out["dpo_accuracy"] <= 1.0
+
+
+def test_dpo_missing_reference_logps_raises(dummy_ctx, dummy_model_output):
+    """Goal: DPO without ``ref_*`` keys raises KeyError (reference is required).
+
+    Input: batch with only policy logps, no reference logps.
+    Contract: DPO must fail loudly when the reference model outputs are absent.
+    """
+    batch = {
+        "chosen_logps": torch.zeros(3), "rejected_logps": torch.zeros(3),
+    }
+    with pytest.raises(KeyError):
+        DPOLoss()(dummy_model_output, batch, dummy_ctx)
+
+
 # ---------------------------------------------------------------------------
 # IPOLoss
 # ---------------------------------------------------------------------------
@@ -299,6 +332,26 @@ def test_ipo_closed_form_value(dummy_ctx, dummy_model_output):
     torch.testing.assert_close(out["loss"], torch.tensor(4.0), atol=1e-5, rtol=1e-4)
 
 
+def test_ipo_matched_logratios_equals_one_over_four_beta_squared(dummy_ctx, dummy_model_output):
+    """Goal: π and ref share identical logratios → Δπ - Δref = 0 → h = -1/(2β)
+            → loss = h² = 1/(4β²).
+
+    Input: chosen == rejected and ref_chosen == ref_rejected (so both logratios
+           are 0), β = 0.5.
+    Analytical: h = 0 - 1/(2β) = -1; loss = (1/(2β))² = 1/(4·0.25) = 1.0.
+    """
+    beta = 0.5
+    chosen = torch.zeros(3)
+    rejected = torch.zeros(3)
+    batch = {
+        "chosen_logps": chosen, "rejected_logps": rejected,
+        "ref_chosen_logps": chosen.clone(), "ref_rejected_logps": rejected.clone(),
+    }
+    out = IPOLoss(beta=beta)(dummy_model_output, batch, dummy_ctx)
+    expected = (1.0 / (2.0 * beta)) ** 2
+    torch.testing.assert_close(out["loss"], torch.tensor(expected), atol=1e-5, rtol=1e-4)
+
+
 # ---------------------------------------------------------------------------
 # SimPOLoss
 # ---------------------------------------------------------------------------
@@ -352,6 +405,27 @@ def test_regression_simpo_gamma_cancels_in_subtraction(dummy_ctx, dummy_model_ou
     assert abs(float(out_g0["loss"]) - float(out_g2["loss"])) > 0.1, (
         "γ must affect SimPO loss; if it cancels in subtraction the bug returns."
     )
+
+
+def test_simpo_needs_no_reference_keys(dummy_ctx, dummy_model_output):
+    """Goal: SimPO computes from chosen/rejected alone — no ref_* keys required.
+
+    Input: batch with only chosen_logps / rejected_logps.
+    Contract: SimPO is reference-free; it must produce a loss without ref logps.
+    """
+    batch = {"chosen_logps": torch.tensor([-0.5]), "rejected_logps": torch.tensor([-1.5])}
+    out = SimPOLoss()(dummy_model_output, batch, dummy_ctx)
+    assert "loss" in out
+
+
+def test_simpo_reports_accuracy_metric(dummy_ctx, dummy_model_output):
+    """Goal: SimPO always reports a ``simpo_accuracy`` metric key."""
+    batch = {
+        "chosen_logps": torch.tensor([1.0, 2.0, -0.5]),
+        "rejected_logps": torch.tensor([0.0, 1.0, 0.5]),
+    }
+    out = SimPOLoss()(dummy_model_output, batch, dummy_ctx)
+    assert "simpo_accuracy" in out
 
 
 # ---------------------------------------------------------------------------
@@ -438,6 +512,22 @@ def test_regression_orpo_clamp_prevents_inf(dummy_ctx, dummy_model_output):
     batch = {"chosen_logps": chosen, "rejected_logps": rejected, "chosen_nll_loss": nll}
     out = ORPOLoss(lam=1.0)(dummy_model_output, batch, dummy_ctx)
     assert torch.isfinite(out["loss"]), "clamp must keep loss finite at chosen=0."
+
+
+def test_orpo_reports_sft_and_ratio_components(dummy_ctx, dummy_model_output):
+    """Goal: ORPO exposes its two additive components ``sft_loss`` and
+            ``ratio_loss``, with the SFT (NLL) component non-negative.
+
+    Input: ordinary chosen/rejected/nll batch.
+    Contract: both metric keys exist; sft_loss >= 0 (it is mean NLL).
+    """
+    chosen = torch.full((3,), -0.5)
+    rejected = torch.full((3,), -1.5)
+    nll = torch.tensor([0.5, 1.0, 1.5])
+    batch = {"chosen_logps": chosen, "rejected_logps": rejected, "chosen_nll_loss": nll}
+    out = ORPOLoss()(dummy_model_output, batch, dummy_ctx)
+    assert "sft_loss" in out and "ratio_loss" in out
+    assert float(out["sft_loss"]) >= 0.0
 
 
 # ---------------------------------------------------------------------------

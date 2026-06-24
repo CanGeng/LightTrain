@@ -356,6 +356,54 @@ def test_detach_removes_all_handles_and_clears_cache():
     assert mgr._cache == {}
 
 
+def test_invariant_topk_capture_through_real_model_leaves_modeloutput_logits_intact():
+    """Invariant: capturing ``lm_head`` output via a topk transform on a real
+    ``TinyCausalLM`` forward does NOT mutate the returned ModelOutput logits.
+
+    Setup: attach a ``transform={topk: 8}`` spec to ``lm_head``; run a real
+    forward.
+    Expected: captured payload has ``{"values", "indices"}`` each of shape
+    (B, T, K), AND the model's own ``out.outputs["logits"]`` retains full
+    vocab width (B, T, vocab) — the hook is non-destructive.
+    """
+    model = TinyCausalLM(vocab_size=64, d_model=32, n_layers=2, n_heads=4, max_seq_len=16)
+    spec = ExtraOutputSpec(name="logits_topk_8", source="lm_head", transform={"topk": 8})
+    mgr = ExtrasHookManager(model, [spec]).attach()
+    try:
+        ids = torch.randint(0, 64, (2, 8))
+        out = model(ids)
+        captured = mgr.collect()
+    finally:
+        mgr.detach()
+    payload = captured["logits_topk_8"]
+    assert set(payload) == {"values", "indices"}
+    assert payload["values"].shape == (2, 8, 8)
+    assert payload["indices"].shape == (2, 8, 8)
+    # The original ModelOutput is untouched — full vocab logits survive.
+    assert out.outputs["logits"].shape == (2, 8, 64)
+
+
+def test_invariant_flatten_hidden_states_from_real_model_has_n_layers_plus_one():
+    """Invariant: a real ``TinyCausalLM`` built with ``output_hidden_states=True``
+    yields a ``hidden_states`` tuple of ``n_layers + 1`` entries (one per block
+    plus the embedding output), and ``flatten_model_output_tensors`` stacks them
+    under ``"hidden_states_layers"``.
+
+    Setup: 3-layer model; real forward; flatten.
+    Expected: ``"logits"`` present; ``hidden_states_layers`` leading dim == 4.
+    """
+    model = TinyCausalLM(
+        vocab_size=64, d_model=32, n_layers=3, n_heads=4, max_seq_len=8,
+        output_hidden_states=True,
+    )
+    ids = torch.randint(0, 64, (1, 4))
+    out = model(ids)
+    flat = flatten_model_output_tensors(out)
+    assert "logits" in flat
+    assert "hidden_states_layers" in flat
+    assert flat["hidden_states_layers"].shape[0] == 4
+
+
 def test_unmatched_source_yields_empty_cache_no_error():
     """A spec whose ``source`` matches nothing is silently skipped.
 

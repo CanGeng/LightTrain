@@ -146,6 +146,46 @@ def test_invariant_quarantine_after_exactly_max_consecutive_failures(capsys):
     assert "_RaisingTimes" in bus.quarantined
 
 
+def test_invariant_other_callbacks_keep_firing_while_one_is_quarantined():
+    """Invariant: quarantine is per-callback — a failing callback being
+    counted toward (and then placed into) quarantine never suppresses the
+    healthy callbacks sharing the same event.
+
+    Setup: a thrower that always raises plus a quiet counter; max=3.
+    Expected: across 3 failing dispatches the quiet callback fires 3 times
+    and the thrower lands in ``quarantined`` only after the 3rd; a 4th
+    dispatch skips the (now quarantined) thrower yet the quiet callback
+    still fires (4 total).
+    """
+    class _Quiet:
+        def __init__(self) -> None:
+            self.seen = 0
+
+        def on_step_end(self, **_):
+            self.seen += 1
+            return Signal.CONTINUE
+
+    class _AlwaysThrows:
+        def on_step_end(self, **_):
+            raise RuntimeError("boom")
+
+    thrower = _AlwaysThrows()
+    quiet = _Quiet()
+    bus = EventBus([thrower, quiet], max_consecutive_failures=3)
+
+    bus.dispatch("on_step_end")
+    assert "_AlwaysThrows" not in bus.quarantined
+    bus.dispatch("on_step_end")
+    assert "_AlwaysThrows" not in bus.quarantined
+    bus.dispatch("on_step_end")
+    assert "_AlwaysThrows" in bus.quarantined
+    assert quiet.seen == 3
+
+    # After quarantine the thrower is silently skipped; quiet still fires.
+    bus.dispatch("on_step_end")
+    assert quiet.seen == 4
+
+
 def test_invariant_failure_counter_resets_on_successful_invocation():
     """Invariant: the failure counter is CONSECUTIVE — one successful
     invocation resets it. Two failures + one success + three more failures
@@ -354,6 +394,37 @@ def test_dispatch_returns_continue_when_no_callbacks_implement_event():
     """
     bus = EventBus([_Counter()])  # only implements on_step_begin
     assert bus.dispatch("on_train_end") == Signal.CONTINUE
+
+
+def test_dispatch_calls_only_callbacks_implementing_method_others_untouched():
+    """Invariant: a dispatch invokes every callback that implements the event
+    and skips the rest — a callback lacking the method is not called, and the
+    others still fire exactly once.
+
+    Setup: two _Counter callbacks (only implement on_step_begin); dispatch
+    on_step_begin then on_step_end.
+    Expected: both fire once on on_step_begin; neither fires on on_step_end.
+    """
+    a, b = _Counter(), _Counter()
+    bus = EventBus([a, b])
+    bus.dispatch("on_step_begin", step=1)
+    bus.dispatch("on_step_end", step=1)  # neither implements it
+    assert (a.calls, b.calls) == (1, 1)
+
+
+def test_dispatch_coerces_int_and_string_callback_return_values():
+    """Invariant: dispatch coerces each callback's raw return value through
+    ``_coerce`` before aggregating — an int (2) and a string ("skip_step")
+    are mapped to Signals and the strongest wins.
+
+    Setup: one callback returns int 2 (RETRY_STEP), another returns the
+    string "skip_step".
+    Expected: aggregated dispatch result is Signal.RETRY_STEP.
+    """
+    a = _Counter(signal=2)  # RETRY_STEP
+    b = _Counter(signal="skip_step")
+    out = EventBus([a, b]).dispatch("on_step_begin", step=1)
+    assert out == Signal.RETRY_STEP
 
 
 def test_add_appends_callback_to_internal_list():

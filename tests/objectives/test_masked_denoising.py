@@ -103,6 +103,22 @@ def test_mlm_attention_mask_prevents_padding_from_being_masked():
     )
 
 
+def test_mlm_loss_exposes_scalar_mlm_loss():
+    """Goal: forward returns a scalar ``mlm_loss`` metric alongside finite loss.
+
+    Invariant: ``mlm_loss`` must be a 0-d tensor (shape == ()).
+    """
+    torch.manual_seed(96)
+    obj = MaskedDenoisingObjective(mask_prob=0.5, vocab_size=50)
+    batch = {"input_ids": torch.randint(0, 50, (2, 8)),
+             "attention_mask": torch.ones(2, 8)}
+    batch = obj.prepare_batch(batch, step=0, device="cpu")
+    logits = torch.randn(2, 8, 50)
+    out = obj(ModelOutput(outputs={"logits": logits}), batch, LossContext())
+    assert torch.isfinite(out["loss"])
+    assert out["mlm_loss"].shape == ()
+
+
 def test_mlm_sets_loss_family_on_context():
     """Goal: ctx.loss_family is stamped to 'masked_denoising'.
 
