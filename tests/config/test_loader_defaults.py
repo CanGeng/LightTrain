@@ -32,6 +32,45 @@ def test_compose_defaults_basic_merge_order(tmp_config_dir):
     assert cfg.seed == 100
 
 
+def test_compose_defaults_three_level_chain(tmp_config_dir):
+    """A three-deep defaults chain (a → b → c) composes; the leaf wins on the
+    shared key and the base's untouched key survives the whole chain.
+
+    Setup: a sets mode=lab, seed=1; b inherits a, seed=2; c inherits b, seed=3.
+    Expected: cfg.mode == 'lab' (from a), cfg.seed == 3 (c wins).
+    """
+    (tmp_config_dir / "a.yaml").write_text("mode: lab\nseed: 1\n", encoding="utf-8")
+    (tmp_config_dir / "b.yaml").write_text("defaults: [a]\nseed: 2\n", encoding="utf-8")
+    c = tmp_config_dir / "c.yaml"
+    c.write_text("defaults: [b]\nseed: 3\n", encoding="utf-8")
+    cfg = load_config(c)
+    assert cfg.mode == "lab"
+    assert cfg.seed == 3
+
+
+def test_compose_defaults_internal_interpolation(tmp_yaml):
+    """OmegaConf ``${...}`` internal interpolation resolves at load time.
+
+    Setup: ``base: 10, derived: ${base}``.
+    Expected: cfg.derived == 10 (resolved to base's value).
+    """
+    p = tmp_yaml("base: 10\nderived: ${base}\n")
+    cfg = load_config(p, validate=False)
+    assert cfg.derived == 10
+
+
+def test_compose_defaults_env_interpolation(tmp_yaml, monkeypatch):
+    """OmegaConf ``${oc.env:VAR}`` env interpolation resolves from the environment.
+
+    Setup: env LT_TEST_VAR=hello; ``greeting: ${oc.env:LT_TEST_VAR}``.
+    Expected: cfg.greeting == 'hello'.
+    """
+    monkeypatch.setenv("LT_TEST_VAR", "hello")
+    p = tmp_yaml("greeting: ${oc.env:LT_TEST_VAR}\n")
+    cfg = load_config(p, validate=False)
+    assert cfg.greeting == "hello"
+
+
 def test_compose_defaults_yaml_suffix_tried_first(tmp_config_dir):
     """``defaults: [base]`` finds ``base.yaml`` (suffix appended at line 57).
 

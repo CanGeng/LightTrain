@@ -1,4 +1,13 @@
-"""EvalSuite metrics tests (M6) — perplexity / exact_match / rouge / bleu."""
+"""Adversarial tests for ``lighttrain.eval.metrics``.
+
+Coverage:
+
+* **perplexity** is finite and > 1.0 for a tiny LM.
+* **perplexity** honours ``max_batches`` (stops after N batches).
+* **exact_match**: perfect match → 1.0, no match → 0.0, ``normalize`` folds case.
+* **rouge_score**: identical strings → f1 ≈ 1.0; disjoint strings → f1 ≈ 0.0.
+* **bleu_score**: identical strings → ≈ 1.0; disjoint strings → in [0, 1].
+"""
 
 from __future__ import annotations
 
@@ -15,7 +24,6 @@ from lighttrain.eval.metrics import (
 )
 from lighttrain.protocols import ModelOutput
 
-# ---- Tiny model for perplexity -------------------------------------------
 
 class _TinyLM(nn.Module):
     def __init__(self, V: int = 16, D: int = 8) -> None:
@@ -34,15 +42,19 @@ def _make_loader(B: int = 2, T: int = 6, V: int = 16, n: int = 3):
         yield {"input_ids": ids, "labels": ids.clone()}
 
 
-# ---- perplexity -----------------------------------------------------------
+# ---------------------------------------------------------------------------
+# perplexity
+# ---------------------------------------------------------------------------
 
-def test_perplexity_finite():
+def test_invariant_perplexity_is_finite_and_above_one():
+    """``perplexity`` of a tiny LM is finite and strictly above 1.0."""
     model = _TinyLM()
     ppl = perplexity(model, _make_loader(), max_batches=2)
     assert math.isfinite(ppl) and ppl > 1.0
 
 
-def test_perplexity_max_batches():
+def test_invariant_perplexity_honours_max_batches():
+    """``perplexity`` consumes at most ``max_batches`` batches from the loader."""
     model = _TinyLM()
     processed = []
 
@@ -57,47 +69,53 @@ def test_perplexity_max_batches():
     assert sum(processed) == 3
 
 
-# ---- exact_match ---------------------------------------------------------
+# ---------------------------------------------------------------------------
+# exact_match
+# ---------------------------------------------------------------------------
 
-def test_exact_match_perfect():
+def test_invariant_exact_match_perfect_is_one():
     preds = ["hello world", "foo bar"]
-    refs  = ["hello world", "foo bar"]
+    refs = ["hello world", "foo bar"]
     assert exact_match(preds, refs) == 1.0
 
 
-def test_exact_match_none():
+def test_invariant_exact_match_none_is_zero():
     assert exact_match(["abc"], ["xyz"]) == 0.0
 
 
-def test_exact_match_normalize():
+def test_invariant_exact_match_normalize_folds_case():
     assert exact_match(["Hello World"], ["hello world"], normalize=True) == 1.0
 
 
-# ---- rouge ---------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# rouge
+# ---------------------------------------------------------------------------
 
-def test_rouge_l_perfect():
+def test_invariant_rouge_l_perfect_is_one():
     preds = ["the cat sat on the mat"]
-    refs  = ["the cat sat on the mat"]
+    refs = ["the cat sat on the mat"]
     out = rouge_score(preds, refs, variant="rougeL")
     f1 = out.get("f1", out.get("rougeL", out.get("f", 0.0)))
     assert f1 >= 0.99
 
 
-def test_rouge_zero_when_no_overlap():
+def test_invariant_rouge_zero_when_no_overlap():
     preds = ["aaaa bbbb"]
-    refs  = ["xxxx yyyy"]
+    refs = ["xxxx yyyy"]
     out = rouge_score(preds, refs)
     f1 = out.get("f1", out.get("f", max(out.values())))
     assert f1 < 0.01
 
 
-# ---- bleu ----------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# bleu
+# ---------------------------------------------------------------------------
 
-def test_bleu_perfect():
+def test_invariant_bleu_perfect_is_one():
     score = bleu_score(["the cat sat on the mat"], ["the cat sat on the mat"])
     assert score >= 0.99
 
 
-def test_bleu_between_zero_and_one():
+def test_invariant_bleu_between_zero_and_one():
     score = bleu_score(["a b c"], ["x y z"])
     assert 0.0 <= score <= 1.0

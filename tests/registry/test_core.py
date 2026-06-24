@@ -20,14 +20,17 @@ import warnings
 import pytest
 
 from lighttrain.registry import (
+    KNOWN_CATEGORIES,
     NotRegisteredError,
     Registry,
     RegistryConflictError,
     UnknownCategoryError,
+    categories,
     contains,
     get,
     list_entries,
     register,
+    register_category,
     unregister,
 )
 
@@ -489,3 +492,212 @@ def test_isolated_registry_can_be_cleared_independently():
             unregister("model", "indep_test")
         except Exception:  # noqa: BLE001
             pass
+
+
+# ---------------------------------------------------------------------------
+# Known-category roster / categories() ordering
+# (merged from flat tests/test_registry.py — not previously covered here)
+# ---------------------------------------------------------------------------
+
+def test_invariant_known_categories_superset_includes_core_eight():
+    """Invariant: ``KNOWN_CATEGORIES`` is a superset of the eight core
+    component categories that the framework always ships.
+
+    (was test_known_categories_includes_core_eight)
+    """
+    core_eight = {
+        "model",
+        "loss",
+        "optimizer",
+        "scheduler",
+        "dataset",
+        "processor",
+        "collator",
+        "sampler",
+    }
+    assert core_eight.issubset(set(KNOWN_CATEGORIES))
+
+
+def test_invariant_categories_snapshot_is_sorted_and_includes_extensions():
+    """Invariant: ``categories()`` returns a sorted snapshot that includes the
+    extension categories 'callback' and 'prep_node'.
+
+    (was test_categories_is_sorted_snapshot)
+    """
+    cats = categories()
+    assert cats == sorted(cats)
+    assert "callback" in cats
+    assert "prep_node" in cats
+
+
+# ---------------------------------------------------------------------------
+# register_category — dynamic plugin categories
+# (merged from flat tests/test_registry.py — not previously covered here)
+# ---------------------------------------------------------------------------
+
+def test_register_category_then_register_and_get(clean_registry):
+    """A category created via ``register_category`` becomes usable for
+    registration and retrieval.
+
+    (was test_register_category_then_use)
+    """
+    register_category("my_plugin_category")
+    assert "my_plugin_category" in categories()
+
+    @register("my_plugin_category", "thing")
+    class Thing:
+        pass
+
+    assert get("my_plugin_category", "thing") is Thing
+
+
+def test_register_category_is_idempotent(clean_registry):
+    """``register_category`` called twice with the same name registers the
+    category exactly once (no duplicate entry in ``categories()``).
+
+    (was test_register_category_idempotent)
+    """
+    register_category("p1")
+    register_category("p1")
+    assert categories().count("p1") == 1
+
+
+# ---------------------------------------------------------------------------
+# Unknown-category strictness on the register / list_entries paths
+# (mirror only covered the get/contains paths)
+# ---------------------------------------------------------------------------
+
+def test_register_unknown_category_raises(clean_registry):
+    """``register`` into an unknown category raises UnknownCategoryError.
+
+    (was test_unknown_category_register_raises)
+    """
+    with pytest.raises(UnknownCategoryError):
+        register("not_a_category", "x", lambda: None)
+
+
+def test_list_entries_unknown_category_raises():
+    """``list_entries`` on an unknown category raises UnknownCategoryError,
+    not a silent empty list.
+
+    (was test_list_entries_unknown_category_raises)
+    """
+    with pytest.raises(UnknownCategoryError):
+        list_entries("xxx")
+
+
+# ---------------------------------------------------------------------------
+# unregister missing / clear single category
+# (mirror covered clear(None) and cross-category unregister, not these)
+# ---------------------------------------------------------------------------
+
+def test_unregister_missing_name_raises(clean_registry):
+    """Unregistering a name that was never added raises NotRegisteredError.
+
+    (was test_unregister_missing_raises)
+    """
+    with pytest.raises(NotRegisteredError):
+        unregister("model", "never_added")
+
+
+def test_clear_single_category_empties_only_that_category(clean_registry):
+    """``clear(category)`` empties exactly the named category's bucket.
+
+    (was test_clear_resets_category)
+    """
+    reg = clean_registry
+    reg.register("model", "a", object)
+    reg.register("model", "b", object)
+    reg.clear("model")
+    assert reg.list("model") == []
+
+
+# ---------------------------------------------------------------------------
+# Content-identity idempotency (ISSUE-2 / root cause B): re-registering the
+# same logical component is a no-op; genuinely different definitions still
+# conflict. (merged from flat tests/test_registry.py — not previously here)
+# ---------------------------------------------------------------------------
+
+def _load_twice(tmp_path, body: str):
+    """Load one .py file under two distinct module identities (as the
+    user_modules path-import and a _target_ dotted-import would)."""
+    import importlib.util
+
+    f = tmp_path / "lt_idem_src.py"
+    f.write_text(body)
+    mods = []
+    for modname in ("lt_idem_A", "lt_idem_B"):
+        spec = importlib.util.spec_from_file_location(modname, f)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        mods.append(m)
+    return mods
+
+
+def test_same_file_two_module_identities_is_noop(clean_registry, tmp_path):
+    """Loading the same physical file under two distinct module identities
+    (producing two distinct class objects) does NOT raise a conflict.
+
+    (was test_same_file_two_module_identities_is_noop)
+    """
+    body = (
+        "from lighttrain.registry import register\n"
+        "@register('prep_node', '_idem_node')\n"
+        "class IdemNode:\n"
+        "    def run(self):\n"
+        "        return 1\n"
+    )
+    _load_twice(tmp_path, body)
+    assert contains("prep_node", "_idem_node")
+
+
+def test_same_object_reregistered_is_noop(clean_registry):
+    """Re-registering the identical object under the same name must not raise.
+
+    (was test_same_object_reregistered_is_noop)
+    """
+    class Foo:
+        def run(self):  # gives the class a code object to fingerprint
+            return 1
+
+    register("model", "_idem_obj", Foo)
+    register("model", "_idem_obj", Foo)
+    assert get("model", "_idem_obj") is Foo
+
+
+def test_different_class_same_name_still_raises(clean_registry):
+    """Two genuinely different class objects under the same name still raise
+    RegistryConflictError despite content-identity idempotency.
+
+    (was test_different_class_same_name_still_raises)
+    """
+    class A:
+        def run(self):
+            return 1
+
+    class B:  # different qualname + line → genuine conflict
+        def run(self):
+            return 2
+
+    register("model", "_idem_conflict", A)
+    with pytest.raises(RegistryConflictError):
+        register("model", "_idem_conflict", B)
+
+
+def test_force_still_overrides_after_idempotency(clean_registry):
+    """``force=True`` still overrides even with content-identity idempotency
+    in play (two distinct classes).
+
+    (was test_force_still_overrides_after_idempotency)
+    """
+    class A:
+        def run(self):
+            return 1
+
+    class B:
+        def run(self):
+            return 2
+
+    register("model", "_idem_force", A)
+    register("model", "_idem_force", B, force=True)
+    assert get("model", "_idem_force") is B

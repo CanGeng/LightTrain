@@ -266,6 +266,18 @@ def test_regression_CFG_TILDE_01_missing_intermediate_raises_configerror():
     assert "missing.nested.key" in str(exc_info.value) or "~" in str(exc_info.value)
 
 
+def test_apply_override_tilde_deletes_existing_key(tmp_yaml):
+    """``~key`` removes an existing top-level key end-to-end through load_config;
+    the validated RootConfig then reports it as absent (None).
+
+    Input: YAML with ``run_dir: runs/keep``, override ``~run_dir``.
+    Closed form: ``cfg.run_dir is None`` after the delete.
+    """
+    p = tmp_yaml("mode: lab\nrun_dir: runs/keep\n")
+    cfg = load_config(p, overrides=["~run_dir"])
+    assert cfg.run_dir is None
+
+
 def test_invariant_tilde_missing_leaf_is_noop():
     """Invariant: when intermediates exist but the leaf is absent, ``~`` is a
     silent noop ("ensure absent" semantics).
