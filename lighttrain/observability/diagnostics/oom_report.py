@@ -221,7 +221,7 @@ def is_oom_exception(exc: BaseException) -> bool:
     """Lightweight check that doesn't depend on torch>=2.0 OutOfMemoryError."""
     if torch.cuda.is_available():
         try:
-            if isinstance(exc, torch.cuda.OutOfMemoryError):  # type: ignore[attr-defined,unused-ignore]
+            if isinstance(exc, torch.cuda.OutOfMemoryError):  # type: ignore[attr-defined]
                 return True
         except Exception:  # noqa: BLE001
             _log.warning(
