@@ -17,11 +17,14 @@ silent (the alternative would mask the original callback failure).
 from __future__ import annotations
 
 import json
+import logging
 import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 
 class CallbackIsolationSink:
@@ -63,7 +66,10 @@ class CallbackIsolationSink:
                 self._run_dir, bus=self._bus or getattr(trainer, "bus", None)
             )
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "callback_isolation: callback report generation failed at train end; report not regenerated",
+                exc_info=True,
+            )
 
     def install(self, bus: Any) -> None:
         """Replace ``bus._on_error`` with a sink that persists to disk."""
@@ -78,13 +84,20 @@ class CallbackIsolationSink:
                 try:
                     original(event, cb, exc)
                 except Exception:  # noqa: BLE001
-                    pass
+                    _log.warning(
+                        "callback_isolation: chained original _on_error handler raised for event %s; ignored",
+                        event,
+                        exc_info=True,
+                    )
 
         try:
             bus._on_error = _sink
             self._installed = True
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "callback_isolation: failed to install sink on bus._on_error; failures won't be persisted",
+                exc_info=True,
+            )
 
     def _record(self, event: str, cb: Any, exc: BaseException) -> None:
         entry = {
@@ -110,7 +123,10 @@ class CallbackIsolationSink:
             ) as f:
                 f.write(json.dumps(entry) + "\n")
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "callback_isolation: failed to persist callback failure to callback_failures.jsonl; entry dropped",
+                exc_info=True,
+            )
 
 
 def write_callback_report(run_dir: Path, *, bus: Any | None = None) -> Path | None:
@@ -131,6 +147,10 @@ def write_callback_report(run_dir: Path, *, bus: Any | None = None) -> Path | No
         try:
             lines.append(json.loads(raw))
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "callback_isolation: skipping malformed line in callback_failures.jsonl",
+                exc_info=True,
+            )
             continue
     by_cb: dict[str, int] = defaultdict(int)
     by_event: dict[str, int] = defaultdict(int)
@@ -142,6 +162,10 @@ def write_callback_report(run_dir: Path, *, bus: Any | None = None) -> Path | No
         try:
             quarantined = list(bus.quarantined)
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "callback_isolation: failed to read bus.quarantined; report lists no quarantined callbacks",
+                exc_info=True,
+            )
             quarantined = []
     out_md = [
         "# Callback failure report",

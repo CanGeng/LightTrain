@@ -9,6 +9,7 @@ file can't be opened the user wants to know immediately, not after 12 hours.
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -16,6 +17,8 @@ from typing import Any, Literal, cast
 from lighttrain.lineage.dag import apply_cycle_policy, cycle_check
 from lighttrain.lineage.store import LineageStore
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("callback", "lineage_recorder")
@@ -193,7 +196,11 @@ class LineageRecorderCallback:
                     {"reason": "exception", "step": step},
                 )
         except Exception:  # noqa: BLE001 — never mask the original crash
-            pass
+            _log.warning(
+                "lineage_recorder: failed to record crash frozen_step node for run %s; lineage will omit it",
+                self._run_id,
+                exc_info=True,
+            )
 
 
 def _safe_metrics(metrics: Any) -> dict[str, Any]:
@@ -204,9 +211,19 @@ def _safe_metrics(metrics: Any) -> dict[str, Any]:
         try:
             out[str(k)] = float(v)
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "lineage_recorder: metric %r not float-coercible; falling back to str()",
+                k,
+                exc_info=True,
+            )
             try:
                 out[str(k)] = str(v)
             except Exception:  # noqa: BLE001
+                _log.warning(
+                    "lineage_recorder: metric %r not str-coercible; dropping it from final_metrics",
+                    k,
+                    exc_info=True,
+                )
                 continue
     return out
 

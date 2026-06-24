@@ -34,6 +34,7 @@ Registered as ``@register("model", "adalora")``.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -44,6 +45,8 @@ from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
 
 from ._common import auto_target_modules, resolve_base_model
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # AdaLoRA linear layer (manual implementation — no PEFT dependency)
@@ -229,7 +232,7 @@ class AdaLoRAAdapter(nn.Module):
                 from peft import get_peft_model_state_dict
                 return get_peft_model_state_dict(self.model)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("AdaLoRA.state_dict: PEFT export failed; falling back to manual adapter collection", exc_info=True)
         # Manual: collect adapter weights only
         if hasattr(self, "_adalora_layers"):
             sd: dict[str, torch.Tensor] = {}
@@ -245,7 +248,7 @@ class AdaLoRAAdapter(nn.Module):
                 from peft import set_peft_model_state_dict
                 return set_peft_model_state_dict(self.model, state_dict)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("AdaLoRA.load_state_dict: PEFT load failed; falling back to base model load_state_dict", exc_info=True)
         return self.model.load_state_dict(state_dict, strict=False)
 
 

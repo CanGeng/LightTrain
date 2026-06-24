@@ -17,12 +17,15 @@ an identity over the base optimizer (still legal; useful for unit tests).
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
 import torch
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("optimizer", "cpu_offload")
@@ -84,7 +87,10 @@ class OptimizerCPUOffloadWrapper:
                     try:
                         master = master.pin_memory()
                     except Exception:  # noqa: BLE001
-                        pass
+                        _log.warning(
+                            "layer_offload: pin_memory failed for a host master param; D2H grad transfer stays unpinned",
+                            exc_info=True,
+                        )
                 self._host_master[id(p)] = master
         return inner_opt
 

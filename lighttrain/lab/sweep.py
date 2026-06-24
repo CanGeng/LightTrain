@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import logging
 import random
 import statistics
 import subprocess
@@ -35,6 +36,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Config parsing
@@ -318,6 +321,11 @@ class SweepRunner:
         except subprocess.TimeoutExpired:
             return TrialResult(trial_id, overrides, None, "failed", None)
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "lab.sweep: trial %s subprocess crashed; recording trial as failed",
+                trial_id,
+                exc_info=True,
+            )
             return TrialResult(trial_id, overrides, None, "failed", None)
 
         run_dir = _find_run_dir(sweep_run_root / trial_exp)

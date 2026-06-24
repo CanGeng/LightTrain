@@ -19,6 +19,7 @@ that fires periodically (``every_n_steps``) and also on demand via
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,8 @@ import torch
 import torch.nn.functional as F
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 def compute_loss_attribution(
@@ -125,7 +128,10 @@ def compute_loss_attribution(
                 try:
                     h.remove()
                 except Exception:  # noqa: BLE001
-                    pass
+                    _log.warning(
+                        "loss_attribution: failed to remove a forward hook; leftover hook may add overhead",
+                        exc_info=True,
+                    )
 
     return out
 
@@ -231,6 +237,11 @@ class LossAttributionCallback:
                 levels=levels,
             )
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "loss_attribution: compute failed at step %s; skipping this snapshot",
+                step,
+                exc_info=True,
+            )
             return
         out_dir = run_dir / "diagnostics"
         out_dir.mkdir(parents=True, exist_ok=True)

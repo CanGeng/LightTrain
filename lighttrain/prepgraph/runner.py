@@ -17,6 +17,7 @@ SQLite after the fact.
 
 from __future__ import annotations
 
+import logging
 import shutil
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
@@ -29,6 +30,8 @@ from ._banner import PlanEntry, print_plan
 from ._fp import SCHEMA_VERSION, short
 from .dag import PrepGraph
 from .node import NodeResult, PrepNode, RunContext, materialize_manifest
+
+_log = logging.getLogger(__name__)
 
 # Manifest keys written by the framework itself (materialize_manifest + the
 # runner's ``elapsed_s``). Everything else in a manifest came from a node's
@@ -487,4 +490,5 @@ def _rebind_store(store: Any, final_dir: Path) -> Any:
     try:
         return cls(final_dir)
     except Exception:  # noqa: BLE001
+        _log.warning("prepgraph runner: rebinding store %s to final dir failed; keeping original store", cls.__name__, exc_info=True)
         return store

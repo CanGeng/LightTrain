@@ -14,12 +14,15 @@ that layer). For tiny / debug workloads the same code path works without
 
 from __future__ import annotations
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import torch
+
+_log = logging.getLogger(__name__)
 
 
 def _save_layer(path: Path, state: dict[str, torch.Tensor]) -> None:
@@ -65,7 +68,10 @@ class NvmeStorage:
         try:
             self.close()
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "layer_offload: NVMe storage close() during __del__ failed; thread pool may leak",
+                exc_info=True,
+            )
 
     # ---- contract mirror of CpuPinnedStorage -----------------------------
 

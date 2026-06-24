@@ -22,6 +22,7 @@ Back-pressure: when the queue is full, the new submission is **dropped** and
 
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 import time
@@ -32,6 +33,8 @@ from typing import Any
 from lighttrain.registry import register
 
 from .producer import ModelForwardProducer
+
+_log = logging.getLogger(__name__)
 
 
 @register("callback", "dynamic_artifact")
@@ -120,6 +123,12 @@ class DynamicArtifactCallback:
                 ):
                     return
             except Exception:  # noqa: BLE001
+                _log.warning(
+                    "dynamic_artifact: trigger condition %r failed to evaluate at step %s; skipping production",
+                    cond,
+                    step,
+                    exc_info=True,
+                )
                 return
         submission = {
             "step": int(step),
@@ -148,6 +157,11 @@ class DynamicArtifactCallback:
                 self._produce_one(item)
             except Exception as exc:  # pragma: no cover — logging only  # noqa: BLE001
                 # Worker faults must not kill training.
+                _log.warning(
+                    "dynamic_artifact: worker failed to produce item at step %s; artifact skipped",
+                    item.get("step", -1),
+                    exc_info=True,
+                )
                 if self._ctx_ref is not None and getattr(self._ctx_ref, "logger", None):
                     try:
                         self._ctx_ref.logger.log_text(
@@ -155,7 +169,10 @@ class DynamicArtifactCallback:
                             int(item.get("step", -1)),
                         )
                     except Exception:  # noqa: BLE001
-                        pass
+                        _log.warning(
+                            "dynamic_artifact: ctx.logger.log_text failed while reporting worker error",
+                            exc_info=True,
+                        )
             finally:
                 self._q.task_done()
 

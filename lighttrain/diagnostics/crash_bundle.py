@@ -28,6 +28,7 @@ produce as much as we can — model + batch + traceback always.
 from __future__ import annotations
 
 import json
+import logging
 import time
 import traceback
 from collections.abc import Mapping
@@ -39,6 +40,8 @@ from safetensors.torch import save_model as _save_model
 
 from ..minimal import dump_spec
 from ..utils.seed import rng_state
+
+_log = logging.getLogger(__name__)
 
 
 def write_crash_bundle(
@@ -76,7 +79,10 @@ def write_crash_bundle(
 
         env.update(capture_env())
     except Exception:  # noqa: BLE001
-        pass
+        _log.warning(
+            "crash_bundle: env capture failed; env.json omits extended environment info",
+            exc_info=True,
+        )
     (bundle / "env.json").write_text(json.dumps(env, indent=2, default=str), encoding="utf-8")
 
     # batch + decoded.
@@ -97,6 +103,11 @@ def write_crash_bundle(
                     decoded_lines.append(str(tokenizer.decode(ids[i].tolist())))
                     decoded_lines.append("")
                 except Exception:  # noqa: BLE001
+                    _log.warning(
+                        "crash_bundle: tokenizer.decode failed for sample %d; decoded.txt records a placeholder",
+                        i,
+                        exc_info=True,
+                    )
                     decoded_lines.append("<decode error>")
         (bundle / "decoded.txt").write_text(
             "\n".join(decoded_lines), encoding="utf-8"
@@ -107,7 +118,10 @@ def write_crash_bundle(
         try:
             _save_model(model, str(bundle / "model_state.safetensors"))
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "crash_bundle: model state save failed; bundle omits model_state.safetensors",
+                exc_info=True,
+            )
         try:
             from .nan_repro import _infer_spec  # private helper, reused
 
@@ -119,20 +133,29 @@ def write_crash_bundle(
                 encoding="utf-8",
             )
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "crash_bundle: model spec inference failed; bundle omits model_spec.json",
+                exc_info=True,
+            )
 
     # optimizer state.
     if optimizer is not None and hasattr(optimizer, "state_dict"):
         try:
             torch.save(optimizer.state_dict(), str(bundle / "optimizer_state.pt"))
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "crash_bundle: optimizer state capture failed; bundle omits optimizer_state.pt",
+                exc_info=True,
+            )
 
     # rng.
     try:
         torch.save(rng_state(), str(bundle / "rng.pt"))
     except Exception:  # noqa: BLE001
-        pass
+        _log.warning(
+            "crash_bundle: RNG state capture failed; bundle omits rng.pt (replay won't be bit-exact)",
+            exc_info=True,
+        )
 
     # metrics_recent.jsonl — one line.
     if metrics:
@@ -140,7 +163,10 @@ def write_crash_bundle(
             with (bundle / "metrics_recent.jsonl").open("w", encoding="utf-8") as f:
                 f.write(json.dumps({"step": int(step), **{k: _scalar(v) for k, v in metrics.items()}}) + "\n")
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "crash_bundle: recent metrics write failed; bundle omits metrics_recent.jsonl",
+                exc_info=True,
+            )
 
     # tail of logs (if caller supplied any).
     if recent_logs:
@@ -154,6 +180,10 @@ def _scalar(v: Any) -> Any:
         try:
             return float(v.detach().item())
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "crash_bundle: tensor metric could not be coerced to float; recording None",
+                exc_info=True,
+            )
             return None
     if isinstance(v, (int, float, str, bool)) or v is None:
         return v

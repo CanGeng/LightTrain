@@ -23,12 +23,15 @@ The new run can then be resumed with::
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Data class
@@ -167,6 +170,12 @@ def _record_lineage_edge(
             )
         return True
     except Exception:  # noqa: BLE001
+        _log.warning(
+            "lab.fork: failed to record fork_of lineage edge in %s; "
+            "reporting edge as not recorded",
+            sqlite_path,
+            exc_info=True,
+        )
         return False
 
 
@@ -235,6 +244,11 @@ def fork(
                 resolved_yaml=resolved_yaml,
             )
         except Exception:  # pragma: no cover — graceful fallback  # noqa: BLE001
+            _log.warning(
+                "lab.fork: make_run_dir failed; falling back to a temp directory "
+                "for the forked run",
+                exc_info=True,
+            )
             import tempfile
 
             new_run_dir = Path(tempfile.mkdtemp(prefix="lighttrain_fork_"))
@@ -256,7 +270,12 @@ def fork(
             _yaml.safe_dump(cfg_dict), encoding="utf-8"
         )
     except Exception:  # pragma: no cover  # noqa: BLE001
-        pass
+        _log.warning(
+            "lab.fork: failed to persist config.yaml into %s; "
+            "the forked run will lack a config snapshot",
+            new_run_dir,
+            exc_info=True,
+        )
 
     forked_at_step = _parse_step_from_ckpt(from_checkpoint)
     lineage_ok = False

@@ -17,6 +17,7 @@ callback without issue — no CUDA reach.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,8 @@ import torch
 
 from lighttrain.diagnostics.nan_repro import write_nan_repro
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("callback", "nan_hunter")
@@ -86,7 +89,10 @@ class NanHunterCallback:
             try:
                 h.remove()
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "nan_hunter: failed to remove a forward hook during detach; leftover hook may add overhead",
+                    exc_info=True,
+                )
         self._handles.clear()
 
     def _make_hook(self, name: str):
@@ -142,7 +148,12 @@ class NanHunterCallback:
                         module_name=name,
                     )
                 except Exception:  # noqa: BLE001 — best effort
-                    pass
+                    _log.warning(
+                        "nan_hunter: write_nan_repro failed for module %r at step %s; repro kit not written",
+                        name,
+                        self._step,
+                        exc_info=True,
+                    )
         if self.raise_on_hit:
             raise RuntimeError(
                 f"NaN/Inf detected in module {name!r} at step {self._step}"

@@ -17,6 +17,7 @@ fast and pure-Python.
 
 from __future__ import annotations
 
+import logging
 import time
 import warnings
 from collections.abc import Mapping
@@ -24,6 +25,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import torch
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------- byte sizing
 
@@ -237,6 +240,10 @@ def _tokens_per_sec(model: torch.nn.Module, tokens: int) -> float:
             dt = max(1e-6, time.perf_counter() - t0)
         return (3 * batch_size * seq_len) / dt
     except Exception:  # noqa: BLE001
+        _log.warning(
+            "lab.estimate: timing forward pass failed; reporting 0 tokens/sec",
+            exc_info=True,
+        )
         return 0.0
 
 
@@ -260,6 +267,11 @@ def _offload_estimate(
             probe_layer_bandwidth(model)
         )
     except Exception:  # noqa: BLE001
+        _log.warning(
+            "lab.estimate: layer-offload bandwidth probe unavailable; "
+            "using coarse per-layer estimates",
+            exc_info=True,
+        )
         n_layers = int(getattr(model, "n_layers", 0)) or 4
         d_model = int(getattr(model, "d_model", 0)) or 256
         layer_param_bytes = d_model * d_model * 12 * 4  # rough qkv+proj+mlp

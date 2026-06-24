@@ -8,12 +8,15 @@ CPU-only safe.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 import torch
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("callback", "sample_preview")
@@ -60,6 +63,11 @@ class SamplePreviewCallback:
                 try:
                     decoded = str(self._tokenizer.decode(row))
                 except Exception:  # noqa: BLE001
+                    _log.warning(
+                        "sample_preview: tokenizer.decode failed for sample %d; writing placeholder",
+                        i,
+                        exc_info=True,
+                    )
                     decoded = "<decode error>"
             label_kept = ""
             labels = batch.get("labels")

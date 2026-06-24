@@ -13,6 +13,7 @@ window resets.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -21,6 +22,8 @@ from typing import Any
 import torch
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("callback", "dead_neuron")
@@ -71,7 +74,10 @@ class DeadNeuronCallback:
             try:
                 h.remove()
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "dead_neuron: failed to remove an activation forward hook; leftover hook may add overhead",
+                    exc_info=True,
+                )
         self._handles.clear()
 
     def on_step_end(self, *, step: int = 0, **_: Any) -> None:

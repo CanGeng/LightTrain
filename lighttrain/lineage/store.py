@@ -21,12 +21,15 @@ Notes:
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 _NODE_KINDS = ("artifact", "checkpoint", "config", "run", "frozen_step")
 _EDGE_KINDS = (
@@ -408,7 +411,10 @@ class LineageStore:
         try:
             self.conn.close()
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "lineage.store: failed to close the SQLite connection; ignoring",
+                exc_info=True,
+            )
 
     def __enter__(self) -> LineageStore:
         return self

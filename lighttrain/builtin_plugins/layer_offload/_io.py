@@ -8,11 +8,14 @@ warmup + a 3-iteration timer); finer profiling can come later.
 
 from __future__ import annotations
 
+import logging
 import time
 
 import torch
 
 from ._adapters import get_layered_view
+
+_log = logging.getLogger(__name__)
 
 
 def probe_layer_bandwidth(model: torch.nn.Module) -> tuple[float, float, int, int]:
@@ -62,6 +65,10 @@ def probe_layer_bandwidth(model: torch.nn.Module) -> tuple[float, float, int, in
                 _ = _try_layer(layer, x)
             recompute_us = ((time.perf_counter() - t0) / 3) * 1e6
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "layer_offload: recompute timing probe failed; reporting 0us (estimate may be skewed)",
+                exc_info=True,
+            )
             recompute_us = 0.0
     # 2) transfer
     try:
@@ -73,6 +80,10 @@ def probe_layer_bandwidth(model: torch.nn.Module) -> tuple[float, float, int, in
                 cpu_layer = cpu_layer.cpu()
         transfer_us = ((time.perf_counter() - t0) / 3) * 1e6
     except Exception:  # noqa: BLE001
+        _log.warning(
+            "layer_offload: transfer timing probe failed; reporting 0us (estimate may be skewed)",
+            exc_info=True,
+        )
         transfer_us = 0.0
     return float(recompute_us), float(transfer_us), int(layer_param_bytes), int(len(view.layers))
 

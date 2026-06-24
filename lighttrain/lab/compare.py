@@ -21,9 +21,12 @@ PNG export requires ``matplotlib`` (``pip install -e '.[dev]'``)::
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Data class
@@ -55,7 +58,11 @@ def _load_run_config(run_dir: Path) -> dict[str, Any]:
                 with open(p, encoding="utf-8") as f:
                     return yaml.safe_load(f) or {}
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "lab.compare: failed to load run config %s; skipping this candidate",
+                    p,
+                    exc_info=True,
+                )
     return {}
 
 
@@ -148,7 +155,12 @@ def _query_fork_ancestry(run_dir: Path) -> str | None:
                 meta = json.load(f)
             return meta.get("fork_of_run_dir")
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "lab.compare: failed to read fork_meta.json for %s; "
+                "falling back to lineage store",
+                run_dir,
+                exc_info=True,
+            )
     # Also try lineage store
     sqlite_path = run_dir / "lineage.sqlite"
     if not sqlite_path.exists():
@@ -168,7 +180,12 @@ def _query_fork_ancestry(run_dir: Path) -> str | None:
                     except (json.JSONDecodeError, TypeError):
                         pass
     except Exception:  # noqa: BLE001
-        pass
+        _log.warning(
+            "lab.compare: lineage store lookup failed for %s; "
+            "reporting no fork ancestry",
+            run_dir,
+            exc_info=True,
+        )
     return None
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import typer
@@ -15,6 +16,8 @@ from lighttrain.cli._helpers import (
 )
 from lighttrain.cli._runtime import _validate_mode_override, setup_run_from_config
 from lighttrain.config import ConfigError, dump_resolved, load_config
+
+_log = logging.getLogger(__name__)
 
 
 def train_cmd(
@@ -114,6 +117,11 @@ def train_cmd(
             latest = mgr.latest()
             return str(latest) if latest is not None else None
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "cli train: resolving latest checkpoint for summary failed; "
+                "recording None",
+                exc_info=True,
+            )
             return None
 
     t0 = _time.perf_counter()
@@ -122,6 +130,11 @@ def train_cmd(
         try:
             trainer.fit()
         except BaseException as exc:  # noqa: BLE001 — capture to still emit a summary row
+            _log.warning(
+                "cli train: trainer.fit() raised; captured for the summary row and "
+                "surfaced via exit code 1 below",
+                exc_info=True,
+            )
             fit_error = exc
     finally:
         if bundle.get("logger") is not None:

@@ -11,6 +11,7 @@ works without NCCL or any dist initialization.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,8 @@ import torch
 
 if TYPE_CHECKING:
     from ..config._schema import ParallelSection
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -111,6 +114,7 @@ class ParallelContext:
             pp_rank = mesh.get_local_rank("pp")
         except Exception:  # noqa: BLE001
             # Fallback for older PyTorch or force_cpu=True
+            _log.warning("parallel context: CUDA DeviceMesh init failed; falling back to manual process groups", exc_info=True)
             mesh = None
             dp_rank, tp_rank, pp_rank = _compute_ranks(rank, dp, tp, pp)
             dp_group, tp_group, pp_group = _create_groups_manual(dp, tp, pp, rank)

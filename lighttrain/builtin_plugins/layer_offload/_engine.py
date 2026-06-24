@@ -37,6 +37,7 @@ Known limitations:
 
 from __future__ import annotations
 
+import logging
 import warnings
 from collections import deque
 from collections.abc import Mapping
@@ -54,6 +55,8 @@ from ._layer_handle import LayerOffloadNotSupported
 from ._storage_cpu import CpuPinnedStorage
 from ._storage_nvme import NvmeStorage
 from ._streams import StreamManager
+
+_log = logging.getLogger(__name__)
 
 
 def _resolve_storage(spec: str | Mapping[str, Any], *, device: torch.device, kind: str):
@@ -239,19 +242,28 @@ class LayerOffloadEngine:
             try:
                 h.remove()
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "layer_offload: failed to remove a swap hook on close; leftover hook may add overhead",
+                    exc_info=True,
+                )
         self._installed.clear()
         if self._weights_storage is not None and hasattr(self._weights_storage, "close"):
             try:
                 self._weights_storage.close()
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "layer_offload: weights storage close failed; backing files/threads may leak",
+                    exc_info=True,
+                )
 
     def __del__(self) -> None:
         try:
             self.close()
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "layer_offload: close() during __del__ failed; resources may leak",
+                exc_info=True,
+            )
 
 
 # Surface the ``activation: offload`` fallback as a one-time warning rather
