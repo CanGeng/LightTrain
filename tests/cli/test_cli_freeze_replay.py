@@ -62,7 +62,7 @@ logger:
 
 def _write_recipe(tmp_path: Path) -> Path:
     corpus = (
-        Path(__file__).resolve().parent / "fixtures" / "tiny_corpus.txt"
+        Path(__file__).resolve().parent.parent / "fixtures" / "tiny_corpus.txt"
     )
     assert corpus.exists()
     cfg = tmp_path / "cfg.yaml"
