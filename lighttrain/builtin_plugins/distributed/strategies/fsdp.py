@@ -13,6 +13,7 @@ Checkpoint modes (``state_dict_type``):
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -22,6 +23,8 @@ import torch.nn as nn
 
 from lighttrain.distributed._context import ParallelContext
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("grad_sync_strategy", "fsdp")
@@ -99,7 +102,7 @@ class FSDPStrategy:
                 )
                 apply_activation_checkpointing(wrapped)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("fsdp.prepare: activation checkpointing wrap failed; continuing without it", exc_info=True)
 
         # Optimizer MUST be built after FSDP wrapping.
         optimizer = optimizer_factory(wrapped)

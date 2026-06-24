@@ -10,12 +10,15 @@ import path is part of the contract).
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 import typer
 
 from lighttrain.cli._context import console
+
+_log = logging.getLogger(__name__)
 
 
 def _todo(milestone: str, what: str = "") -> None:
@@ -56,6 +59,12 @@ def _flatten_patch_to_overrides(patch: object, prefix: str = "") -> list[str]:
                     f"++{key}={_yaml.safe_dump(list(v), default_flow_style=True).strip()}"
                 )
             except Exception:  # noqa: BLE001
+                _log.warning(
+                    "cli helpers: YAML flow-dump of override %r failed; "
+                    "falling back to repr() encoding",
+                    key,
+                    exc_info=True,
+                )
                 out.append(f"++{key}={v!r}")
         elif v is None:
             out.append(f"++{key}=null")
@@ -108,6 +117,7 @@ def _eval_perplexity(trainer: object, max_batches: int) -> float | None:
     try:
         return perplexity(model, loader, device=getattr(trainer, "device", None), max_batches=mb)
     except Exception as exc:  # noqa: BLE001
+        _log.warning("cli helpers: perplexity eval failed; returning None", exc_info=True)
         console.print(f"[yellow]perplexity eval failed:[/] {exc}")
         return None
 

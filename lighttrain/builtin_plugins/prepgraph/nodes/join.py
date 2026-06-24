@@ -33,6 +33,7 @@ Config schema::
 from __future__ import annotations
 
 import ast
+import logging
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,8 @@ from lighttrain.builtin_plugins.artifacts.store import open_artifact_store
 from lighttrain.data.core._schema import derive_sample_id
 from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 _MISSING_REQUIRE = "require"
 _MISSING_DROP = "drop"
@@ -168,7 +171,7 @@ def _parse_shape(shape_str: str) -> tuple[int, ...]:
         if isinstance(parsed, int):
             return (parsed,)
     except Exception:  # noqa: BLE001
-        pass
+        _log.warning("join: shape literal %r could not be parsed; treating as empty shape", shape_str, exc_info=True)
     return ()
 
 

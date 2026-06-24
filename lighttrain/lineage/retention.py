@@ -11,6 +11,7 @@ When no evaluation edges have been written yet it returns the empty set.
 
 from __future__ import annotations
 
+import logging
 import shutil
 import time
 from collections.abc import Iterable
@@ -19,6 +20,8 @@ from pathlib import Path
 from typing import Any
 
 from .store import LineageStore
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -138,6 +141,12 @@ def _keep_best_by_metric(
 
                 payload = json.loads(edge.get("payload") or "{}")
             except Exception:  # noqa: BLE001
+                _log.warning(
+                    "lineage.retention: failed to parse evaluated_by edge payload "
+                    "for node %s; treating it as empty",
+                    n["id"],
+                    exc_info=True,
+                )
                 payload = {}
             v = payload.get(metric)
             if isinstance(v, (int, float)):

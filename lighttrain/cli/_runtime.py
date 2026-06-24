@@ -7,6 +7,7 @@ Keeps ``cli/_app.py`` thin: every train-style command boils down to
 from __future__ import annotations
 
 import inspect
+import logging
 import warnings
 from collections.abc import Mapping
 from pathlib import Path
@@ -46,6 +47,8 @@ from ..registry import get as _registry_get
 from ..utils.accelerate import build_accelerator
 from ..utils.run_dir import make_run_dir, slugify
 from ..utils.seed import seed_everything
+
+_log = logging.getLogger(__name__)
 
 # Keystone migration (step 2): trainer names removed in favour of the single
 # ``preference`` trainer + the ``loss:`` seam. Resolved to a clear error below.
@@ -728,6 +731,10 @@ def _open_lineage_store(run_dir: Path) -> Any:
 
         return _LineageStore(run_dir / "lineage.sqlite")
     except Exception:  # noqa: BLE001
+        _log.warning(
+            "cli runtime: lineage store open failed; lineage recording disabled for this run",
+            exc_info=True,
+        )
         return None
 
 
@@ -1043,7 +1050,11 @@ def _wire_trainer_context(
     try:
         trainer._run_dir = run_dir
     except Exception:  # noqa: BLE001
-        pass
+        _log.warning(
+            "cli runtime: could not stash run_dir on trainer; "
+            "LineageRecorderCallback may not find it",
+            exc_info=True,
+        )
     # Auto-attach default lab-mode callbacks (land at the *end* of the list so
     # user-declared ones still see their events first).
     _auto_attach_m4_callbacks(cfg, trainer, callbacks)

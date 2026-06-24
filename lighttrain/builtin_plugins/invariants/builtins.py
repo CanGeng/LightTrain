@@ -13,11 +13,14 @@ Baseline set: ``loss_finite``, ``grad_norm_bounded``, ``lr_nonneg``,
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import torch
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 # ----------------------------------------------------------------- registry
 # Stash {invariant_name: callable(**ns) -> bool}. The InvariantsCallback
@@ -34,6 +37,7 @@ def loss_finite(*, loss: Any = None, **_: Any) -> bool:
     try:
         return bool(loss == loss) and abs(float(loss)) != float("inf")
     except Exception:  # noqa: BLE001
+        _log.warning("invariant loss_finite: non-tensor loss check failed; treating as holding", exc_info=True)
         return True
 
 
@@ -88,6 +92,7 @@ def label_mask_nonzero(
     try:
         return any(int(x) != int(ignore_index) for x in labels)
     except Exception:  # noqa: BLE001
+        _log.warning("invariant label_mask_nonzero: non-tensor labels check failed; treating as holding", exc_info=True)
         return True
 
 

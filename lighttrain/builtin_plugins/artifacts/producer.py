@@ -12,6 +12,7 @@ ships only the model-forward variant since that's the one R3 needs.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -30,6 +31,8 @@ from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
 
 from .store import SafetensorsShardStore, open_artifact_store
+
+_log = logging.getLogger(__name__)
 
 
 class ArtifactProducerProtocol(Protocol):
@@ -88,6 +91,11 @@ def _resolve_store(
             return open_artifact_store(store, allow_stale=allow_stale)
         except Exception:  # noqa: BLE001
             # Not yet finalized — produce mode opens fresh shard store.
+            _log.warning(
+                "artifacts: could not open existing store at %s; creating a fresh shard store",
+                store,
+                exc_info=True,
+            )
             return SafetensorsShardStore(store)
     return store  # already an ArtifactStore instance
 

@@ -23,10 +23,13 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+import logging
 import os
 from collections.abc import Iterable, Mapping
 from functools import lru_cache
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 # Bumping a value here invalidates every downstream cache for the matching
 # schema_kind. Keep entries terse and prefer additive changes.
@@ -102,6 +105,7 @@ def code_version_for(qualname_or_cls: Any) -> str:
             else:
                 stamp = repr(qualname_or_cls)
         except Exception:  # noqa: BLE001
+            _log.warning("code fingerprint: mtime fallback failed; using repr stamp for %r", qualname_or_cls, exc_info=True)
             stamp = repr(qualname_or_cls)
         return hashlib.sha256(stamp.encode("utf-8")).hexdigest()
 

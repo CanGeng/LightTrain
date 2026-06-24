@@ -18,6 +18,7 @@ Usage (sweep spec):
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 try:
@@ -31,6 +32,8 @@ except ImportError as _import_err:
     ) from _import_err
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("sweep_backend", "optuna")
@@ -115,6 +118,7 @@ class OptunaSearcher:
         try:
             return self._study.best_params
         except Exception:  # noqa: BLE001
+            _log.warning("optuna: best_params unavailable (no completed trials?); returning None", exc_info=True)
             return None
 
     @property
@@ -122,6 +126,7 @@ class OptunaSearcher:
         try:
             return self._study.best_value
         except Exception:  # noqa: BLE001
+            _log.warning("optuna: best_value unavailable (no completed trials?); returning None", exc_info=True)
             return None
 
 

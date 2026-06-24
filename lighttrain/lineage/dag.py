@@ -10,11 +10,14 @@ formats so the CLI can pipe them or write them next to the run dir.
 
 from __future__ import annotations
 
+import logging
 import warnings
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from .store import LineageStore
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -86,7 +89,11 @@ def apply_cycle_policy(
             try:
                 logger.log_text(msg, 0)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "lineage.dag: logger.log_text failed while emitting "
+                    "self-feeding cycle notice; suppressing",
+                    exc_info=True,
+                )
         return
     if self_feeding == "warn":
         warnings.warn(msg, stacklevel=2)

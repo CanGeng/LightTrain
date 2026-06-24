@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import typer
@@ -10,6 +11,8 @@ from rich.table import Table
 from lighttrain.cli._context import console
 from lighttrain.cli._runtime import setup_run_from_config
 from lighttrain.config import ConfigError
+
+_log = logging.getLogger(__name__)
 
 
 def replay_cmd(
@@ -72,7 +75,11 @@ def replay_cmd(
     try:
         import lighttrain.builtin_plugins.models.adapters  # noqa: F401 — populate registry
     except Exception:  # noqa: BLE001
-        pass
+        _log.warning(
+            "cli replay-step: model adapter registry import failed; "
+            "proceeding with whatever is already registered",
+            exc_info=True,
+        )
 
     spec = _json.loads((target / "model_spec.json").read_text(encoding="utf-8"))
     model = build_minimal_model(spec)
@@ -130,6 +137,12 @@ def freeze_step_cmd(
         try:
             n = int(p.name.split("_", 1)[1])
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "cli freeze-step: could not parse step number from checkpoint %r; "
+                "skipping it as a restore candidate",
+                p.name,
+                exc_info=True,
+            )
             continue
         if n <= step and (target is None or n > int(target.name.split("_", 1)[1])):
             target = p
@@ -137,6 +150,12 @@ def freeze_step_cmd(
         try:
             trainer.load_checkpoint(target)
         except Exception as e:  # noqa: BLE001
+            _log.warning(
+                "cli freeze-step: checkpoint restore of %s failed; "
+                "continuing from current trainer state",
+                target,
+                exc_info=True,
+            )
             console.print(f"[yellow]warning:[/] could not load {target}: {e}")
     # Override step on the ctx so the produced zip is named for the user's step.
     trainer.ctx.step = int(step)
@@ -152,7 +171,10 @@ def freeze_step_cmd(
             try:
                 bundle["logger"].close()
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "cli freeze-step: logger close failed during cleanup; ignoring",
+                    exc_info=True,
+                )
     zips = sorted((run / "frozen_steps").glob("*.zip"))
     if zips:
         console.print(f"[green]frozen step bundle[/] -> {zips[-1]}")

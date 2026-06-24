@@ -19,6 +19,7 @@ the on-disk header against a user-supplied expectation; mismatches raise
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import Iterator, Mapping
 from pathlib import Path
@@ -35,6 +36,8 @@ from lighttrain.artifacts.base import (
 from lighttrain.protocols import ArtifactStoreProtocol
 from lighttrain.registry import register
 
+_log = logging.getLogger(__name__)
+
 try:
     from safetensors.torch import load_file as _st_load_file
     from safetensors.torch import save_file as _st_save_file
@@ -47,6 +50,10 @@ try:
     import pyarrow.parquet as pq
     _HAS_PARQUET = True
 except Exception:  # pragma: no cover — optional  # noqa: BLE001
+    _log.warning(
+        "artifacts: pyarrow import failed; Parquet store backend disabled",
+        exc_info=True,
+    )
     _HAS_PARQUET = False
 
 

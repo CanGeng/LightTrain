@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("logger", "jsonl")
@@ -62,7 +65,7 @@ class JSONLLogger:
             self._fp.flush()
             self._fp.close()
         except Exception:  # pragma: no cover  # noqa: BLE001
-            pass
+            _log.warning("jsonl logger: close/flush failed; file may be partially written", exc_info=True)
 
 
 def _coerce(v: Any) -> Any:

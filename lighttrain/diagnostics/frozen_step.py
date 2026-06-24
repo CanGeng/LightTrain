@@ -34,6 +34,7 @@ from __future__ import annotations
 import copy
 import io
 import json
+import logging
 import os
 import time
 import zipfile
@@ -47,6 +48,8 @@ from safetensors.torch import save_model as _save_model
 
 from ..minimal import build_minimal_model, dump_spec, load_state
 from ..utils.seed import restore_rng_state, rng_state
+
+_log = logging.getLogger(__name__)
 
 _REASONS = ("scheduled", "exception", "cli", "retry")
 
@@ -117,16 +120,31 @@ class FrozenStepWriter:
                 for k, v in model.state_dict().items()
             }
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "frozen_step snapshot: model state_dict copy failed; "
+                "model will be absent from snapshot",
+                exc_info=True,
+            )
             snap_model = None
         try:
             opt_state = copy.deepcopy(
                 optimizer.state_dict() if hasattr(optimizer, "state_dict") else None
             )
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "frozen_step snapshot: optimizer state_dict copy failed; "
+                "optimizer will be absent from snapshot",
+                exc_info=True,
+            )
             opt_state = None
         try:
             rng = rng_state()
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "frozen_step snapshot: RNG state capture failed; "
+                "RNG will be absent from snapshot",
+                exc_info=True,
+            )
             rng = None
         safe_batch = {
             k: (v.detach().cpu() if isinstance(v, torch.Tensor) else v)
@@ -162,7 +180,11 @@ class FrozenStepWriter:
             try:
                 model.load_state_dict(snap["model_state"], strict=False)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "frozen_step restore: model load_state_dict failed; "
+                    "retry will see un-restored model params",
+                    exc_info=True,
+                )
         if (
             optimizer is not None
             and snap.get("optimizer_state") is not None
@@ -171,12 +193,20 @@ class FrozenStepWriter:
             try:
                 optimizer.load_state_dict(snap["optimizer_state"])
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "frozen_step restore: optimizer load_state_dict failed; "
+                    "retry will see un-restored optimizer state",
+                    exc_info=True,
+                )
         if snap.get("rng_state") is not None:
             try:
                 restore_rng_state(snap["rng_state"])
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "frozen_step restore: RNG restore failed; "
+                    "retry will see un-restored RNG state",
+                    exc_info=True,
+                )
 
     # ----- commit ----------------------------------------------------------
 
@@ -262,6 +292,13 @@ class FrozenStepWriter:
                 )
             os.replace(tmp, out_path)
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "frozen_step commit failed for step %s (reason=%s); "
+                "no bundle written",
+                step,
+                reason,
+                exc_info=True,
+            )
             try:
                 tmp.unlink()
             except FileNotFoundError:
@@ -288,7 +325,12 @@ class FrozenStepWriter:
                         {"reason": reason, "step": step},
                     )
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "frozen_step commit: lineage node write failed for "
+                    "step %s; bundle on disk is unaffected",
+                    step,
+                    exc_info=True,
+                )
         return out_path
 
 
@@ -351,7 +393,11 @@ def replay_step_bundle(
         try:
             import lighttrain.builtin_plugins.models.adapters  # noqa: F401
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "replay: model adapter import failed; short-name model "
+                "resolution may fail",
+                exc_info=True,
+            )
         model = build_minimal_model(bundle.model_spec)
     else:
         raise RuntimeError("frozen step bundle has no model spec")
@@ -371,7 +417,10 @@ def replay_step_bundle(
         try:
             restore_rng_state(bundle.rng_state)
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "replay: RNG restore failed; replay will use current RNG state",
+                exc_info=True,
+            )
 
     # 3) Debugger / inject hooks.
     if debugger:  # pragma: no cover — interactive

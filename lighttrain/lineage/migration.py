@@ -17,6 +17,7 @@ so PrepGraph and lineage share one source of truth.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import time
@@ -28,6 +29,8 @@ from typing import Any
 import yaml
 
 from ..prepgraph._fp import SCHEMA_VERSION
+
+_log = logging.getLogger(__name__)
 
 MigrationFn = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -194,7 +197,12 @@ def migrate_file(
                 {"from": payload.get("schema_version"), "to": migrated.get("schema_version")},
             )
         except Exception:  # noqa: BLE001
-            pass  # lineage is soft — never block migration on a DB hiccup
+            _log.warning(
+                "lineage.migration: failed to record migration lineage for %s; "
+                "continuing without blocking the migration",
+                path,
+                exc_info=True,
+            )  # lineage is soft — never block migration on a DB hiccup
     return migrated
 
 

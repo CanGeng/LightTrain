@@ -23,11 +23,14 @@ the index page.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
 
 import torch
+
+_log = logging.getLogger(__name__)
 
 # ----- peak component identification --------------------------------------
 
@@ -116,7 +119,10 @@ def write_oom_report(
             stats = dict(torch.cuda.memory_stats())
             summary = torch.cuda.memory_summary()
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "oom_report: reading CUDA memory stats failed; peak component falls back to 'unknown'",
+                exc_info=True,
+            )
 
     component = _classify_peak(stats, summary) if cuda_ok else "unknown"
     suggestion = _PATCH_BY_COMPONENT[component]
@@ -180,6 +186,10 @@ def write_oom_report(
             encoding="utf-8",
         )
     except Exception:  # noqa: BLE001
+        _log.warning(
+            "oom_report: YAML dump of patch failed; writing patch.yaml as JSON fallback",
+            exc_info=True,
+        )
         (out / "patch.yaml").write_text(
             json.dumps(suggestion["patch"], indent=2),
             encoding="utf-8",
@@ -214,7 +224,10 @@ def is_oom_exception(exc: BaseException) -> bool:
             if isinstance(exc, torch.cuda.OutOfMemoryError):  # type: ignore[attr-defined]
                 return True
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "oom_report: OutOfMemoryError isinstance check failed; falling back to message-string matching",
+                exc_info=True,
+            )
     msg = str(exc).lower()
     return "out of memory" in msg or "cuda out of memory" in msg
 

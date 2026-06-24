@@ -9,11 +9,14 @@ Multi-model composition is a ``CompositeJudge`` plugin, not part of core.
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Verifier judge — symbolic / regex check
@@ -159,6 +162,7 @@ class PairwiseLLMJudge:
                 else:
                     scores.append(0.5)
             except Exception:  # noqa: BLE001
+                _log.warning("judge: pairwise scoring failed for an item; scoring as tie (0.5)", exc_info=True)
                 scores.append(0.5)
         return scores
 

@@ -22,12 +22,15 @@ TCP / socket variants are not yet implemented.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
 
 from lighttrain.callbacks.base import Signal
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 _FILES = ("lr.json", "stop", "eval_now", "inject.py")
 
@@ -86,7 +89,7 @@ class FileSignalsCallback:
                     {"event": "lr_scale", "scale": scale, "step": int(step), "ts": time.time()}
                 )
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning("file_signals: lr.json apply failed; lr scale skipped", exc_info=True)
             try:
                 lr_path.unlink()
             except FileNotFoundError:
@@ -130,6 +133,7 @@ class FileSignalsCallback:
                     {"event": "inject", "step": int(step), "ts": time.time()}
                 )
             except Exception as exc:  # noqa: BLE001 — never kill on inject error
+                _log.warning("file_signals: inject.py exec failed; recording inject_error", exc_info=True)
                 events.append(
                     {
                         "event": "inject_error",
@@ -152,7 +156,7 @@ class FileSignalsCallback:
                 try:
                     store.update_node_payload(int(run_node), {"realtime_events": log})
                 except Exception:  # noqa: BLE001
-                    pass
+                    _log.warning("file_signals: lineage update_node_payload failed; realtime events not persisted", exc_info=True)
 
         return signal
 

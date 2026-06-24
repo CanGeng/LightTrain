@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from pathlib import Path
 
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("logger", "tensorboard")
@@ -51,7 +54,7 @@ class TensorBoardLogger:
             self._writer.flush()
             self._writer.close()
         except Exception:  # pragma: no cover  # noqa: BLE001
-            pass
+            _log.warning("tensorboard logger: close/flush failed; event file may be incomplete", exc_info=True)
 
 
 __all__ = ["TensorBoardLogger"]

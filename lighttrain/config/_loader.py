@@ -8,6 +8,7 @@ Pipeline:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, cast
@@ -18,6 +19,8 @@ from pydantic import ValidationError
 
 from ._exceptions import ConfigError, ConfigSchemaError
 from ._schema import RootConfig
+
+_log = logging.getLogger(__name__)
 
 
 def _read_yaml_node(path: Path) -> DictConfig:
@@ -122,6 +125,7 @@ def _leaf_exists(cfg: DictConfig, keys: list[str]) -> bool:
             node = node[k]
         except Exception:  # noqa: BLE001
             # Intermediate present but unresolved/missing — cannot descend.
+            _log.warning("config: descend into key %r failed; treating leaf path as absent", k, exc_info=True)
             return False
     return True
 

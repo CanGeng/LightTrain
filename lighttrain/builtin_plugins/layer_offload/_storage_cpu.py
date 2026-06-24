@@ -17,10 +17,13 @@ contracts.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
 import torch
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,7 +45,12 @@ class CpuPinnedStorage:
                     try:
                         t = t.pin_memory()
                     except Exception:  # noqa: BLE001
-                        pass
+                        _log.warning(
+                            "layer_offload: pin_memory failed for param %r of layer %r; swap stays unpinned",
+                            pname,
+                            name,
+                            exc_info=True,
+                        )
             pinned[pname] = t
         self.stash[name] = pinned
 

@@ -6,6 +6,7 @@ is attributable to the config change rather than stochastic variance.
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -13,6 +14,8 @@ from pathlib import Path
 
 from .compare import CompareReport, compare
 from .sweep import _find_run_dir, _read_final_metric
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,7 +69,12 @@ def ab_test(
                 timeout=trial_timeout_s,
             )
         except (subprocess.TimeoutExpired, Exception):  # noqa: BLE001
-            pass
+            _log.warning(
+                "lab.ab_test: training subprocess for variant %s crashed or timed out; "
+                "metrics will be read from whatever the run produced",
+                variant,
+                exc_info=True,
+            )
         rd = _find_run_dir(run_root_path / exp)
         metric = _read_final_metric(rd, metric_key) if rd else None
         return rd, metric
@@ -83,7 +91,13 @@ def ab_test(
         try:
             compare_report = compare([run_a_dir, run_b_dir])
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "lab.ab_test: compare() failed for runs %s vs %s; "
+                "returning report without a compare section",
+                run_a_dir,
+                run_b_dir,
+                exc_info=True,
+            )
 
     return ABReport(
         run_a=run_a_dir,

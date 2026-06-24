@@ -7,10 +7,13 @@ in the lineage graph.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
 import torch
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -120,7 +123,10 @@ class GenerationEvalTask:
             try:
                 self._write_lineage_edge(mean_score, step)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "generation_eval: writing lineage evaluated_by edge failed; eval results not recorded in lineage graph",
+                    exc_info=True,
+                )
 
         return {
             "task_name": self.name,

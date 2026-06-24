@@ -7,10 +7,13 @@ core, concrete impl in builtin_plugins).
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Protocols & data classes
@@ -138,7 +141,10 @@ class Evaluator:
             try:
                 self.on_report(report)
             except Exception:  # noqa: BLE001
-                pass
+                _log.warning(
+                    "eval_suite: on_report callback raised; report not delivered to consumer",
+                    exc_info=True,
+                )
         return report
 
 

@@ -16,11 +16,14 @@ must not kill the training run. The cost is silent — checked in
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from lighttrain.diagnostics.frozen_step import FrozenStepWriter
 from lighttrain.registry import register
+
+_log = logging.getLogger(__name__)
 
 
 @register("callback", "frozen_step")
@@ -88,7 +91,11 @@ class FrozenStepCallback:
                 config_resolved_yaml=self._config_yaml,
             )
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "frozen_step: snapshot at step %s failed; this step won't be restorable via RETRY_STEP",
+                step,
+                exc_info=True,
+            )
 
     def on_step_end(self, *, step: int = 0, **_: Any) -> None:
         if self._writer is None:
@@ -98,7 +105,11 @@ class FrozenStepCallback:
         try:
             self._writer.commit(reason=self.reason)
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "frozen_step: scheduled commit (reason=%s) failed; no frozen step persisted",
+                self.reason,
+                exc_info=True,
+            )
 
     def on_exception(self, **_: Any) -> None:
         if self._writer is None:
@@ -106,7 +117,10 @@ class FrozenStepCallback:
         try:
             self._writer.commit(reason="exception")
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "frozen_step: exception-time commit failed; no crash frozen step persisted",
+                exc_info=True,
+            )
 
 
 __all__ = ["FrozenStepCallback"]

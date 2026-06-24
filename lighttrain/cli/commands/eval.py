@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import typer
@@ -11,6 +12,8 @@ from lighttrain.cli._context import console
 from lighttrain.cli._helpers import _eval_perplexity
 from lighttrain.cli._runtime import setup_run_from_config
 from lighttrain.utils.env import load_dotenv_if_present
+
+_log = logging.getLogger(__name__)
 
 
 def eval_cmd(
@@ -58,6 +61,11 @@ def eval_cmd(
                     console.print(f"[green]loaded checkpoint[/] {checkpoint}")
                     loaded_ckpt = True
                 except Exception as exc:  # noqa: BLE001
+                    _log.warning(
+                        "cli eval: checkpoint load failed; "
+                        "scoring will proceed on untrained weights",
+                        exc_info=True,
+                    )
                     console.print(f"[yellow]checkpoint load failed:[/] {exc}")
 
         # Loud guard: scoring init weights produces a meaningless (random)
@@ -96,6 +104,11 @@ def eval_cmd(
                     if report is not None:
                         metrics.update(report.metrics)
             except Exception as exc:  # noqa: BLE001
+                _log.warning(
+                    "cli eval: evaluator suite run failed; "
+                    "its metrics will be missing from the report",
+                    exc_info=True,
+                )
                 console.print(f"[yellow]evaluator failed:[/] {exc}")
 
         # ---- display ----
@@ -121,7 +134,11 @@ def eval_cmd(
         try:
             _tmp_run.cleanup()
         except Exception:  # noqa: BLE001 — open handles (e.g. sqlite) on some OSes
-            pass
+            _log.warning(
+                "cli eval: temp run dir cleanup failed (likely open handles); "
+                "leaving it on disk",
+                exc_info=True,
+            )
 
 
 def regression_gate_cmd(
@@ -157,6 +174,11 @@ def regression_gate_cmd(
             try:
                 trainer.load_checkpoint(checkpoint)
             except Exception as exc:  # noqa: BLE001
+                _log.warning(
+                    "cli regression-gate: checkpoint load failed; "
+                    "gate metrics will reflect untrained weights",
+                    exc_info=True,
+                )
                 console.print(f"[yellow]checkpoint load failed:[/] {exc}")
 
     model = getattr(trainer, "model", None)

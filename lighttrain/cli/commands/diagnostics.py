@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import typer
@@ -10,6 +11,8 @@ from rich.table import Table
 from lighttrain.cli._context import console
 from lighttrain.cli._runtime import setup_run_from_config
 from lighttrain.config import ConfigError, dump_resolved, load_config
+
+_log = logging.getLogger(__name__)
 
 
 def estimate_cmd(
@@ -216,6 +219,11 @@ def doctor_cmd(run: Path = typer.Option(..., "--run")) -> None:
                 if line.strip()
             )
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "cli doctor: reading callback_failures.jsonl failed; "
+                "reporting 0 isolated failures",
+                exc_info=True,
+            )
             n_failures = 0
         if n_failures > 0:
             console.print(
@@ -363,11 +371,19 @@ def profile_cmd(
                 try:
                     bundle["logger"].close()
                 except Exception:  # noqa: BLE001
-                    pass
+                    _log.warning(
+                        "cli profile: logger close failed during cleanup; ignoring",
+                        exc_info=True,
+                    )
 
     try:
         prof.export_chrome_trace(str(trace_path))
     except Exception as e:  # noqa: BLE001
+        _log.warning(
+            "cli profile: chrome trace export failed; "
+            "continuing without the trace file",
+            exc_info=True,
+        )
         console.print(f"[yellow]chrome trace export failed: {e}[/]")
     table = prof.key_averages().table(
         sort_by="cpu_time_total", row_limit=10
@@ -416,6 +432,11 @@ def inspect_data_cmd(
                 try:
                     text = tokenizer.decode(ids)[:80]
                 except Exception:  # noqa: BLE001
+                    _log.warning(
+                        "cli inspect-data: tokenizer decode of a sample failed; "
+                        "showing <decode error> placeholder",
+                        exc_info=True,
+                    )
                     text = "<decode error>"
             row.append(text.replace("\n", "\\n"))
         table.add_row(*row)

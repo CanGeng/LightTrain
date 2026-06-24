@@ -10,8 +10,11 @@ Always safe to call multiple times; idempotent.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 
 def write_index_page(run_dir: str | Path, *, bus: Any | None = None) -> Path:
@@ -47,6 +50,10 @@ def write_index_page(run_dir: str | Path, *, bus: Any | None = None) -> Path:
         try:
             quarantined = list(bus.quarantined)
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "index_page: failed to read bus.quarantined; index lists no quarantined callbacks",
+                exc_info=True,
+            )
             quarantined = []
 
     # also regenerate callback_report.md if there were failures.
@@ -56,7 +63,10 @@ def write_index_page(run_dir: str | Path, *, bus: Any | None = None) -> Path:
 
             write_callback_report(run_dir, bus=bus)
         except Exception:  # noqa: BLE001
-            pass
+            _log.warning(
+                "index_page: callback report regeneration failed; index may reference a stale callback_report.md",
+                exc_info=True,
+            )
 
     last_frozen = frozen[-1].name if frozen else "—"
     lines = [

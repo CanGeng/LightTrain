@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import socket
@@ -10,11 +11,14 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
+_log = logging.getLogger(__name__)
+
 
 def _safe(fn, default: Any = None) -> Any:
     try:
         return fn()
     except Exception:  # noqa: BLE001
+        _log.warning("env capture: probe failed; using default value", exc_info=True)
         return default
 
 

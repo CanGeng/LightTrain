@@ -23,6 +23,7 @@ exhaustion falls back to a soft SKIP_STEP and writes
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -39,6 +40,8 @@ from lighttrain.update_rules._primitives import (  # noqa: F401  (_register_new_
     make_autocast,
 )
 from lighttrain.utils.seed import restore_rng_state, rng_state
+
+_log = logging.getLogger(__name__)
 
 
 def _to_metric(value: Any) -> float:
@@ -122,6 +125,10 @@ class StandardUpdateRule:
         try:
             rng_snap = rng_state()
         except Exception:  # noqa: BLE001
+            _log.warning(
+                "update_rule.step: RNG snapshot failed; RETRY_STEP replay will skip RNG restore",
+                exc_info=True,
+            )
             rng_snap = None
 
         # Forward.
@@ -194,12 +201,18 @@ class StandardUpdateRule:
                     try:
                         writer.restore_snapshot(model=model, optimizer=optimizer)
                     except Exception:  # noqa: BLE001
-                        pass
+                        _log.warning(
+                            "update_rule.step: RETRY_STEP snapshot restore failed; replaying on unrestored params",
+                            exc_info=True,
+                        )
                 if rng_snap is not None:
                     try:
                         restore_rng_state(rng_snap)
                     except Exception:  # noqa: BLE001
-                        pass
+                        _log.warning(
+                            "update_rule.step: RETRY_STEP RNG restore failed; replaying with current RNG state",
+                            exc_info=True,
+                        )
                 outputs, loss, loss_dict = _run_forward_and_loss()
                 if bus is not None:
                     bus.dispatch(
