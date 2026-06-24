@@ -22,6 +22,7 @@ from lighttrain.observability.lineage.retention import (
     gc_artifacts,
     prune_orphans,
 )
+from tests._diagnostics import expect_exists
 
 # --------------------------------------------------------------------------- #
 # Edges                                                                       #
@@ -257,13 +258,13 @@ def test_gc_deprecates_then_deletes_after_ttl(lineage_store_factory, tmp_path) -
     assert sorted(r1.deprecated) == sorted(ids[:2])
     assert r1.deleted == []
     for d in payload_dirs[:2]:
-        assert d.exists()
+        expect_exists(d, d.parent, what="payload dir (pass 1, pre-TTL)")
 
     # Pass 2 within TTL: still no delete.
     r2 = gc_artifacts(store, policy=policy, now=base + 10 + 3600)
     assert r2.deleted == []
     for d in payload_dirs[:2]:
-        assert d.exists()
+        expect_exists(d, d.parent, what="payload dir (pass 2, within TTL)")
 
     # Pass 3 past TTL: physical delete.
     r3 = gc_artifacts(store, policy=policy, now=base + 10 + 25 * 3600)
@@ -271,7 +272,7 @@ def test_gc_deprecates_then_deletes_after_ttl(lineage_store_factory, tmp_path) -
     for d in payload_dirs[:2]:
         assert not d.exists()
     # The kept (newest) version's payload is untouched.
-    assert payload_dirs[2].exists()
+    expect_exists(payload_dirs[2], payload_dirs[2].parent, what="kept (newest) payload dir")
 
 
 # --------------------------------------------------------------------------- #

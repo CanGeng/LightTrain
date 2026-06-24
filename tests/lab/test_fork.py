@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from lighttrain.lab.fork import ForkReport, fork
+from tests._diagnostics import expect_exists
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -39,7 +40,7 @@ def test_fork_creates_new_run_dir(tmp_path: Path):
     report = fork(ckpt, {"run_root": str(tmp_path), "exp": "forked"})
 
     assert isinstance(report, ForkReport)
-    assert report.new_run_dir.exists()
+    expect_exists(report.new_run_dir, tmp_path, what="forked run dir")
     assert report.parent_checkpoint == ckpt.resolve()
 
 
@@ -51,8 +52,8 @@ def test_fork_copies_checkpoint_files(tmp_path: Path):
     report = fork(ckpt, {"run_root": str(tmp_path), "exp": "forked"})
 
     copied_ckpt = report.new_run_dir / "checkpoints" / ckpt.name
-    assert copied_ckpt.exists()
-    assert (copied_ckpt / "model.safetensors").exists()
+    expect_exists(copied_ckpt, report.new_run_dir, what="copied checkpoint dir")
+    expect_exists(copied_ckpt / "model.safetensors", copied_ckpt, what="model.safetensors")
 
 
 def test_fork_writes_fork_meta(tmp_path: Path):
@@ -63,7 +64,7 @@ def test_fork_writes_fork_meta(tmp_path: Path):
     report = fork(ckpt, {"run_root": str(tmp_path), "exp": "forked"})
 
     meta_path = report.new_run_dir / "fork_meta.json"
-    assert meta_path.exists()
+    expect_exists(meta_path, report.new_run_dir, what="fork_meta.json")
     meta = json.loads(meta_path.read_text())
     assert "fork_of_checkpoint" in meta
     assert str(ckpt.resolve()) in meta["fork_of_checkpoint"]
@@ -89,7 +90,7 @@ def test_fork_explicit_run_dir(tmp_path: Path):
     report = fork(ckpt, {}, run_dir=explicit_dir)
 
     assert report.new_run_dir == explicit_dir
-    assert explicit_dir.exists()
+    expect_exists(explicit_dir, tmp_path, what="explicit run dir")
 
 
 def test_fork_nonexistent_checkpoint_raises(tmp_path: Path):
@@ -106,7 +107,7 @@ def test_fork_writes_config_yaml(tmp_path: Path):
     report = fork(ckpt, cfg)
 
     config_path = report.new_run_dir / "config.yaml"
-    assert config_path.exists()
+    expect_exists(config_path, report.new_run_dir, what="config.yaml")
     import yaml
 
     loaded = yaml.safe_load(config_path.read_text())
@@ -175,8 +176,8 @@ def test_three_generation_fork_chain(tmp_path: Path):
     r3 = fork(ckpt2, {"run_root": str(tmp_path), "exp": "gen3"})
 
     # Both gen2 and gen3 have fork_meta.json
-    assert (r2.new_run_dir / "fork_meta.json").exists()
-    assert (r3.new_run_dir / "fork_meta.json").exists()
+    expect_exists(r2.new_run_dir / "fork_meta.json", r2.new_run_dir, what="gen2 fork_meta.json")
+    expect_exists(r3.new_run_dir / "fork_meta.json", r3.new_run_dir, what="gen3 fork_meta.json")
 
     # Gen1 lineage store has a fork_of edge pointing to gen2's run
     with LineageStore(gen1 / "lineage.sqlite") as store:

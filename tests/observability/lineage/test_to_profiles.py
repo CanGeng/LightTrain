@@ -17,6 +17,7 @@ from lighttrain.observability.lineage.migration import (
     migrate_model_to_profiles_text,
     rewrite_model_to_profiles_file,
 )
+from tests._diagnostics import expect_exists
 
 runner = CliRunner()
 
@@ -88,7 +89,8 @@ def test_file_rewrite_creates_backup_and_is_loadable(tmp_yaml):
     changed = rewrite_model_to_profiles_file(p, in_place=True)
     assert changed
     bak = p.with_suffix(p.suffix + ".pre-migration-bak")
-    assert bak.exists() and bak.read_text() == _BLOCK
+    expect_exists(bak, bak.parent, what="pre-migration backup")
+    assert bak.read_text() == _BLOCK
     # Migrated file loads and resolves through the v0.1.8 selector path.
     cfg = load_config(p)
     spec = select_model_spec(cfg.model, cfg.model_profiles)

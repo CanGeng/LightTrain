@@ -29,6 +29,7 @@ from pathlib import Path
 import pytest
 
 from lighttrain.builtin_plugins.logging_backends.jsonl import JSONLLogger, _coerce
+from tests._diagnostics import expect_exists
 
 # ---------------------------------------------------------------------------
 # Record format invariants
@@ -315,7 +316,7 @@ def test_run_dir_mode_creates_logs_subdir(tmp_path: Path):
     j = JSONLLogger(run_dir=tmp_path)
     expected = tmp_path / "logs" / "metrics.jsonl"
     j.close()
-    assert expected.exists()
+    expect_exists(expected, tmp_path, what="metrics.jsonl")
     assert j.path == expected
 
 
@@ -323,7 +324,7 @@ def test_run_dir_mode_with_custom_filename(tmp_path: Path):
     """``filename`` parameter overrides the default ``metrics.jsonl``."""
     j = JSONLLogger(run_dir=tmp_path, filename="my_metrics.jsonl")
     j.close()
-    assert (tmp_path / "logs" / "my_metrics.jsonl").exists()
+    expect_exists(tmp_path / "logs" / "my_metrics.jsonl", tmp_path, what="my_metrics.jsonl")
 
 
 def test_path_mode_creates_parent_dir(tmp_path: Path):
@@ -333,7 +334,7 @@ def test_path_mode_creates_parent_dir(tmp_path: Path):
     nested = tmp_path / "a" / "b" / "c" / "metrics.jsonl"
     j = JSONLLogger(path=nested)
     j.close()
-    assert nested.parent.exists()
+    expect_exists(nested.parent, tmp_path, what="auto-created parent dir")
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ import torch
 
 from lighttrain.builtin_plugins.data.core.tokenizers import ByteTokenizer
 from lighttrain.builtin_plugins.diagnostics.sample_preview import SamplePreviewCallback
+from tests._diagnostics import expect_count
 
 
 class _DM:
@@ -31,6 +32,6 @@ def test_sample_preview_writes_first_n(tmp_path):
         cb.on_train_batch_start(step=i, batch=batch)
     out = tmp_path / "diagnostics" / "sample_preview"
     files = sorted(out.glob("*.txt"))
-    assert len(files) == 2
+    expect_count(files, 2, tmp_path, what="sample_preview *.txt files")
     body = files[0].read_text(encoding="utf-8")
     assert "step=" in body

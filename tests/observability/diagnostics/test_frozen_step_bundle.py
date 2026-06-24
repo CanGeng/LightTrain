@@ -10,6 +10,7 @@ from lighttrain.observability.diagnostics.frozen_step import (
     FrozenStepWriter,
     read_frozen_step_bundle,
 )
+from tests._diagnostics import expect_exists
 
 
 def test_writer_commit_creates_zip(tmp_path):
@@ -29,7 +30,7 @@ def test_writer_commit_creates_zip(tmp_path):
         config_resolved_yaml="mode: lab\n",
     )
     path = writer.commit(reason="scheduled")
-    assert path is not None and path.exists()
+    expect_exists(path, tmp_path, what="frozen-step zip")
     bundle = read_frozen_step_bundle(path)
     assert bundle.step == 7
     assert bundle.reason == "scheduled"
@@ -53,4 +54,5 @@ def test_exception_reason_is_independent_file(tmp_path):
     scheduled = writer.commit(reason="scheduled")
     exception = writer.commit(reason="exception")
     assert scheduled != exception
-    assert scheduled.exists() and exception.exists()
+    expect_exists(scheduled, tmp_path, what="scheduled frozen-step zip")
+    expect_exists(exception, tmp_path, what="exception frozen-step zip")

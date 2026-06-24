@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from lighttrain.observability.diagnostics.index_page import write_index_page
+from tests._diagnostics import expect_exists
 
 
 def test_empty_run_still_writes(tmp_path):
     out = write_index_page(tmp_path)
-    assert out.exists()
+    expect_exists(out, tmp_path, what="index page")
     body = out.read_text(encoding="utf-8")
     assert "Run diagnostics" in body
     assert "Frozen step bundles: **0**" in body

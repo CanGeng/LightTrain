@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from lighttrain.cli._app import app
 from lighttrain.cli._runtime import _eager_import_components
 from lighttrain.lab.estimate import EstimateReport, estimate
+from tests._diagnostics import expect_exists
 
 _eager_import_components()
 
@@ -194,7 +195,7 @@ def test_estimate_cli_smoke_json_output(tmp_path: Path):
     )
     assert result.exit_code == 0, result.output
     assert "trainable_params" in result.output
-    assert out_json.exists()
+    expect_exists(out_json, tmp_path, what="estimate.json")
     data = json.loads(out_json.read_text(encoding="utf-8"))
     assert "trainable_params" in data
     assert "engine_name" in data
