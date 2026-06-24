@@ -13,6 +13,7 @@ from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.engine._context import StepContext
 from lighttrain.observability.diagnostics.crash_bundle import write_crash_bundle
 from lighttrain.observability.lineage.store import LineageStore
+from tests._diagnostics import expect_exists
 
 
 def test_crash_bundle_contents(tmp_path):
@@ -32,7 +33,7 @@ def test_crash_bundle_contents(tmp_path):
         optimizer=optimizer,
         metrics={"loss": 1.23},
     )
-    assert bundle.exists()
+    expect_exists(bundle, tmp_path, what="crash bundle dir")
     for name in (
         "traceback.txt",
         "env.json",
@@ -43,7 +44,7 @@ def test_crash_bundle_contents(tmp_path):
         "model_spec.json",
         "metrics_recent.jsonl",
     ):
-        assert (bundle / name).exists(), f"missing {name}"
+        expect_exists(bundle / name, bundle, what=name)
     # env.json mentions the exception type.
     env = json.loads((bundle / "env.json").read_text(encoding="utf-8"))
     assert env["exception_type"] == "RuntimeError"

@@ -30,6 +30,7 @@ from lighttrain.builtin_plugins.diagnostics.nan_hunter import (
     _flatten_tensors,
     _safe_name,
 )
+from tests._diagnostics import expect_count, expect_exists, expect_nonempty
 
 
 class _Trainer:
@@ -213,7 +214,7 @@ def test_invariant_fired_flag_prevents_double_dump_in_same_step(tmp_path):
     dump_dir = tmp_path / "diagnostics" / "nan_dumps" / "step_1"
     dumps = list(dump_dir.glob("*.pt"))
     # The first hit set _fired; the second module is skipped.
-    assert len(dumps) == 1
+    expect_count(dumps, 1, dump_dir.parent, what="step_1 module dump (*.pt)")
 
 
 def test_invariant_on_step_begin_resets_fired_for_next_step(tmp_path):
@@ -236,8 +237,9 @@ def test_invariant_on_step_begin_resets_fired_for_next_step(tmp_path):
     model(torch.ones(1, 4))
     cb.on_train_end()
 
-    assert (tmp_path / "diagnostics" / "nan_dumps" / "step_1").exists()
-    assert (tmp_path / "diagnostics" / "nan_dumps" / "step_2").exists()
+    nan_dumps = tmp_path / "diagnostics" / "nan_dumps"
+    expect_exists(nan_dumps / "step_1", nan_dumps, what="step_1 dump dir")
+    expect_exists(nan_dumps / "step_2", nan_dumps, what="step_2 dump dir")
 
 
 def test_raise_on_hit_false_records_dump_without_raising(tmp_path):
@@ -254,8 +256,9 @@ def test_raise_on_hit_false_records_dump_without_raising(tmp_path):
     # Should NOT raise
     model(torch.ones(1, 4))
     cb.on_train_end()
-    dumps = list((tmp_path / "diagnostics" / "nan_dumps" / "step_5").glob("*.pt"))
-    assert len(dumps) >= 1
+    step5 = tmp_path / "diagnostics" / "nan_dumps" / "step_5"
+    dumps = list(step5.glob("*.pt"))
+    expect_nonempty(dumps, step5.parent, what="a step_5 module dump (*.pt)")
 
 
 # ---------------------------------------------------------------------------
@@ -387,11 +390,12 @@ def test_invariant_repro_kit_written_on_nan_fire(tmp_path):
 
     diag = tmp_path / "diagnostics"
     repros = sorted(diag.glob("repro_nan_*"))
-    assert len(repros) == 1, f"expected one repro kit, got {repros}"
-    assert (repros[0] / "repro.py").exists()
-    assert (repros[0] / "batch.pt").exists()
-    assert (repros[0] / "model_state.safetensors").exists()
-    assert sorted((diag / "nan_dumps").rglob("*.pt")), "expected a module dump"
+    expect_count(repros, 1, diag, what="repro_nan_* kit")
+    expect_exists(repros[0] / "repro.py", repros[0], what="repro.py")
+    expect_exists(repros[0] / "batch.pt", repros[0], what="batch.pt")
+    expect_exists(repros[0] / "model_state.safetensors", repros[0], what="model_state.safetensors")
+    pt_dumps = sorted((diag / "nan_dumps").rglob("*.pt"))
+    expect_nonempty(pt_dumps, diag, what="a module dump (*.pt) under nan_dumps")
 
 
 def test_invariant_repro_py_is_under_80_lines(tmp_path):
@@ -416,6 +420,6 @@ def test_invariant_repro_py_is_under_80_lines(tmp_path):
     cb.on_train_end()
 
     repros = sorted((tmp_path / "diagnostics").glob("repro_nan_*"))
-    assert repros
+    expect_nonempty(repros, tmp_path / "diagnostics", what="a repro_nan_* kit")
     lines = (repros[0] / "repro.py").read_text(encoding="utf-8").splitlines()
     assert len(lines) <= 80, f"repro.py is {len(lines)} lines, DESIGN §18.3 says ≤80"

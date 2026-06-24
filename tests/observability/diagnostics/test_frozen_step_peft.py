@@ -21,6 +21,7 @@ from lighttrain.observability.diagnostics.frozen_step import (  # noqa: E402
     read_frozen_step_bundle,
 )
 from lighttrain.observability.minimal import build_minimal_model  # noqa: E402
+from tests._diagnostics import expect_exists  # noqa: E402
 
 
 def _spec_for_tiny() -> dict:
@@ -58,7 +59,7 @@ def test_frozen_step_writes_lora_model_spec(tmp_path):
         optimizer=None,
     )
     out = writer.commit(reason="scheduled")
-    assert out.exists()
+    expect_exists(out, tmp_path, what="frozen-step zip")
     # Read back the metadata.
     with zipfile.ZipFile(out) as zf:
         meta = json.loads(zf.read("step_metadata.json"))

@@ -19,6 +19,7 @@ from lighttrain.lab.auto_report import render_sweep_markdown, write_sweep_report
 from lighttrain.lab.compare import compare, render_ascii
 from lighttrain.lab.fork import fork
 from lighttrain.lab.sweep import SweepRunner
+from tests._diagnostics import expect_exists
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -132,7 +133,7 @@ def test_r15_sweep_produces_report(sweep_setup, tmp_path: Path):
 
     # Write report to file
     out = write_sweep_report(report, tmp_path / "sweep_report.md")
-    assert out.exists()
+    expect_exists(out, tmp_path, what="sweep_report.md")
     content = out.read_text()
     assert "r15_sweep" in content
 
@@ -184,8 +185,8 @@ def test_r16_fork_gen2_from_gen1(tmp_path: Path):
 
     r2 = fork(ckpt1, {"run_root": str(tmp_path), "exp": "gen2", "optim": {"lr": 1.5e-4}})
 
-    assert r2.new_run_dir.exists()
-    assert (r2.new_run_dir / "fork_meta.json").exists()
+    expect_exists(r2.new_run_dir, tmp_path, what="gen2 run dir")
+    expect_exists(r2.new_run_dir / "fork_meta.json", r2.new_run_dir, what="gen2 fork_meta.json")
 
 
 def test_r16_three_generation_lineage(tmp_path: Path):
@@ -204,8 +205,8 @@ def test_r16_three_generation_lineage(tmp_path: Path):
     r3 = fork(ckpt2, {"run_root": str(tmp_path), "exp": "gen3"})
 
     # All three generations must have fork provenance
-    assert (r2.new_run_dir / "fork_meta.json").exists()
-    assert (r3.new_run_dir / "fork_meta.json").exists()
+    expect_exists(r2.new_run_dir / "fork_meta.json", r2.new_run_dir, what="gen2 fork_meta.json")
+    expect_exists(r3.new_run_dir / "fork_meta.json", r3.new_run_dir, what="gen3 fork_meta.json")
 
     meta2 = json.loads((r2.new_run_dir / "fork_meta.json").read_text())
     meta3 = json.loads((r3.new_run_dir / "fork_meta.json").read_text())

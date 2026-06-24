@@ -15,6 +15,7 @@ from lighttrain.observability.lineage.migration import (
     migrate_payload,
     registered_migrations,
 )
+from tests._diagnostics import expect_exists
 
 
 def test_registered_migrations_include_seed_set():
@@ -51,7 +52,7 @@ def test_migrate_file_writes_backup_and_lineage_edge(tmp_path):
     store = LineageStore(tmp_path / "l.sqlite")
     migrated = migrate_file(path, schema_kind="config", lineage_store=store)
     assert migrated["schema_version"] == "0.4"
-    assert (path.with_suffix(".yaml.pre-migration-bak")).exists()
+    expect_exists(path.with_suffix(".yaml.pre-migration-bak"), tmp_path, what="pre-migration backup")
 
     # Lineage edge written.
     nodes = list(store.iter_nodes(kind="config"))

@@ -9,6 +9,7 @@ import torch
 
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.observability.diagnostics.nan_repro import write_nan_repro
+from tests._diagnostics import expect_exists
 
 
 def test_repro_script_executes(tmp_path):
@@ -28,7 +29,7 @@ def test_repro_script_executes(tmp_path):
         module_name="tok_emb",
     )
     repro_py = diag / "repro.py"
-    assert repro_py.exists()
+    expect_exists(repro_py, diag, what="repro.py")
     # Run the script in a subprocess. It should *finish* (the anomaly detection
     # may print findings or raise; we only require exit cleanly *or* with a
     # RuntimeError mentioning anomaly/nan — both are acceptable per DESIGN §18.3).

@@ -9,6 +9,7 @@ import torch.nn as nn
 
 from lighttrain.builtin_plugins.diagnostics.dead_neuron import DeadNeuronCallback
 from lighttrain.engine._context import StepContext
+from tests._diagnostics import expect_nonempty
 
 
 class _TinyNet(nn.Module):
@@ -36,7 +37,7 @@ def test_dead_neuron_writes_snapshot(tmp_path):
         cb.on_step_end(step=s)
     cb.on_train_end()
     files = sorted((tmp_path / "diagnostics").glob("dead_neurons_*.json"))
-    assert files, "expected at least one dead_neurons_<step>.json"
+    expect_nonempty(files, tmp_path, what="a dead_neurons_<step>.json snapshot")
     payload = json.loads(files[-1].read_text(encoding="utf-8"))
     assert "fc" in payload
     assert "zero_ratio_mean" in payload["fc"]

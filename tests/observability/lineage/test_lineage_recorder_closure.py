@@ -20,6 +20,7 @@ from lighttrain.builtin_plugins.callbacks.builtins.lineage_recorder import (
 )
 from lighttrain.callbacks.base import EventBus
 from lighttrain.observability.lineage.store import LineageStore
+from tests._diagnostics import expect_exists
 
 
 def test_update_node_payload_merges_existing(tmp_path):
@@ -117,4 +118,5 @@ def test_checkpoint_events_dispatched_by_trainer(tmp_path):
     assert post["step"] == 1
     assert post["kind"] == "step"
     # path is the directory the ckpt was written to
-    assert Path(str(post["path"])).exists()
+    ckpt_path = Path(str(post["path"]))
+    expect_exists(ckpt_path, ckpt_path.parent, what="checkpoint dir")

@@ -9,6 +9,7 @@ import torch.nn as nn
 
 from lighttrain.builtin_plugins.diagnostics.grad_flow import GradFlowCallback
 from lighttrain.engine._context import StepContext
+from tests._diagnostics import expect_nonempty
 
 
 class _Tiny(nn.Module):
@@ -38,7 +39,7 @@ def test_grad_flow_writes_per_layer_norms(tmp_path):
     cb.on_backward_post(step=1, loss=y)
     cb.on_step_end(step=1)
     snaps = sorted((tmp_path / "diagnostics").glob("grad_flow_*.json"))
-    assert snaps
+    expect_nonempty(snaps, tmp_path, what="a grad_flow_<step>.json snapshot")
     data = json.loads(snaps[-1].read_text(encoding="utf-8"))
     assert any(k.startswith("fc1.") for k in data)
     assert any(k.startswith("fc2.") for k in data)

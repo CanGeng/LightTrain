@@ -21,6 +21,7 @@ from lighttrain.builtin_plugins.artifacts import (
 )
 from lighttrain.builtin_plugins.artifacts.producer import _coerce_model_output
 from lighttrain.protocols import ModelOutput
+from tests._diagnostics import expect_exists
 
 # --------------------------------------------------------------------------- #
 # Deterministic tiny model                                                    #
@@ -195,7 +196,7 @@ def test_producer_finalize_writes_manifest_complete(tmp_path: Path) -> None:
     producer.finalize()
 
     manifest_path = tmp_path / "art" / "MANIFEST_COMPLETE.json"
-    assert manifest_path.exists()
+    expect_exists(manifest_path, tmp_path / "art", what="MANIFEST_COMPLETE.json")
     body = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert body["count"] == 3
     assert body["backend"] == "safetensors-shards"
@@ -265,7 +266,7 @@ def test_producer_writes_topk_extra_and_hidden_states(tmp_path: Path) -> None:
     for s in samples:
         producer.produce(s)
     manifest = producer.finalize()
-    assert manifest.exists()
+    expect_exists(manifest, tmp_path / "art", what="artifact manifest")
 
     store = open_artifact_store(tmp_path / "art")
     assert sorted(store.iter_keys()) == ["sample_00", "sample_01", "sample_02"]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
 
@@ -16,6 +17,7 @@ from lighttrain.observability.diagnostics.frozen_step import (
     FrozenStepWriter,
     replay_step_bundle,
 )
+from tests._diagnostics import expect_nonempty
 
 pytestmark = pytest.mark.heavy
 
@@ -26,7 +28,7 @@ class _Trainer:
         self._run_dir = run_dir
 
 
-def test_r17_nan_repro_round_trips_subprocess(tmp_path):
+def test_r17_nan_repro_round_trips_subprocess(tmp_path, caplog):
     """End-to-end: inject NaN → write repro kit → run repro.py in subprocess."""
     torch.manual_seed(0)
     model = TinyCausalLM(vocab_size=64, d_model=16, n_layers=2, n_heads=2, max_seq_len=16)
@@ -36,19 +38,22 @@ def test_r17_nan_repro_round_trips_subprocess(tmp_path):
     hunter = NanHunterCallback()
     ctx = StepContext(run_dir=tmp_path)
     hunter.on_train_start(trainer=_Trainer(model, tmp_path), ctx=ctx)
-    hunter.on_step_begin(
-        step=1,
-        batch={
-            "input_ids": torch.zeros(2, 8, dtype=torch.long),  # row 0 → NaN
-            "attention_mask": torch.ones(2, 8, dtype=torch.long),
-        },
-    )
-    with pytest.raises(RuntimeError, match="NaN/Inf"):
-        model(input_ids=torch.zeros(2, 8, dtype=torch.long))
-    hunter.on_train_end()
+    with caplog.at_level(logging.WARNING, logger="lighttrain"):
+        hunter.on_step_begin(
+            step=1,
+            batch={
+                "input_ids": torch.zeros(2, 8, dtype=torch.long),  # row 0 → NaN
+                "attention_mask": torch.ones(2, 8, dtype=torch.long),
+            },
+        )
+        with pytest.raises(RuntimeError, match="NaN/Inf"):
+            model(input_ids=torch.zeros(2, 8, dtype=torch.long))
+        hunter.on_train_end()
 
     repros = sorted((tmp_path / "diagnostics").glob("repro_nan_*"))
-    assert repros, "expected NaN repro kit"
+    expect_nonempty(
+        repros, tmp_path / "diagnostics", what="a NaN repro kit", caplog=caplog
+    )
     proc = subprocess.run(
         [sys.executable, str(repros[0] / "repro.py")],
         capture_output=True,
