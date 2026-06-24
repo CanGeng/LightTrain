@@ -213,6 +213,10 @@ class FrozenStepWriter:
     def commit(self, *, reason: str = "scheduled") -> Path | None:
         """Atomically write the most recent snapshot to disk."""
         if self._snapshot is None:
+            _log.warning(
+                "frozen_step commit: no snapshot captured at commit time "
+                "(snapshot() never ran or was skipped); nothing written"
+            )
             return None
         if reason not in _REASONS:
             reason = "scheduled"
