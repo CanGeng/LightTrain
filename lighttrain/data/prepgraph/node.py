@@ -1,6 +1,6 @@
 """PrepNode base class + result/estimate dataclasses.
 
-Every concrete node lives in ``lighttrain/builtin_plugins/prepgraph/nodes/`` and registers via
+Every concrete node lives in ``lighttrain/builtin_plugins/data/prepgraph/nodes/`` and registers via
 ``@register("prep_node", "<kind>")``. The base class implements the
 ``PrepNodeProtocol`` shape:
 
