@@ -9,7 +9,7 @@ import pytest
 from lighttrain.cli._runtime import build_prep_runner
 from lighttrain.config import load_config
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 
 
 # ---------------------------------------------------------------------------

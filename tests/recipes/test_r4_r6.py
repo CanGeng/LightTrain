@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-_RECIPES = Path(__file__).parent.parent / "recipes"
+_RECIPES = Path(__file__).parent.parent.parent / "recipes"
 
 
 def _load(name: str) -> dict:
