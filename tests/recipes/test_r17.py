@@ -9,9 +9,11 @@ import sys
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.observability.diagnostics.nan_hunter import NanHunterCallback
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
+from lighttrain.builtin_plugins.observability.diagnostics.nan_hunter import (
+    NanHunterCallback,
+)
 from lighttrain.engine._context import StepContext
 from lighttrain.observability.diagnostics.frozen_step import (
     FrozenStepWriter,

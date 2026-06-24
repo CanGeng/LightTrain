@@ -25,7 +25,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from lighttrain.builtin_plugins.callbacks.realtime_control.file_signals import FileSignalsCallback
+from lighttrain.builtin_plugins.callbacks.realtime_control.file_signals import (
+    FileSignalsCallback,
+)
 from lighttrain.callbacks.base import Signal
 from lighttrain.engine._context import StepContext
 

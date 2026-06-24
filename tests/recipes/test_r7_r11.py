@@ -69,13 +69,13 @@ def test_r8_diffusion_smoke():
 # ---------------------------------------------------------------------------
 
 def test_r9_jepa_smoke():
+    from lighttrain.builtin_plugins.objectives.jepa import JEPAObjective
     from lighttrain.builtin_plugins.optim.architectures.jepa import (
         EMATargetEncoder,
         JEPAEncoder,
         JEPAModelConfig,
         JEPAPredictor,
     )
-    from lighttrain.builtin_plugins.objectives.jepa import JEPAObjective
     from lighttrain.protocols import LossContext, ModelOutput
 
     cfg = JEPAModelConfig(patch_dim=16, embed_dim=32, num_heads=2, depth=2, predictor_depth=1)

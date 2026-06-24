@@ -16,7 +16,10 @@ this is a package.
 
 from __future__ import annotations
 
-from . import builtins, regression_gate  # noqa: F401 — import for @register side-effects
+from . import (  # noqa: F401 — import for @register side-effects
+    builtins,
+    regression_gate,
+)
 from .callback import InvariantsCallback
 
 __all__ = ["InvariantsCallback"]

@@ -9,8 +9,8 @@ from __future__ import annotations
 import torch
 
 from lighttrain.builtin_plugins.engine.standard import StandardEngine
-from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.engine.update_rules.standard import StandardUpdateRule
+from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.callbacks.base import EventBus, Signal
 from lighttrain.engine._context import StepContext
 from lighttrain.protocols import ModelOutput

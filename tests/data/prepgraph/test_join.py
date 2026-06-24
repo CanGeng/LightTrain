@@ -8,11 +8,11 @@ import pytest
 import torch
 
 from lighttrain.builtin_plugins.data.artifacts import ModelForwardProducer
-from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.builtin_plugins.data.prepgraph import (
     nodes,  # noqa: F401 — register prep_node entries
 )
 from lighttrain.builtin_plugins.data.prepgraph.nodes.join import JoinNode
+from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.data.prepgraph.node import NodeResult, RunContext
 
 
