@@ -563,7 +563,7 @@ def _auto_attach_m4_callbacks(cfg: Any, trainer: Any, existing: list[Any]) -> No
         rt_enabled = bool(rt.enabled)
     if rt_enabled and "FileSignalsCallback" not in have:
         try:
-            from ..builtin_plugins.realtime_control.file_signals import (
+            from ..builtin_plugins.callbacks.realtime_control.file_signals import (
                 FileSignalsCallback,
             )
 
