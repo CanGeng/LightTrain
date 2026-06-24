@@ -109,7 +109,7 @@ def test_lora_param_groups_via_optim_wrapper():
 
 def test_lora_dump_peft_spec_round_trip_via_minimal():
     """dump_peft_spec → build_minimal_model should reconstruct the same shape."""
-    from lighttrain.minimal import build_minimal_model
+    from lighttrain.observability.minimal import build_minimal_model
 
     a = _make_lora(r=4, lora_alpha=8)
     spec = dump_peft_spec(a)

@@ -69,7 +69,7 @@ def replay_cmd(
     import torch as _torch
 
     from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
-    from lighttrain.minimal import build_minimal_model, load_state
+    from lighttrain.observability.minimal import build_minimal_model, load_state
     from lighttrain.protocols import LossContext
 
     try:
@@ -197,7 +197,7 @@ def replay_step_cmd(
         console.print(f"[red]bundle not found:[/] {bundle}")
         raise typer.Exit(code=1)
     from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
-    from lighttrain.diagnostics.frozen_step import (
+    from lighttrain.observability.diagnostics.frozen_step import (
         read_frozen_step_bundle,
         replay_step_bundle,
     )

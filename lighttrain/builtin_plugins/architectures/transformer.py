@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from lighttrain.architectures.profile import ArchitectureProfile
+from lighttrain.optim.architectures.profile import ArchitectureProfile
 from lighttrain.registry import register
 
 # ---------------------------------------------------------------------------

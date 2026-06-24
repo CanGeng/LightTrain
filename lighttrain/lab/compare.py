@@ -166,7 +166,7 @@ def _query_fork_ancestry(run_dir: Path) -> str | None:
     if not sqlite_path.exists():
         return None
     try:
-        from ..lineage.store import LineageStore
+        from ..observability.lineage.store import LineageStore
 
         with LineageStore(sqlite_path) as store:
             for edge in store.iter_edges(kind="fork_of"):

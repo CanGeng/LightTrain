@@ -31,7 +31,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from lighttrain.callbacks.base import Signal
-from lighttrain.invariants import InvariantError, evaluate_check
+from lighttrain.callbacks.invariants import InvariantError, evaluate_check
 from lighttrain.registry import get as _registry_get
 from lighttrain.registry import register
 

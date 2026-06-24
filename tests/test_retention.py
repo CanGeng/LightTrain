@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from lighttrain.lineage import (
+from lighttrain.observability.lineage import (
     LineageStore,
     RetentionPolicy,
     gc_artifacts,

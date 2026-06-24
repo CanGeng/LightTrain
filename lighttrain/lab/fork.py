@@ -139,7 +139,7 @@ def _record_lineage_edge(
     if not sqlite_path.exists():
         return False
     try:
-        from ..lineage.store import LineageStore
+        from ..observability.lineage.store import LineageStore
 
         with LineageStore(sqlite_path) as store:
             # Register the parent checkpoint node (upsert so we don't duplicate)

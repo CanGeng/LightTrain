@@ -7,7 +7,7 @@ All mixing happens on iterators of in-memory rows. Strategies and
 from __future__ import annotations
 
 from lighttrain.data.mixing._mixed import mix_rows
-from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.data.prepgraph.node import NodeResult, PrepNode, RunContext
 from lighttrain.registry import register
 
 

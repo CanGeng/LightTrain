@@ -16,8 +16,8 @@ from omegaconf import OmegaConf
 
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
 from lighttrain.config._loader import _leaf_exists
-from lighttrain.diagnostics import frozen_step as fs_mod
-from lighttrain.diagnostics.frozen_step import FrozenStepWriter
+from lighttrain.observability.diagnostics import frozen_step as fs_mod
+from lighttrain.observability.diagnostics.frozen_step import FrozenStepWriter
 
 
 class _Ctx:
@@ -50,7 +50,7 @@ def test_frozen_step_commit_failure_logs_warning(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(fs_mod, "_save_model", _boom)
 
     with caplog.at_level(
-        logging.WARNING, logger="lighttrain.diagnostics.frozen_step"
+        logging.WARNING, logger="lighttrain.observability.diagnostics.frozen_step"
     ):
         result = writer.commit(reason="scheduled")
 

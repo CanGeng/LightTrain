@@ -9,7 +9,7 @@ import torch
 
 from lighttrain.builtin_plugins.callbacks.invariants import InvariantsCallback
 from lighttrain.callbacks.base import Signal
-from lighttrain.invariants import InvariantError
+from lighttrain.callbacks.invariants import InvariantError
 
 
 def test_invariant_abort_raises():

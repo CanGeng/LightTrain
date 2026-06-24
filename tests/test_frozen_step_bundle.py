@@ -5,11 +5,11 @@ from __future__ import annotations
 import torch
 
 from lighttrain.builtin_plugins.models.adapters.tiny_lm import TinyCausalLM
-from lighttrain.diagnostics.frozen_step import (
+from lighttrain.engine._context import StepContext
+from lighttrain.observability.diagnostics.frozen_step import (
     FrozenStepWriter,
     read_frozen_step_bundle,
 )
-from lighttrain.engine._context import StepContext
 
 
 def test_writer_commit_creates_zip(tmp_path):

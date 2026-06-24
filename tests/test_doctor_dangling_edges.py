@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from lighttrain.checkpoint.manager import CheckpointManager
 from lighttrain.cli._app import app
-from lighttrain.lineage.store import LineageStore
+from lighttrain.engine.checkpoint.manager import CheckpointManager
+from lighttrain.observability.lineage.store import LineageStore
 
 
 def test_fk_cascade_actually_fires_on_delete_node(tmp_path):

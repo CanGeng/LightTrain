@@ -18,7 +18,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
 
 from lighttrain.config._resolver import resolve as _resolve
-from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.data.prepgraph.node import NodeResult, PrepNode, RunContext
 from lighttrain.registry import register
 
 

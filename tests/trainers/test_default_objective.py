@@ -11,9 +11,9 @@ errors loudly instead of falling back to ``None`` — is covered by
 
 from __future__ import annotations
 
-from lighttrain.architectures.profile import LossOnlyObjective
 from lighttrain.builtin_plugins.losses.core import CrossEntropyLoss
 from lighttrain.builtin_plugins.trainers.pretrain import PretrainTrainer
+from lighttrain.optim.architectures.profile import LossOnlyObjective
 from lighttrain.trainers.base import Trainer
 
 

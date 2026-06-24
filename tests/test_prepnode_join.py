@@ -13,7 +13,7 @@ from lighttrain.builtin_plugins.prepgraph import (
     nodes,  # noqa: F401 — register prep_node entries
 )
 from lighttrain.builtin_plugins.prepgraph.nodes.join import JoinNode
-from lighttrain.prepgraph.node import NodeResult, RunContext
+from lighttrain.data.prepgraph.node import NodeResult, RunContext
 
 
 def _build_artifact_store(root: Path, sample_ids: list[str]) -> Path:

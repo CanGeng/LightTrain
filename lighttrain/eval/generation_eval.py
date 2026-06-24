@@ -44,7 +44,7 @@ class GenerationEvalTask:
     extras_per_prompt :
         Optional list of extra dicts (one per prompt), forwarded to the judge.
     lineage_store :
-        Optional :class:`~lighttrain.lineage.LineageStore`; if provided, writes
+        Optional :class:`~lighttrain.observability.lineage.LineageStore`; if provided, writes
         an ``evaluated_by`` edge for the artifact/checkpoint being evaluated.
     artifact_id :
         ID of the artifact/checkpoint being evaluated (for lineage).
@@ -141,7 +141,7 @@ class GenerationEvalTask:
         ``artifact_id`` may be:
         - An ``int`` node ID (direct use).
         - A ``"kind:name:version"`` ref string (resolved via
-          :meth:`~lighttrain.lineage.store.LineageStore.resolve_ref`).
+          :meth:`~lighttrain.observability.lineage.store.LineageStore.resolve_ref`).
         - A plain artifact name (resolved as ``artifact:<name>:latest``).
 
         The evaluation result node is upserted as a ``"run"`` node keyed by

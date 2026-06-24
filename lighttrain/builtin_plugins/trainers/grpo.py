@@ -38,7 +38,7 @@ def _effective_beta_kl(objective: Any) -> float:
     knob (e.g. a custom non-GRPO loss) so we never build a reference policy the
     effective loss can't consume.
     """
-    from lighttrain.architectures.profile import LossOnlyObjective
+    from lighttrain.optim.architectures.profile import LossOnlyObjective
 
     loss_fn = objective.loss_fn if isinstance(objective, LossOnlyObjective) else objective
     return float(getattr(loss_fn, "beta_kl", 0.0))
@@ -68,7 +68,7 @@ class GRPOTrainer(Trainer):
 
     def default_objective(self) -> Any:
         """When the recipe omits loss/objective, use the GRPO surrogate."""
-        from lighttrain.architectures.profile import LossOnlyObjective
+        from lighttrain.optim.architectures.profile import LossOnlyObjective
 
         return LossOnlyObjective(self._default_loss, loss_family="rl")
 

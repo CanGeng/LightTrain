@@ -59,7 +59,7 @@ def test_regression_gate_passes_ok():
 
 
 def test_regression_gate_abort_raises():
-    from lighttrain.invariants import InvariantError
+    from lighttrain.callbacks.invariants import InvariantError
     gate = RegressionGate(metric_name="mean_score", threshold=0.5, op=">", action="abort")
     report = EvalReport(task_name="t", metrics={"mean_score": 0.3})
     with pytest.raises((InvariantError, RuntimeError)):

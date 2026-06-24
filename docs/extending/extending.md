@@ -86,7 +86,7 @@ forward them to `Trainer.__init__`** (see
 ## Custom PrepGraph node
 
 ```python
-from lighttrain.prepgraph.node import PrepNode, NodeResult, RunContext
+from lighttrain.data.prepgraph.node import PrepNode, NodeResult, RunContext
 from lighttrain.registry import register
 
 @register("prep_node", "my_kind")

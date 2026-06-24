@@ -115,7 +115,7 @@ def doctor_cmd(run: Path = typer.Option(..., "--run")) -> None:
     problems = 0
     ckpt_dir = run / "checkpoints"
     if ckpt_dir.exists():
-        from lighttrain.checkpoint.manager import CheckpointManager
+        from lighttrain.engine.checkpoint.manager import CheckpointManager
 
         mgr = CheckpointManager(run)
         steps = mgr.list_steps()
@@ -131,8 +131,8 @@ def doctor_cmd(run: Path = typer.Option(..., "--run")) -> None:
 
     lineage_path = run / "lineage.sqlite"
     if lineage_path.exists():
-        from lighttrain.lineage.store import LineageStore
-        from lighttrain.prepgraph._fp import SCHEMA_VERSION
+        from lighttrain.data.prepgraph._fp import SCHEMA_VERSION
+        from lighttrain.observability.lineage.store import LineageStore
 
         ls = LineageStore(lineage_path)
         try:

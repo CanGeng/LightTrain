@@ -11,8 +11,8 @@ import warnings
 
 import pytest
 
-from lighttrain.lineage.dag import apply_cycle_policy, cycle_check
-from lighttrain.lineage.store import LineageStore
+from lighttrain.observability.lineage.dag import apply_cycle_policy, cycle_check
+from lighttrain.observability.lineage.store import LineageStore
 
 
 def _seed_cycle(store: LineageStore, run_id: str) -> int:

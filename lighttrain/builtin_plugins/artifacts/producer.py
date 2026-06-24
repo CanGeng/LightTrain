@@ -20,7 +20,7 @@ from typing import Any, Protocol
 
 import torch
 
-from lighttrain.artifacts import ArtifactStoreProtocol
+from lighttrain.data.artifacts import ArtifactStoreProtocol
 from lighttrain.data.core._schema import derive_sample_id
 from lighttrain.models.extras import (
     ExtraOutputSpec,

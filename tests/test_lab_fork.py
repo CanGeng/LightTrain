@@ -119,7 +119,7 @@ def test_fork_writes_config_yaml(tmp_path: Path):
 
 
 def test_fork_records_lineage_edge_when_store_exists(tmp_path: Path):
-    from lighttrain.lineage.store import LineageStore
+    from lighttrain.observability.lineage.store import LineageStore
 
     parent = tmp_path / "parent_run"
     parent.mkdir()
@@ -156,7 +156,7 @@ def test_fork_lineage_soft_failure_no_sqlite(tmp_path: Path):
 
 
 def test_three_generation_fork_chain(tmp_path: Path):
-    from lighttrain.lineage.store import LineageStore
+    from lighttrain.observability.lineage.store import LineageStore
 
     # Gen 1 — initial run
     gen1 = tmp_path / "gen1"

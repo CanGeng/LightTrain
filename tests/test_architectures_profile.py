@@ -2,8 +2,8 @@
 import pytest
 import torch.nn as nn
 
-from lighttrain.architectures import ArchitectureProfile
 from lighttrain.builtin_plugins.architectures.transformer import transformer_profile
+from lighttrain.optim.architectures import ArchitectureProfile
 
 
 def _make_tiny_transformer():

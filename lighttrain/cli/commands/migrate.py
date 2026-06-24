@@ -25,12 +25,15 @@ def migrate_config_cmd(
         "default", "--profile-name", help="Name for the migrated profile."
     ),
 ) -> None:
-    from lighttrain.lineage.migration import SchemaMigrationError, migrate_file
+    from lighttrain.observability.lineage.migration import (
+        SchemaMigrationError,
+        migrate_file,
+    )
 
     # --to-profiles is a structural (comment-preserving) text rewrite, not a
     # schema_version hop, so it takes its own path through migration.py.
     if to_profiles:
-        from lighttrain.lineage.migration import (
+        from lighttrain.observability.lineage.migration import (
             migrate_model_to_profiles_text,
             rewrite_model_to_profiles_file,
         )
@@ -74,7 +77,10 @@ def migrate_artifact_header_cmd(
     path: Path = typer.Argument(...),
     in_place: bool = typer.Option(True, "--in-place"),
 ) -> None:
-    from lighttrain.lineage.migration import SchemaMigrationError, migrate_file
+    from lighttrain.observability.lineage.migration import (
+        SchemaMigrationError,
+        migrate_file,
+    )
 
     try:
         migrated = migrate_file(path, schema_kind="artifact_header", in_place=in_place)
@@ -93,7 +99,10 @@ def migrate_checkpoint_cmd(
     path: Path = typer.Argument(..., help="step_<n>/ directory or manifest.json"),
     in_place: bool = typer.Option(True, "--in-place"),
 ) -> None:
-    from lighttrain.lineage.migration import SchemaMigrationError, migrate_file
+    from lighttrain.observability.lineage.migration import (
+        SchemaMigrationError,
+        migrate_file,
+    )
 
     manifest = path if path.is_file() else path / "manifest.json"
     if not manifest.exists():

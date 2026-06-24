@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lighttrain.diagnostics.index_page import write_index_page
+from lighttrain.observability.diagnostics.index_page import write_index_page
 
 
 def test_empty_run_still_writes(tmp_path):

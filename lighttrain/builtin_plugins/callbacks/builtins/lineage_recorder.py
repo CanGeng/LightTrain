@@ -14,8 +14,8 @@ import time
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from lighttrain.lineage.dag import apply_cycle_policy, cycle_check
-from lighttrain.lineage.store import LineageStore
+from lighttrain.observability.lineage.dag import apply_cycle_policy, cycle_check
+from lighttrain.observability.lineage.store import LineageStore
 from lighttrain.registry import register
 
 _log = logging.getLogger(__name__)

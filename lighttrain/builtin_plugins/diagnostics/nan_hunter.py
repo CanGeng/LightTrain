@@ -23,7 +23,7 @@ from typing import Any
 
 import torch
 
-from lighttrain.diagnostics.nan_repro import write_nan_repro
+from lighttrain.observability.diagnostics.nan_repro import write_nan_repro
 from lighttrain.registry import register
 
 _log = logging.getLogger(__name__)

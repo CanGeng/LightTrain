@@ -16,7 +16,7 @@ lighttrain defines five clean seams; everything else stays straightforward.
    (`model_profiles:` + `model: <name>`). See [Configuration](../guide/configuration.md).
 
 3. **Engine + UpdateRule** ([engine/](../../lighttrain/engine),
-   [update_rules/](../../lighttrain/update_rules)) — the engine owns the
+   [update_rules/](../../lighttrain/engine/update_rules)) — the engine owns the
    accelerator (mixed precision, device) and delegates per-step math
    (forward / backward / clip / step / scheduler) to a swappable `UpdateRule`,
    so research code can change the training math without touching the engine.
@@ -33,7 +33,7 @@ lighttrain defines five clean seams; everything else stays straightforward.
    results aggregate to a `Signal` (`STOP_TRAINING > RETRY_STEP > SKIP_STEP >
    CONTINUE`). See [Diagnostics](../operations/diagnostics.md).
 
-5. **PrepGraph** ([prepgraph/](../../lighttrain/prepgraph)) — content-addressed
+5. **PrepGraph** ([prepgraph/](../../lighttrain/data/prepgraph)) — content-addressed
    DAG of data-prep nodes; fingerprint =
    `sha256(config + code_version + schema_version + sorted upstream_fps)`;
    results land atomically with `MANIFEST_COMPLETE.json` written last. See

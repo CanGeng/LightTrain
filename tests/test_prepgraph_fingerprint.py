@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lighttrain.prepgraph._fp import (
+from lighttrain.data.prepgraph._fp import (
     SCHEMA_VERSION,
     canonical_config,
     code_version_for,

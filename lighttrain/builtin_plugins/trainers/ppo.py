@@ -73,7 +73,7 @@ class PPOTrainer(Trainer):
 
     def default_objective(self) -> Any:
         """When the recipe omits loss/objective, use the PPO surrogate."""
-        from lighttrain.architectures.profile import LossOnlyObjective
+        from lighttrain.optim.architectures.profile import LossOnlyObjective
 
         return LossOnlyObjective(self._default_loss, loss_family="rl")
 

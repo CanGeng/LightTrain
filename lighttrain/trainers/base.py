@@ -33,8 +33,8 @@ import torch
 from ..callbacks.base import EventBus
 from ..distributed._context import ParallelContext
 from ..engine._context import StepContext
+from ..engine.update_rules._primitives import MicroState, apply_update
 from ..protocols import LossContext, ModelOutput, StepOutput
-from ..update_rules._primitives import MicroState, apply_update
 from ..utils.seed import restore_rng_state, rng_state
 from ._primitives import run_train_loop
 from ._utils import _device_of, _move_batch
@@ -535,7 +535,7 @@ class Trainer:
         if rd is None:
             return
         try:
-            from ..diagnostics.crash_bundle import write_crash_bundle
+            from ..observability.diagnostics.crash_bundle import write_crash_bundle
 
             tokenizer = None
             if self.data_module is not None:
@@ -554,7 +554,10 @@ class Trainer:
             _log.warning("Suppressed exception in write_crash_bundle", exc_info=True)
         # OOM-specific report — non-fatal.
         try:
-            from ..diagnostics.oom_report import is_oom_exception, write_oom_report
+            from ..observability.diagnostics.oom_report import (
+                is_oom_exception,
+                write_oom_report,
+            )
 
             if is_oom_exception(exc):
                 write_oom_report(rd, exception=exc)

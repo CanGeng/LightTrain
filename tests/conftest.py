@@ -55,7 +55,7 @@ def lineage_store_factory(tmp_path: Path):
 
     Use ``store = lineage_store_factory()`` to get a clean SQLite-backed store.
     """
-    from lighttrain.lineage import LineageStore
+    from lighttrain.observability.lineage import LineageStore
 
     stores: list[LineageStore] = []
 

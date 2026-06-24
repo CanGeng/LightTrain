@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.data.prepgraph.node import NodeResult, PrepNode, RunContext
 from lighttrain.registry import register
 
 

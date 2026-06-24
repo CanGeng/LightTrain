@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from lighttrain.checkpoint.manager import CheckpointManager
+from lighttrain.engine.checkpoint.manager import CheckpointManager
 
 
 def test_save_round_trips_data_module_and_full_rng(tmp_path):

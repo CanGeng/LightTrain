@@ -23,7 +23,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lighttrain.architectures.profile import ArchitectureProfile
+from lighttrain.optim.architectures.profile import ArchitectureProfile
 from lighttrain.protocols import ModelOutput
 from lighttrain.registry import register
 

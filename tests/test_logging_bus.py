@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lighttrain.builtin_plugins.logging_backends.console import ConsoleLogger
 from lighttrain.builtin_plugins.logging_backends.jsonl import JSONLLogger
-from lighttrain.logging._bus import LoggerBus
+from lighttrain.callbacks.logging._bus import LoggerBus
 
 
 class _Recorder:

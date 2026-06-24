@@ -40,10 +40,10 @@ from typing import Any
 
 import torch
 
-from lighttrain.artifacts import ArtifactHeader
 from lighttrain.builtin_plugins.artifacts.store import open_artifact_store
+from lighttrain.data.artifacts import ArtifactHeader
 from lighttrain.data.core._schema import derive_sample_id
-from lighttrain.prepgraph.node import NodeResult, PrepNode, RunContext
+from lighttrain.data.prepgraph.node import NodeResult, PrepNode, RunContext
 from lighttrain.registry import register
 
 _log = logging.getLogger(__name__)

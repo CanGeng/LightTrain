@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lighttrain.lineage import LineageStore
+from lighttrain.observability.lineage import LineageStore
 
 
 def test_upsert_node_returns_stable_id(tmp_path):

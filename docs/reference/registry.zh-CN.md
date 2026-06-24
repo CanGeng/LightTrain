@@ -336,8 +336,8 @@ def optim_state_bytes(self, model) -> int: ...
 安全读取并投影 `.grad`。
 
 **自定义状态 checkpoint**：optimizer state 经
-`torch.save(..., weights_only=False)`（[checkpoint/manager.py:136](../../lighttrain/checkpoint/manager.py#L136)、
-[:177](../../lighttrain/checkpoint/manager.py#L177)）整体 round-trip。放进 `optimizer.state[p]` 的任意
+`torch.save(..., weights_only=False)`（[checkpoint/manager.py:136](../../lighttrain/engine/checkpoint/manager.py#L136)、
+[:177](../../lighttrain/engine/checkpoint/manager.py#L177)）整体 round-trip。放进 `optimizer.state[p]` 的任意
 对象（如 GaLore 的 `GaLoreProjector`）能存活，前提是 **(a) 可 pickle、(b) 加载时其类可
 import**。若按引用 pickle 自定义类，checkpoint 即**不自包含**（加载进程缺该包会
 `ModuleNotFoundError`）。要可移植，请在 `state_dict()` 里把自定义状态序列化为**纯张量**
@@ -662,7 +662,7 @@ class Trainer:
 
 **公共原语**（可不经 `Trainer` 直接调，re-entrant）：
 - `run_train_loop(trainer, *, target_steps)`（[trainers/_primitives.py](../../lighttrain/trainers/_primitives.py)）—— epoch rollover + 信号 + log/ckpt/eval + crash bundle。
-- `apply_update(*, loss, model, optimizer, ctx, micro_state, ...)`（[update_rules/_primitives.py](../../lighttrain/update_rules/_primitives.py)）—— backward/clip/step/sched 半边。
+- `apply_update(*, loss, model, optimizer, ctx, micro_state, ...)`（[update_rules/_primitives.py](../../lighttrain/engine/update_rules/_primitives.py)）—— backward/clip/step/sched 半边。
 - `forward_with_activations(model, batch, *, layers=None)`（[trainers/_primitives.py](../../lighttrain/trainers/_primitives.py)）—— 层粒度激活捕获。
 
 **写一个新范式**：重写 `produce_batch` / `forward_loss`（多模型经 `self.models[...]`、多优化器经
@@ -833,7 +833,7 @@ def flush(self) -> None: ...
 
 **Protocol**：（非 `ObjectiveProtocol`，见下方说明）
 
-实际上，已注册的 objective 类遵循 **ObjectiveProfile** 接口（在 [lighttrain/architectures/profile.py](../../lighttrain/architectures/profile.py) 中定义）：
+实际上，已注册的 objective 类遵循 **ObjectiveProfile** 接口（在 [lighttrain/optim/architectures/profile.py](../../lighttrain/optim/architectures/profile.py) 中定义）：
 
 ```python
 loss_family: str   # "next_token" / "mlm" / "diffusion" / "flow_matching" / "jepa"
@@ -1012,7 +1012,7 @@ def iter_keys(self) -> Iterable[str]: ...
 
 **Protocol**：`PrepNodeProtocol`（[lighttrain/protocols.py:416](../../lighttrain/protocols.py#L416)）
 
-**基类**：`PrepNode`（[lighttrain/prepgraph/node.py:67](../../lighttrain/prepgraph/node.py#L67)）— **推荐继承**
+**基类**：`PrepNode`（[lighttrain/data/prepgraph/node.py:67](../../lighttrain/data/prepgraph/node.py#L67)）— **推荐继承**
 
 ```python
 class PrepNode:
@@ -1030,7 +1030,7 @@ class PrepNode:
     def estimate(self, ctx: RunContext) -> NodeEstimate: ...
 ```
 
-**`RunContext` / `NodeResult`** 定义在 [lighttrain/prepgraph/node.py](../../lighttrain/prepgraph/node.py)。
+**`RunContext` / `NodeResult`** 定义在 [lighttrain/data/prepgraph/node.py](../../lighttrain/data/prepgraph/node.py)。
 
 **内置注册项**
 

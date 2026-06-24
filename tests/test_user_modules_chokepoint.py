@@ -19,7 +19,7 @@ from lighttrain.registry import contains, unregister
 _CUSTOM_NODE_SRC = textwrap.dedent(
     """
     from lighttrain.registry import register
-    from lighttrain.prepgraph.node import NodeResult, PrepNode
+    from lighttrain.data.prepgraph.node import NodeResult, PrepNode
 
     @register("prep_node", "_chokepoint_pack")
     class ChokepointPackNode(PrepNode):

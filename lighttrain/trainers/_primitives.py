@@ -166,7 +166,7 @@ def run_train_loop(trainer: Any, *, target_steps: int) -> dict[str, Any]:
         # Always emit the run failure-entry page. Soft — never let index
         # generation interfere with crash propagation.
         try:
-            from ..diagnostics.index_page import write_index_page
+            from ..observability.diagnostics.index_page import write_index_page
 
             rd = getattr(trainer, "_run_dir", None)
             if rd is not None:

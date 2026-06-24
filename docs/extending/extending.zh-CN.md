@@ -79,7 +79,7 @@ class MyCB:
 ## 自定义 PrepGraph 节点
 
 ```python
-from lighttrain.prepgraph.node import PrepNode, NodeResult, RunContext
+from lighttrain.data.prepgraph.node import PrepNode, NodeResult, RunContext
 from lighttrain.registry import register
 
 @register("prep_node", "my_kind")
