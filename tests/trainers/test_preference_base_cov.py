@@ -420,7 +420,7 @@ def test_invariant_maybe_log_skips_when_all_scalars_filtered():
 def test_invariant_maybe_eval_skips_when_val_every_nonpositive():
     """val_every <= 0 disables eval entirely."""
     trainer = _make_trainer(val_every=0)
-    trainer.eval = MagicMock()  # type: ignore[method-assign]
+    trainer.eval = MagicMock()
     trainer._maybe_eval()
     trainer.eval.assert_not_called()
 
@@ -428,7 +428,7 @@ def test_invariant_maybe_eval_skips_when_val_every_nonpositive():
 def test_invariant_maybe_eval_skips_off_schedule():
     """Off the val_every cadence, eval is not invoked."""
     trainer = _make_trainer(val_every=3)
-    trainer.eval = MagicMock()  # type: ignore[method-assign]
+    trainer.eval = MagicMock()
     trainer.ctx.step = 2  # 2 % 3 != 0
     trainer._maybe_eval()
     trainer.eval.assert_not_called()
@@ -437,7 +437,7 @@ def test_invariant_maybe_eval_skips_off_schedule():
 def test_invariant_maybe_eval_runs_on_schedule():
     """On the val_every cadence, eval is invoked once."""
     trainer = _make_trainer(val_every=2)
-    trainer.eval = MagicMock()  # type: ignore[method-assign]
+    trainer.eval = MagicMock()
     trainer.ctx.step = 4
     trainer._maybe_eval()
     trainer.eval.assert_called_once()

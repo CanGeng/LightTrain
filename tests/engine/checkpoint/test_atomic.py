@@ -258,14 +258,14 @@ def test_regression_CKPT_PRUNE_02_protects_stale_last_pointer(tmp_run_dir) -> No
         pytest.skip("symlink not supported in this environment")
 
     # Sanity: pointer resolves to step_2 BEFORE prune.
-    assert mgr._read_pointer("last").resolve() == target.resolve()
+    assert mgr._read_pointer("last").resolve() == target.resolve()  # type: ignore[union-attr]
     assert (ckpt_dir / "step_1").exists()
 
     mgr._prune()
 
     # Post-fix expectations:
     assert target.exists(), "step_2 (last pointer target) was wrongly pruned"
-    assert mgr._read_pointer("last").resolve() == target.resolve(), (
+    assert mgr._read_pointer("last").resolve() == target.resolve(), (  # type: ignore[union-attr]
         "last pointer became dangling after prune"
     )
     # Prove prune actually ran (not a no-op): step_1 is older and unprotected.
@@ -303,7 +303,7 @@ def test_invariant_prune_protects_best_pointer_target(tmp_run_dir) -> None:
         "step_4 (not protected) should have been pruned"
     )
     # Best pointer still resolves correctly.
-    assert mgr._read_pointer("best").resolve() == (ckpt_dir / "step_3").resolve()
+    assert mgr._read_pointer("best").resolve() == (ckpt_dir / "step_3").resolve()  # type: ignore[union-attr]
 
 
 def test_prune_keep_last_zero_is_noop(tmp_run_dir) -> None:
@@ -391,11 +391,11 @@ def test_last_pointer_resolves_via_json_fallback(tmp_run_dir) -> None:
     last_json = tmp_run_dir / "checkpoints" / "last.json"
     assert last_json.exists()
     info = json.loads(last_json.read_text(encoding="utf-8"))
-    assert info["target"] == target.name
+    assert info["target"] == target.name  # type: ignore[union-attr]
 
     resolved = mgr._read_pointer("last")
     assert resolved is not None
-    assert resolved.resolve() == target.resolve()
+    assert resolved.resolve() == target.resolve()  # type: ignore[union-attr]
 
 
 def test_best_pointer_records_metric_extras(tmp_run_dir) -> None:
@@ -434,14 +434,14 @@ def test_save_load_tied_weights(tmp_run_dir) -> None:
     mgr = CheckpointManager(tmp_run_dir)
     # Must not raise safetensors shared-storage error.
     saved = mgr.save(0, {"model": model.state_dict()})
-    assert (saved / "manifest.json").exists()
+    assert (saved / "manifest.json").exists()  # type: ignore[operator]
 
     # Load into a fresh tied model and verify values + tied-weight semantics.
     fresh = TinyCausalLM(
         vocab_size=64, d_model=32, n_layers=1, n_heads=2,
         max_seq_len=32, tie_weights=True,
     )
-    ckpt = mgr.load(saved)
+    ckpt = mgr.load(saved)  # type: ignore[arg-type]
     fresh.load_state_dict(ckpt["model"])
 
     assert torch.equal(fresh.lm_head.weight, model.tok_emb.weight), (
@@ -478,12 +478,12 @@ def test_save_round_trips_data_module_and_full_rng(tmp_run_dir) -> None:
 
     target = mgr.save(5, state, kind="step")
 
-    assert (target / "data_module.pt").exists()
-    manifest = json.loads((target / "manifest.json").read_text(encoding="utf-8"))
+    assert (target / "data_module.pt").exists()  # type: ignore[operator]
+    manifest = json.loads((target / "manifest.json").read_text(encoding="utf-8"))  # type: ignore[operator]
     assert manifest["files"]["data_module"] == "data_module.pt"
     assert manifest["files"]["rng"] == "rng.pt"
 
-    loaded = mgr.load(target)
+    loaded = mgr.load(target)  # type: ignore[arg-type]
     assert "data_module" in loaded
     assert loaded["data_module"]["sampler"]["consumed"] == 8
     rng = loaded["rng"]

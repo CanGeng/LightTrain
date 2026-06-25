@@ -273,9 +273,10 @@ def test_render_png_raises_when_matplotlib_missing(tmp_path: Path, monkeypatch):
 def test_render_png_returns_early_when_all_metrics_none(tmp_path: Path):
     """If every metric column is all-``None`` the metric list is empty and the
     function returns without writing a file (lines 352-358)."""
+    pytest.importorskip("matplotlib")
     out = tmp_path / "sub" / "out.png"
     report = _report({"loss": [None, None], "acc": [None, None]})
-    assert render_png(report, out) is None
+    assert render_png(report, out) is None  # type: ignore[func-returns-value]
     assert not out.exists()
     # parent dir was NOT created on the early return
     assert not out.parent.exists()
@@ -283,9 +284,10 @@ def test_render_png_returns_early_when_all_metrics_none(tmp_path: Path):
 
 def test_render_png_returns_early_when_metrics_table_empty(tmp_path: Path):
     """An empty metrics table also yields the no-op early return."""
+    pytest.importorskip("matplotlib")
     out = tmp_path / "out.png"
     report = _report({})
-    assert render_png(report, out) is None
+    assert render_png(report, out) is None  # type: ignore[func-returns-value]
     assert not out.exists()
 
 
@@ -293,9 +295,10 @@ def test_render_png_writes_file_and_creates_parent_dir(tmp_path: Path):
     """Happy path: with at least one non-``None`` metric, a PNG is written and
     missing parent directories are created (lines 360-375). ``None`` cells are
     plotted as ``0.0``."""
+    pytest.importorskip("matplotlib")
     out = tmp_path / "nested" / "deeper" / "compare.png"
     report = _report({"loss": [0.5, None], "acc": [0.9, 0.8]})
-    result = render_png(report, out)
+    result = render_png(report, out)  # type: ignore[func-returns-value]
     assert result is None
     assert out.exists()
     assert out.stat().st_size > 0
@@ -306,15 +309,17 @@ def test_render_png_writes_file_and_creates_parent_dir(tmp_path: Path):
 def test_render_png_accepts_string_path(tmp_path: Path):
     """``render_png`` wraps ``out_path`` in ``Path`` (line 372), so a plain
     string path is accepted."""
+    pytest.importorskip("matplotlib")
     out = tmp_path / "as_string.png"
     report = _report({"loss": [1.0, 2.0]})
-    render_png(report, str(out))
+    render_png(report, str(out))  # type: ignore[arg-type]
     assert out.exists()
 
 
 def test_render_png_single_run_single_metric(tmp_path: Path):
     """One run, one metric still produces a valid figure (squeeze=False guards
     the single-subplot axes indexing)."""
+    pytest.importorskip("matplotlib")
     out = tmp_path / "single.png"
     report = _report({"loss": [0.42]}, n_runs=1)
     render_png(report, out)

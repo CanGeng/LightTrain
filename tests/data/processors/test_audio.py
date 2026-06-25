@@ -98,7 +98,7 @@ def _fake_transformers_module(out: dict) -> tuple[types.ModuleType, list]:
             calls.append((name, kw))
             return _FakeExtractor(out)
 
-    mod.AutoFeatureExtractor = AutoFeatureExtractor
+    mod.AutoFeatureExtractor = AutoFeatureExtractor  # type: ignore[attr-defined]
     return mod, calls
 
 

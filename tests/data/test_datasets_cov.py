@@ -175,7 +175,7 @@ def test_invariant_line_file_getitem_int_coercion(tmp_path: Path) -> None:
     p.write_text("hello\nworld\n", encoding="utf-8")
     ds = LineFileTextDataset(p, tokenizer=_FixedTokenizer(3), max_len=8)
     # Pass a float – should coerce silently via int(idx)
-    assert ds[0.0] is ds[0]  # type: ignore[arg-type]
+    assert ds[0.0] is ds[0]  # type: ignore[index]
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ def test_invariant_pref_jsonl_getitem_int_coercion(tmp_path: Path) -> None:
     f = tmp_path / "pref.jsonl"
     f.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
     ds = PreferenceJsonlDataset(f)
-    assert ds[0.0] is ds[0]  # type: ignore[arg-type]
+    assert ds[0.0] is ds[0]  # type: ignore[index]
 
 
 def test_invariant_pref_jsonl_truncation_all_four_fields(tmp_path: Path) -> None:

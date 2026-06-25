@@ -107,22 +107,22 @@ def _make_grpo(
 
 def _stub_rollout(trainer: GRPOTrainer, rewards: torch.Tensor) -> None:
     """Replace rollout engine + buffer with mocks so fit() never calls generate."""
-    trainer._rollout_engine.rollout = MagicMock(return_value=[])
-    trainer._buffer.clear = MagicMock()
-    trainer._buffer.add = MagicMock()
-    trainer._buffer.all_rewards = MagicMock(return_value=rewards)
-    trainer._buffer.batches = MagicMock(return_value=iter([]))
+    trainer._rollout_engine.rollout = MagicMock(return_value=[])  # type: ignore[method-assign]
+    trainer._buffer.clear = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.all_rewards = MagicMock(return_value=rewards)  # type: ignore[method-assign]
+    trainer._buffer.batches = MagicMock(return_value=iter([]))  # type: ignore[method-assign]
 
 
 def _stub_rollout_with_batch(
     trainer: GRPOTrainer, rewards: torch.Tensor, batch: dict
 ) -> None:
     """Like _stub_rollout but feeds one real mini-batch into the inner loop."""
-    trainer._rollout_engine.rollout = MagicMock(return_value=[])
-    trainer._buffer.clear = MagicMock()
-    trainer._buffer.add = MagicMock()
-    trainer._buffer.all_rewards = MagicMock(return_value=rewards)
-    trainer._buffer.batches = MagicMock(return_value=iter([batch]))
+    trainer._rollout_engine.rollout = MagicMock(return_value=[])  # type: ignore[method-assign]
+    trainer._buffer.clear = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.all_rewards = MagicMock(return_value=rewards)  # type: ignore[method-assign]
+    trainer._buffer.batches = MagicMock(return_value=iter([batch]))  # type: ignore[method-assign]
 
 
 def _grpo_batch(V: int = 16, T: int = 4, B: int = 4) -> dict:

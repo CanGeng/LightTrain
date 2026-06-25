@@ -167,7 +167,9 @@ def _resolve_base(base: Any, tokenizer: Any = None) -> Any:
 
 
 def _default_namespace(name: str) -> str:
-    return name.split("_")[0] or "aux"
+    # ``"_v1".split("_")[0]`` is "" — fall back to the full name (not a hardcoded
+    # "aux") so leading-underscore store names keep a meaningful namespace.
+    return name.split("_")[0] or name
 
 
 def _parse_shape(shape_str: str) -> tuple[int, ...]:

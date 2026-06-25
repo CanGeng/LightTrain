@@ -164,10 +164,10 @@ def test_invariant_explicit_collator_passed_through():
 def test_invariant_scalar_kwargs_coerced():
     """Numeric and bool kwargs are coerced to the declared types (lines 36-39)."""
     dm = _make_dm(
-        batch_size="3",  # type: ignore[arg-type]
-        num_workers="0",  # type: ignore[arg-type]
-        pin_memory=1,  # type: ignore[arg-type]
-        drop_last=0,  # type: ignore[arg-type]
+        batch_size="3",
+        num_workers="0",
+        pin_memory=1,
+        drop_last=0,
     )
     assert dm.batch_size == 3 and isinstance(dm.batch_size, int)
     assert dm.num_workers == 0 and isinstance(dm.num_workers, int)
@@ -319,7 +319,7 @@ def test_invariant_seek_coerces_args_to_int():
     dm = _make_dm(sampler=sampler, batch_size=2)
     dm._train_sampler = sampler
 
-    dm.seek(epoch="1", consumed_batches="3")  # type: ignore[arg-type]
+    dm.seek(epoch="1", consumed_batches="3")
     assert sampler.seek_calls == [(1, 6)]
 
 

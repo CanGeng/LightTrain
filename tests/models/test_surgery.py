@@ -182,7 +182,7 @@ def test_add_named_module_param_followed_by_state_dict_and_to_device():
 def test_add_named_module_rejects_non_module_intermediate():
     model = _make_tiny()
     # Inject a non-Module attr in the way and verify we refuse to overwrite.
-    model.bad = 42  # type: ignore[assignment]
+    model.bad = 42
     with pytest.raises(TypeError):
         add_named_module(model, "bad.child", nn.Linear(2, 2))
 

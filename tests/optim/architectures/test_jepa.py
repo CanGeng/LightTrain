@@ -37,7 +37,7 @@ def _tiny_cfg(**overrides) -> JEPAModelConfig:
         depth=2, mlp_ratio=2.0, dropout=0.0, predictor_depth=2,
     )
     base.update(overrides)
-    return JEPAModelConfig(**base)
+    return JEPAModelConfig(**base)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

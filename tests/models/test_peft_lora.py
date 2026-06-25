@@ -45,7 +45,7 @@ def _make_lora(r: int = 4, lora_alpha: int = 8, **overrides):
     torch.manual_seed(0)
     kwargs = dict(base=_BASE_SPEC, r=r, lora_alpha=lora_alpha, lora_dropout=0.0)
     kwargs.update(overrides)
-    return LoRAAdapter(**kwargs)
+    return LoRAAdapter(**kwargs)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

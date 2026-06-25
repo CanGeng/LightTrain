@@ -838,9 +838,9 @@ class _FakeDataModule:
         if tokenizer_raises:
             self.tokenizer = _RaisingTokenizer()
         elif with_tokenizer:
-            self.tokenizer = _HelloTokenizer()
+            self.tokenizer = _HelloTokenizer()  # type: ignore[assignment]
         else:
-            self.tokenizer = None
+            self.tokenizer = None  # type: ignore[assignment]
 
     @staticmethod
     def _build_dataset(n: int):

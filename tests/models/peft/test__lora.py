@@ -271,7 +271,7 @@ def test_invariant_enable_input_require_grads_noop_when_missing():
     model = _make_lora()
     without = _InnerWithout()
     assert not hasattr(without, "enable_input_require_grads")
-    model.inner = without  # type: ignore[assignment]
+    model.inner = without
     # Must not raise.
     model.enable_input_require_grads()
 
@@ -300,7 +300,7 @@ def test_invariant_gradient_checkpointing_enable_noop_when_missing():
             return None
 
     model = _make_lora()
-    model.inner = _NoCkpt()  # type: ignore[assignment]
+    model.inner = _NoCkpt()
     assert not hasattr(model.inner, "gradient_checkpointing_enable")
     model.gradient_checkpointing_enable()  # must not raise
 
@@ -331,7 +331,7 @@ def test_invariant_gradient_checkpointing_disable_noop_when_missing():
             return None
 
     model = _make_lora()
-    model.inner = _NoCkpt()  # type: ignore[assignment]
+    model.inner = _NoCkpt()
     assert not hasattr(model.inner, "gradient_checkpointing_disable")
     model.gradient_checkpointing_disable()  # must not raise
 

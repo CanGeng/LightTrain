@@ -234,7 +234,7 @@ def test_regression_PREP_POOL_01_uses_as_completed_in_thread_dispatch(
         "as_completed. The futures dict must be handed to as_completed."
     )
     # Sanity-check: the dict handed in is non-empty (proves pool path was taken).
-    assert all(len(c) >= 1 for c in calls)
+    assert all(len(c) >= 1 for c in calls)  # type: ignore[arg-type]
 
 
 def test_regression_PREP_POOL_01_uses_as_completed_in_process_dispatch(

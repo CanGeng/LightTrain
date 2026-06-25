@@ -160,13 +160,13 @@ def _make_ppo(
 
 def _stub_rollout(trainer: PPOTrainer, rewards: torch.Tensor) -> None:
     """Skip the actual rollout/generate machinery."""
-    trainer._rollout_engine.rollout = MagicMock(return_value=[])
-    trainer._buffer.clear = MagicMock()
-    trainer._buffer.add = MagicMock()
-    trainer._buffer.all_rewards = MagicMock(return_value=rewards)
-    trainer._buffer.all_values = MagicMock(return_value=None)
-    trainer._buffer.batches = MagicMock(return_value=iter([]))
-    trainer._compute_buffer_values = lambda: None
+    trainer._rollout_engine.rollout = MagicMock(return_value=[])  # type: ignore[method-assign]
+    trainer._buffer.clear = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.all_rewards = MagicMock(return_value=rewards)  # type: ignore[method-assign]
+    trainer._buffer.all_values = MagicMock(return_value=None)  # type: ignore[method-assign]
+    trainer._buffer.batches = MagicMock(return_value=iter([]))  # type: ignore[method-assign]
+    trainer._compute_buffer_values = lambda: None  # type: ignore[method-assign]
 
 
 def _ppo_batch(V: int = 16, T: int = 4, B: int = 2) -> dict:

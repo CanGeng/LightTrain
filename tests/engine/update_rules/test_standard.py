@@ -45,7 +45,7 @@ class _OrderedRecorder:
         self.events: list[str] = []
         self._signal_for = signal_for or {}
 
-    def _handler(name: str):
+    def _handler(name: str):  # type: ignore[misc]
         def _h(self, **_kw):
             self.events.append(name)
             return self._signal_for.get(name)
@@ -741,7 +741,7 @@ def test_accumulation_boundary_optimizer_fires_only_on_last_micro_step(accum_K: 
     """
     ctx, model, optim = _build_ctx()
     step_spy = MagicMock(wraps=optim.step)
-    optim.step = step_spy
+    optim.step = step_spy  # type: ignore[method-assign]
 
     rule = StandardUpdateRule(accumulate_grad_batches=accum_K)
 

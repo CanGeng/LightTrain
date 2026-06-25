@@ -208,14 +208,14 @@ def test_maybe_log_filters_to_finite_scalars():
 
 def test_maybe_eval_skips_when_val_every_nonpositive():
     trainer = Trainer(**_kwargs(model=_DictModel(), val_every=0))
-    trainer.eval = MagicMock()  # type: ignore[method-assign]
+    trainer.eval = MagicMock()
     trainer._maybe_eval()
     trainer.eval.assert_not_called()
 
 
 def test_maybe_eval_runs_on_schedule():
     trainer = Trainer(**_kwargs(model=_DictModel(), val_every=2))
-    trainer.eval = MagicMock()  # type: ignore[method-assign]
+    trainer.eval = MagicMock()
     trainer.ctx.step = 4
     trainer._maybe_eval()
     trainer.eval.assert_called_once()
@@ -406,7 +406,7 @@ def test_maybe_log_skips_off_schedule():
 
 def test_maybe_eval_skips_off_schedule():
     trainer = Trainer(**_kwargs(model=_DictModel(), val_every=3))
-    trainer.eval = MagicMock()  # type: ignore[method-assign]
+    trainer.eval = MagicMock()
     trainer.ctx.step = 2  # 2 % 3 != 0
     trainer._maybe_eval()
     trainer.eval.assert_not_called()

@@ -250,8 +250,10 @@ def test_invariant_reallocate_returns_early_under_peft():
     """Under the PEFT path, ``maybe_reallocate_rank`` increments the step then
     returns immediately (line 206-207 guard).
 
-    No import forcing here, so the repo's installed PEFT drives ``_use_peft=True``.
+    Requires PEFT installed (skipped otherwise); the installed PEFT then drives
+    ``_use_peft=True``.
     """
+    pytest.importorskip("peft")
     adapter = AdaLoRAAdapter(
         base=nn.Sequential(nn.Linear(4, 4)), r=2, target_modules=["0"],
         update_interval=1, total_step=10,
@@ -356,7 +358,7 @@ def test_pin_current_behavior_peft_state_dict_failure_falls_back(monkeypatch, ca
     branch is skipped and the FULL base state dict is returned instead of an
     adapter-only one — pinned as current behaviour.
     """
-    import peft
+    peft = pytest.importorskip("peft")
 
     adapter = AdaLoRAAdapter(
         base=nn.Sequential(nn.Linear(4, 4)), r=2, target_modules=["0"], total_step=10
@@ -380,7 +382,7 @@ def test_pin_current_behavior_peft_load_failure_falls_back(monkeypatch, caplog):
     warning and falls back to ``self.model.load_state_dict(..., strict=False)``
     (line 250-252).
     """
-    import peft
+    peft = pytest.importorskip("peft")
 
     adapter = AdaLoRAAdapter(
         base=nn.Sequential(nn.Linear(4, 4)), r=2, target_modules=["0"], total_step=10

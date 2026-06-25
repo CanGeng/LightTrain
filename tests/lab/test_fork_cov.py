@@ -313,7 +313,7 @@ def test_pin_current_behavior_record_lineage_edge_returns_false_on_exception(tmp
         def __exit__(self, *a):
             pass
 
-    fake_store_mod.LineageStore = _BadStore
+    fake_store_mod.LineageStore = _BadStore  # type: ignore[attr-defined]
     old = sys.modules.get("lighttrain.observability.lineage.store")
     sys.modules["lighttrain.observability.lineage.store"] = fake_store_mod
 
@@ -356,7 +356,7 @@ def test_invariant_fork_accepts_model_dump_config(tmp_path: Path):
     (parent / "env.json").write_text("{}", encoding="utf-8")
 
     cfg = _FakeConfig(run_root=str(tmp_path), exp="model_dump_exp")
-    report = fork(ckpt, cfg)
+    report = fork(ckpt, cfg)  # type: ignore[arg-type]
 
     assert isinstance(report, ForkReport)
     assert report.parent_checkpoint == ckpt.resolve()
@@ -373,7 +373,7 @@ def test_invariant_fork_model_dump_config_writes_config_yaml(tmp_path: Path):
     (parent / "env.json").write_text("{}", encoding="utf-8")
 
     cfg = _FakeConfig(run_root=str(tmp_path), exp="dump_yaml_exp")
-    report = fork(ckpt, cfg)
+    report = fork(ckpt, cfg)  # type: ignore[arg-type]
 
     config_yaml = report.new_run_dir / "config.yaml"
     assert config_yaml.exists()
@@ -403,7 +403,7 @@ def test_invariant_fork_bare_object_config_falls_back_to_empty_dict(tmp_path: Pa
 
     explicit_dir = tmp_path / "bare_run"
     # Use explicit run_dir so we don't need a real 'runs' root to exist
-    report = fork(ckpt, _BareConfig(), run_dir=explicit_dir)
+    report = fork(ckpt, _BareConfig(), run_dir=explicit_dir)  # type: ignore[arg-type]
 
     assert isinstance(report, ForkReport)
     assert report.new_run_dir == explicit_dir

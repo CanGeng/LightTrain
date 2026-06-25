@@ -205,7 +205,7 @@ def test_invariant_fill_zero_populates_zeros_from_field_schema(tmp_path: Path) -
         },
     )
     res = node.run(_make_ctx(upstream_rows, tmp_path))
-    rows = list(res.rows)
+    rows = list(res.rows)  # type: ignore[arg-type]
     # Both rows survive (fill_zero does not drop)
     assert len(rows) == 2, rows
     missing_row = next(r for r in rows if r["id"] == "missing-sample")
@@ -241,7 +241,7 @@ def test_pin_current_behavior_fill_zero_no_field_schema_no_aux_keys(
     )
     ctx = _make_ctx([{"id": "missing-sample"}], tmp_path)
     res = node.run(ctx)
-    rows = list(res.rows)
+    rows = list(res.rows)  # type: ignore[arg-type]
     assert len(rows) == 1
     aux_keys = [k for k in rows[0] if k.startswith("aux.")]
     assert aux_keys == [], f"Expected no aux keys but got {aux_keys}"
@@ -437,7 +437,7 @@ def test_invariant_run_fill_zero_full_pipeline(tmp_path: Path) -> None:
         },
     )
     res = node.run(_make_ctx(upstream_rows, tmp_path))
-    rows = list(res.rows)
+    rows = list(res.rows)  # type: ignore[arg-type]
     assert len(rows) == 3
     hit_row = next(r for r in rows if r["id"] == "hit")
     # Real tensor stored as flat list from tolist()
@@ -468,7 +468,7 @@ def test_invariant_run_result_extras_row_count(tmp_path: Path) -> None:
     )
     upstream_rows = [{"id": "s0"}, {"id": "gone"}]
     res = node.run(_make_ctx(upstream_rows, tmp_path))
-    rows = list(res.rows)
+    rows = list(res.rows)  # type: ignore[arg-type]
     assert res.extras["row_count"] == len(rows) == 1
 
 
@@ -490,6 +490,6 @@ def test_invariant_run_supports_path_alias_for_store_key(tmp_path: Path) -> None
         },
     )
     res = node.run(_make_ctx([{"id": "s0"}], tmp_path))
-    rows = list(res.rows)
+    rows = list(res.rows)  # type: ignore[arg-type]
     assert len(rows) == 1
     assert "aux.ns.v" in rows[0]

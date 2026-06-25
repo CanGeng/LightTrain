@@ -62,7 +62,7 @@ class MLPToy(nn.Module):
 
     def forward(self, **batch: Any) -> ModelOutput:
         h = batch.get("x", batch.get("input_ids"))
-        h = h.float()
+        h = h.float()  # type: ignore[union-attr]
         last = len(self.layers) - 1
         for i, layer in enumerate(self.layers):
             h = layer(h)

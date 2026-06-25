@@ -33,7 +33,7 @@ from lighttrain.eval.suite import EvalReport
 def _gate(**kwargs) -> RegressionGate:
     defaults = dict(metric_name="loss", threshold=1.0, op="<", action="abort")
     defaults.update(kwargs)
-    return RegressionGate(**defaults)
+    return RegressionGate(**defaults)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

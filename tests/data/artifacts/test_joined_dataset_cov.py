@@ -227,7 +227,7 @@ def test_invariant_iter_skips_dropped_samples(tmp_path) -> None:
         base,
         join=[{"store": str(root), "namespace": "ns", "missing": "drop"}],
     )
-    rows = list(ds)
+    rows = list(ds)  # type: ignore[call-overload]
     assert len(rows) == 2
     assert all(r["id"] == "s1" for r in rows)
 
@@ -242,7 +242,7 @@ def test_iter_empty_when_all_dropped(tmp_path) -> None:
         base,
         join=[{"store": str(root), "namespace": "ns", "missing": "drop"}],
     )
-    assert list(ds) == []
+    assert list(ds) == []  # type: ignore[call-overload]
 
 
 # ---------------------------------------------------------------------------
@@ -346,9 +346,10 @@ def test_pin_current_behavior_parse_shape_nested_list_falls_back(
 
 
 def test_invariant_default_namespace_empty_first_segment() -> None:
-    """When the store dir name starts with ``_``, the first ``split('_')``
-    element is ``''``; the function falls back to ``'aux'``."""
-    assert _default_namespace("_v2") == "aux"
+    """When the store dir name starts with ``_`` (e.g. ``_v2``), the first
+    ``split('_')`` element is ``''``; the function falls back to the full name
+    (not a hardcoded ``'aux'``) so the namespace stays meaningful."""
+    assert _default_namespace("_v2") == "_v2"
 
 
 def test_invariant_default_namespace_multi_segment() -> None:
@@ -371,7 +372,7 @@ def test_join_entry_path_alias_accepted(tmp_path) -> None:
         join=[{"path": str(root), "namespace": "ns", "missing": "require"}],
     )
     row = ds[0]
-    assert "aux.ns.v" in row
+    assert "aux.ns.v" in row  # type: ignore[operator]
 
 
 # ---------------------------------------------------------------------------

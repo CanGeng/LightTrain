@@ -181,9 +181,9 @@ def test_invariant_rows_layout_store_readable(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path, upstream={"src": _upstream_result(rows)})
     result = node.run(ctx)
     store = result.store
-    assert len(store) == 4
-    assert store[0]["text"] == "item0"
-    assert store[3]["text"] == "item3"
+    assert len(store) == 4  # type: ignore[arg-type]
+    assert store[0]["text"] == "item0"  # type: ignore[index]
+    assert store[3]["text"] == "item3"  # type: ignore[index]
 
 
 def test_invariant_rows_layout_empty_upstream(tmp_path: Path) -> None:
@@ -192,7 +192,7 @@ def test_invariant_rows_layout_empty_upstream(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path, upstream={"src": _upstream_result([])})
     result = node.run(ctx)
     assert result.extras["row_count"] == 0
-    assert len(result.store) == 0
+    assert len(result.store) == 0  # type: ignore[arg-type]
 
 
 def test_invariant_rows_layout_custom_shard_size(tmp_path: Path) -> None:
@@ -287,7 +287,7 @@ def test_invariant_memmap_layout_dtypes_dict_uses_dtype(tmp_path: Path) -> None:
     node = _make_rows_node(config={"layout": "memmap", "seq_len": 4, "dtype": "int32"})
     ctx = _ctx(tmp_path, upstream={"src": _upstream_result(rows)})
     result = node.run(ctx)
-    store: MemmapDataset = result.store
+    store: MemmapDataset = result.store  # type: ignore[assignment]
     # The header dtypes must all be int32
     for f, dt in store.header.dtypes.items():
         assert dt == "int32", f"field {f} has dtype {dt!r}, expected 'int32'"
@@ -300,7 +300,7 @@ def test_invariant_memmap_layout_data_readable_by_dataset(tmp_path: Path) -> Non
     node = _make_rows_node(config={"layout": "memmap", "seq_len": seq_len})
     ctx = _ctx(tmp_path, upstream={"src": _upstream_result(rows)})
     result = node.run(ctx)
-    store: MemmapDataset = result.store
+    store: MemmapDataset = result.store  # type: ignore[assignment]
     assert len(store) == 3
     # First item's input_ids starts from 0 (matches the synthetic row builder)
     assert store[0]["input_ids"][0] == 0
@@ -399,7 +399,7 @@ def test_invariant_memmap_various_seq_lens(tmp_path: Path, seq_len: int) -> None
     ctx = _ctx(tmp_path, upstream={"src": _upstream_result(rows)})
     result = node.run(ctx)
     assert result.extras["seq_len"] == seq_len
-    assert len(result.store) == 2
+    assert len(result.store) == 2  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(

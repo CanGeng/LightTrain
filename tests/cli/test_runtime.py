@@ -123,7 +123,7 @@ def test_setup_run_from_config_rejects_overrides_with_rootconfig(tmp_path: Path)
     cfg = load_config(cfg_path)
 
     with pytest.raises(ValueError, match="overrides"):
-        setup_run_from_config(cfg, overrides=["++seed=42"])
+        setup_run_from_config(cfg, overrides=["++seed=42"])  # type: ignore[arg-type]
 
 
 def test_setup_run_from_config_rejects_wrong_type(tmp_path: Path):

@@ -183,7 +183,7 @@ def test_invariant_on_train_start_creates_writer_from_ctx_run_dir(tmp_path) -> N
     cb.on_train_start(ctx=ctx)
     assert cb._writer is not None
     # writer is exposed on ctx
-    assert ctx.frozen_step_writer is cb._writer
+    assert ctx.frozen_step_writer is cb._writer  # type: ignore[attr-defined]
 
 
 def test_invariant_on_train_start_falls_back_to_trainer_run_dir(tmp_path) -> None:
@@ -267,7 +267,7 @@ def test_invariant_on_train_start_resolved_yaml_none_becomes_empty(tmp_path) -> 
     """``trainer._resolved_yaml = None`` is coerced to ``''`` (line 81)."""
     cb = FrozenStepCallback()
     ctx = _Ctx(run_dir=tmp_path)
-    trainer = _Trainer(run_dir=tmp_path, yaml=None)
+    trainer = _Trainer(run_dir=tmp_path, yaml=None)  # type: ignore[arg-type]
     cb.on_train_start(ctx=ctx, trainer=trainer)
     assert cb._config_yaml == ""
 
@@ -349,7 +349,7 @@ def test_invariant_on_train_start_no_callbacks_run_node_id_is_none(tmp_path) -> 
 def _cb_with_mock_writer() -> tuple[FrozenStepCallback, _MockWriter]:
     cb = FrozenStepCallback(every=5)
     writer = _MockWriter()
-    cb._writer = writer
+    cb._writer = writer  # type: ignore[assignment]
     return cb, writer
 
 
@@ -496,7 +496,7 @@ def test_invariant_on_step_end_uses_self_reason() -> None:
     """The commit is called with ``self.reason`` (line 136)."""
     cb = FrozenStepCallback(every=2, reason="exception")
     writer = _MockWriter()
-    cb._writer = writer
+    cb._writer = writer  # type: ignore[assignment]
     cb.on_step_end(step=4)
     assert writer.commit_calls == ["exception"]
 
@@ -515,7 +515,7 @@ def test_invariant_on_step_end_commit_exception_swallowed(caplog) -> None:
 def test_invariant_on_step_end_commit_none_warns_once(caplog) -> None:
     """``writer.commit`` returning None triggers ``_warn_once('commit_none')`` (lines 143-145)."""
     cb, writer = _cb_with_mock_writer()
-    writer._commit_return = None
+    writer._commit_return = None  # type: ignore[assignment]
     with caplog.at_level(logging.WARNING, logger=_CB_LOGGER):
         cb.on_step_end(step=5)
         cb.on_step_end(step=10)  # second call — must not emit a second warning

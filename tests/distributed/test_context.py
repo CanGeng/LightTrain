@@ -379,7 +379,7 @@ def test_dp_times_tp_times_pp_mismatch_raises(monkeypatch) -> None:
     monkeypatch.setattr("os.environ", {"LOCAL_RANK": "0"})
 
     with pytest.raises(ValueError, match="world_size"):
-        ParallelContext.from_env(cfg)
+        ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
 
 # --------------------------------------------------------------------------- #
@@ -504,7 +504,7 @@ def test_parallel_section_force_cpu_and_overrides() -> None:
 
 def test_parallel_section_allows_extra_fields() -> None:
     """Unknown experimental fields are accepted (extra fields allowed)."""
-    ps = ParallelSection(experimental_flag=True)
+    ps = ParallelSection(experimental_flag=True)  # type: ignore[call-arg]
     assert ps.experimental_flag is True  # type: ignore[attr-defined]
 
 

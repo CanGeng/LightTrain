@@ -142,13 +142,13 @@ def test_invariant_coerce_raises_for_none_input():
     is not a Mapping).
     """
     with pytest.raises(ConfigResolveError, match="NoneType"):
-        _coerce(None)  # type: ignore[arg-type]
+        _coerce(None)
 
 
 def test_invariant_resolve_raises_for_non_mapping_spec():
     """``resolve()`` surfaces the ConfigResolveError when spec is not a mapping."""
     with pytest.raises(ConfigResolveError, match="Spec must be a mapping"):
-        resolve(123)  # type: ignore[arg-type]
+        resolve(123)
 
 
 # ===========================================================================

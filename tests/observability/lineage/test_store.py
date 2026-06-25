@@ -478,7 +478,7 @@ def test_close_swallows_and_logs_connection_error(
 
     store = lineage_store_factory()
     real = store.conn  # keep a handle so the factory teardown can close it too
-    store.conn = _ExplodingConn()  # type: ignore[assignment]
+    store.conn = _ExplodingConn()
 
     with caplog.at_level(logging.WARNING, logger="lighttrain.observability.lineage.store"):
         store.close()  # must NOT raise
@@ -505,7 +505,7 @@ def test_context_manager_closes_on_exit(tmp_path) -> None:
     """
     with LineageStore(tmp_path / "ctx.sqlite") as s:
         nid = s.upsert_node(kind="artifact", name="A")
-        assert s.get_node(nid)["name"] == "A"
+        assert s.get_node(nid)["name"] == "A"  # type: ignore[index]
     # Connection closed → using it raises ProgrammingError.
     import sqlite3
 
