@@ -741,7 +741,7 @@ def test_accumulation_boundary_optimizer_fires_only_on_last_micro_step(accum_K: 
     """
     ctx, model, optim = _build_ctx()
     step_spy = MagicMock(wraps=optim.step)
-    optim.step = step_spy
+    optim.step = step_spy  # type: ignore[method-assign]
 
     rule = StandardUpdateRule(accumulate_grad_batches=accum_K)
 

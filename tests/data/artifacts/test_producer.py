@@ -138,7 +138,7 @@ def test_producer_skips_existing_sample_id(tmp_path: Path) -> None:
         n_calls["n"] += 1
         return real_forward(*a, **kw)
 
-    model.forward = _counting_forward
+    model.forward = _counting_forward  # type: ignore[method-assign]
 
     out = producer.produce({"id": "s1", "input_ids": torch.tensor([0, 1, 2])})
     assert out == {}
