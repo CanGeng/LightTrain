@@ -201,6 +201,10 @@ class _FakeGradSync:
         self.calls.append(("optimizer_step", {"model_id": id(model)}))
         optimizer.step()
 
+    def zero_grad(self, optimizer):
+        self.calls.append(("zero_grad", {}))
+        optimizer.zero_grad(set_to_none=True)
+
 
 class _FakeAccelerator:
     """Minimal accelerator with autocast/backward/clip surface — records calls."""

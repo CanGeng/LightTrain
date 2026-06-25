@@ -36,6 +36,8 @@ class ZeROStrategy:
         fp16: bool = False,
         bf16: bool = True,
         gradient_clipping: float = 1.0,
+        train_micro_batch_size_per_gpu: int | None = None,
+        gradient_accumulation_steps: int = 1,
         config_file: str | None = None,
     ) -> None:
         self.zero_stage = int(zero_stage)
@@ -44,20 +46,29 @@ class ZeROStrategy:
         self.fp16 = fp16
         self.bf16 = bf16
         self.gradient_clipping = float(gradient_clipping)
+        self.train_micro_batch_size_per_gpu = train_micro_batch_size_per_gpu
+        self.gradient_accumulation_steps = int(gradient_accumulation_steps)
         self.config_file = config_file
         self._engine: Any = None
 
-    def _build_ds_config(self, train_batch_size: int = 1) -> dict[str, Any]:
+    def _build_ds_config(self) -> dict[str, Any]:
         if self.config_file:
             import json
             with open(self.config_file) as f:
                 return json.load(f)
 
         cfg: dict[str, Any] = {
-            "train_batch_size": train_batch_size,
             "gradient_clipping": self.gradient_clipping,
             "zero_optimization": {"stage": self.zero_stage},
         }
+        # Prefer per-GPU micro batch so DeepSpeed derives train_batch_size from
+        # the live world_size (a hardcoded train_batch_size=1 is rejected when
+        # world_size > 1). Fall back to train_batch_size=1 for single-GPU.
+        if self.train_micro_batch_size_per_gpu is not None:
+            cfg["train_micro_batch_size_per_gpu"] = self.train_micro_batch_size_per_gpu
+            cfg["gradient_accumulation_steps"] = self.gradient_accumulation_steps
+        else:
+            cfg["train_batch_size"] = 1
         if self.offload_optimizer:
             cfg["zero_optimization"]["offload_optimizer"] = {"device": "cpu"}
         if self.offload_param and self.zero_stage >= 3:
@@ -105,14 +116,23 @@ class ZeROStrategy:
         max_norm: float,
         parallel_ctx: ParallelContext,
     ) -> float:
-        # DeepSpeed clips internally during engine.step(); retrieve the norm.
+        # DeepSpeed clips internally during engine.step(). lighttrain calls this
+        # *before* optimizer_step, so the norm isn't available yet on the first
+        # step (get_global_grad_norm() returns None); later it reports the prior
+        # step's norm. This value is informational only — report 0.0 when absent.
         try:
-            return float(model.get_global_grad_norm())  # type: ignore[attr-defined]
+            norm = model.get_global_grad_norm()  # type: ignore[attr-defined]
         except AttributeError:
             return 0.0
+        return float(norm) if norm is not None else 0.0
 
     def optimizer_step(self, optimizer: Any, model: nn.Module) -> None:
         model.step()  # type: ignore[attr-defined]  # model is DS engine; step() = clip+step+zero_grad
+
+    def zero_grad(self, optimizer: Any) -> None:
+        # DeepSpeed's engine.step() already zeroed gradients; nothing to do.
+        # (DeepSpeedEngine.zero_grad() also lacks the set_to_none kwarg.)
+        return None
 
     def unwrap_model(self, model: nn.Module) -> nn.Module:
         return model.module  # type: ignore[attr-defined]

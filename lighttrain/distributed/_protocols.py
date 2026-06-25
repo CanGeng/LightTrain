@@ -77,6 +77,15 @@ class GradSyncStrategy(Protocol):
         """Backend-aware optimizer step (ZeRO: engine.step() replaces opt.step())."""
         ...
 
+    def zero_grad(self, optimizer: Any) -> None:
+        """Backend-aware gradient reset.
+
+        DDP/FSDP/noop → ``optimizer.zero_grad(set_to_none=True)``; ZeRO is a
+        no-op (DeepSpeed's ``engine.step()`` already zeroed the gradients and
+        its ``zero_grad`` lacks the ``set_to_none`` kwarg).
+        """
+        ...
+
     def unwrap_model(self, model: nn.Module) -> nn.Module:
         """Strip DDP/FSDP wrapper to get the original ``nn.Module``."""
         ...

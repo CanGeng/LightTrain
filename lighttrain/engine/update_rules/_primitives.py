@@ -170,7 +170,10 @@ def apply_update(
         if bus is not None:
             bus.dispatch("on_optimizer_step_post", step=ctx.step, model=model)
 
-        optimizer.zero_grad(set_to_none=True)
+        if grad_sync is not None:
+            grad_sync.zero_grad(optimizer)
+        else:
+            optimizer.zero_grad(set_to_none=True)
         if bus is not None:
             bus.dispatch("on_zero_grad", step=ctx.step)
 
