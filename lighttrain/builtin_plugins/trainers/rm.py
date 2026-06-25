@@ -125,6 +125,7 @@ class RewardModelTrainer(PreferenceTrainer):
         attention_mask: torch.Tensor | None,
     ) -> torch.Tensor:
         """Run backbone + value head → (B,) reward scalars."""
+        assert self.model is not None
         kwargs: dict[str, Any] = {"input_ids": input_ids}
         if attention_mask is not None:
             kwargs["attention_mask"] = attention_mask
@@ -154,6 +155,7 @@ class RewardModelTrainer(PreferenceTrainer):
         validate_batch(batch, [
             "chosen_input_ids", "rejected_input_ids",
         ], "RewardModelTrainer")
+        assert self.model is not None
         self.model.train()
 
         chosen_ids = batch["chosen_input_ids"]
@@ -193,9 +195,9 @@ class RewardModelTrainer(PreferenceTrainer):
         }
 
     # Backward-compat alias: old tests / external code calling _preference_step still work.
-    _preference_step = _reward_step  # type: ignore[assignment]
+    _preference_step = _reward_step
 
-    def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
+    def _step(self, batch: dict[str, Any]) -> StepOutput:
         """Bridge to _reward_step() for the unified train_step() protocol."""
         raw = self._reward_step(batch)
         return StepOutput(loss=raw.get("loss"), metrics=dict(raw))

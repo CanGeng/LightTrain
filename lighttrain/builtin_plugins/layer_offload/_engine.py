@@ -42,11 +42,12 @@ import warnings
 from collections import deque
 from collections.abc import Mapping
 from contextlib import nullcontext as _nullctx
+from pathlib import Path
 from typing import Any
 
 import torch
 
-from lighttrain.engine._context import StepContext  # type: ignore
+from lighttrain.engine._context import StepContext
 from lighttrain.registry import register
 
 from ._activation import ActivationManager
@@ -67,7 +68,7 @@ def _resolve_storage(spec: str | Mapping[str, Any], *, device: torch.device, kin
         device_str = str(spec)
     if device_str.startswith("nvme:"):
         path = device_str.split(":", 1)[1]
-        return NvmeStorage(root=path + f"/{kind}", device=device)
+        return NvmeStorage(root=Path(path + f"/{kind}"), device=device)
     if device_str in ("cpu_pinned", "cpu", "pinned"):
         return CpuPinnedStorage(device=device, pin_memory=("pinned" in device_str or device_str == "cpu_pinned"))
     raise ValueError(f"unknown storage device: {device_str!r}")
@@ -105,8 +106,8 @@ class LayerOffloadEngine:
         self.pin_memory = bool(pin_memory)
         self.hooks_cfg = dict(hooks or {})
         self.storage_cfg = dict(storage or {})
-        self._view = None
-        self._weights_storage = None
+        self._view: Any = None
+        self._weights_storage: Any = None
         self._streams: StreamManager | None = None
         self._activation_mgr: ActivationManager | None = None
         self._installed: list[Any] = []

@@ -24,7 +24,7 @@ from lighttrain.registry import register
 def _open_image(src: Any) -> Any:
     """Best-effort opener: PIL.Image.Image, ndarray, str/Path."""
     try:
-        from PIL import Image  # type: ignore
+        from PIL import Image
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("Pillow is required for SimpleImageProcessor") from exc
     if isinstance(src, Image.Image):
@@ -47,7 +47,7 @@ def _to_chw_float32(
     std: Sequence[float],
 ) -> np.ndarray:
     img = img.resize(size)
-    arr = np.asarray(img, dtype=np.float32) / 255.0  # HWC
+    arr: np.ndarray = np.asarray(img, dtype=np.float32) / 255.0  # HWC
     arr = (arr - np.asarray(mean, dtype=np.float32)) / np.asarray(std, dtype=np.float32)
     arr = np.transpose(arr, (2, 0, 1))  # CHW
     return arr.astype(np.float32, copy=False)
@@ -117,7 +117,7 @@ class HFImageProcessor:
 
     def _ensure_processor(self) -> Any:
         if self._processor is None:
-            from transformers import AutoImageProcessor  # type: ignore
+            from transformers import AutoImageProcessor
 
             self._processor = AutoImageProcessor.from_pretrained(
                 self.model_name_or_path, **self._fp_kwargs
