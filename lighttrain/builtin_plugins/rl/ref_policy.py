@@ -73,19 +73,17 @@ class ReferencePolicy:
             the realized tokens (next-token targets ``input_ids[:, 1:]`` with a
             leading 0 column), aligned position-for-position with the GRPO
             trainer's ``log_probs_new`` for the per-token k3 KL estimator.
+            Supported in both ``lora_base_as_ref`` modes.
 
         Returns
         -------
         ``(B,)`` if ``per_token=False`` else ``(B, T)``.
         """
-        if per_token and self.lora_base_as_ref:
-            raise RuntimeError(
-                "ReferencePolicy.log_probs(per_token=True) is not supported with "
-                "lora_base_as_ref=True: the LoRA-base reference path needs adapter "
-                "toggling + eval-state handling that is not wired yet. Use a "
-                "deep-copy reference (lora_base_as_ref=False)."
-            )
         if self.lora_base_as_ref:
+            if per_token:
+                return self._lora_base_log_probs_per_token(
+                    input_ids, attention_mask, live_model
+                )
             return self._lora_base_log_probs(input_ids, attention_mask, labels, live_model)
         if self.model is None:
             raise RuntimeError("ReferencePolicy: model is None and lora_base_as_ref=False.")
@@ -135,6 +133,30 @@ class ReferencePolicy:
         try:
             live_model.disable_adapter_layers()
             result = self._frozen_log_probs(live_model, input_ids, attention_mask, labels)
+        finally:
+            live_model.enable_adapter_layers()
+        return result
+
+    def _lora_base_log_probs_per_token(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor | None,
+        live_model: Any,
+    ) -> torch.Tensor:
+        """Per-token (B, T) log-probs from the LoRA base weights.
+
+        Mirrors :meth:`_lora_base_log_probs` but yields the per-token signal the
+        GRPO/PPO k3 KL estimator needs: temporarily disable the live model's LoRA
+        adapters (try/finally so they're always re-enabled) and read the bare
+        base-model per-token log-probs of the realized tokens.
+        """
+        if live_model is None:
+            raise RuntimeError(
+                "ReferencePolicy(lora_base_as_ref=True) needs live_model in log_probs()."
+            )
+        try:
+            live_model.disable_adapter_layers()
+            result = self._frozen_log_probs_per_token(live_model, input_ids, attention_mask)
         finally:
             live_model.enable_adapter_layers()
         return result

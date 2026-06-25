@@ -252,10 +252,13 @@ def test_log_probs_per_token_is_detached():
     assert not out.requires_grad
 
 
-def test_log_probs_per_token_rejects_lora_base():
-    """Goal: public-API misuse guard — per_token=True is unsupported with
-    lora_base_as_ref=True (would crash unclearly on model=None)."""
+def test_log_probs_per_token_lora_base_needs_live_model():
+    """Goal (A2): per_token=True with lora_base_as_ref=True is now supported, but
+    still needs the live model to toggle adapters — live_model=None fails loud.
+
+    (The success path — adapter disable/enable + per-token equivalence to the
+    frozen copy — is covered in test_ref_policy_cov.py::TestLoraAdapterToggle.)"""
     ref = ReferencePolicy(model=None, lora_base_as_ref=True)
     input_ids = torch.randint(0, 10, (2, 4))
-    with pytest.raises(RuntimeError, match="lora_base_as_ref"):
-        ref.log_probs(input_ids, None, input_ids.clone(), per_token=True)
+    with pytest.raises(RuntimeError, match="needs live_model"):
+        ref.log_probs(input_ids, None, input_ids.clone(), per_token=True, live_model=None)

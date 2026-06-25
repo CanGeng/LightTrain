@@ -217,14 +217,9 @@ class PPOTrainer(Trainer):
             else self._default_loss.beta_kl
         )
         if eff_beta > 0:
-            if self.lora_base_as_ref:
-                raise RuntimeError(
-                    "PPO KL penalty (beta_kl > 0) with lora_base_as_ref=True is "
-                    "not supported yet: the LoRA-base reference path needs adapter "
-                    "toggling + eval-state handling that is not wired. Use a "
-                    "deep-copy reference (lora_base_as_ref=False) or set beta_kl=0."
-                )
-            self._ref_policy = freeze_as_ref(self.model, lora_base_as_ref=False)
+            self._ref_policy = freeze_as_ref(
+                self.model, lora_base_as_ref=self.lora_base_as_ref
+            )
 
         target = int(steps) if steps is not None else self.max_steps
         loader = self.data_module.train_loader()
@@ -429,7 +424,8 @@ class PPOTrainer(Trainer):
             # Only when fit() built a reference policy (effective beta_kl > 0).
             if self._ref_policy is not None:
                 self.ctx.extras["log_probs_ref"] = self._ref_policy.log_probs(
-                    input_ids, attention_mask, labels, per_token=True
+                    input_ids, attention_mask, labels,
+                    live_model=self.model, per_token=True,
                 )
         else:
             if self._ref_policy is not None:
