@@ -516,13 +516,65 @@ def test_load_is_manifest_driven_not_file_existence(tmp_run_dir) -> None:
     assert "optimizer" not in loaded
 
 
-def test_save_docstring_pins_not_crash_atomic_contract() -> None:
-    """Pin the documented same-step-overwrite crash-atomicity limitation so a
-    change to overwrite semantics consciously updates the docstring.
-    """
+def test_save_docstring_pins_crash_atomic_contract() -> None:
+    """Pin the crash-atomic same-step-overwrite contract in the docstring so a
+    change to overwrite semantics consciously updates it (C1)."""
     save_doc = CheckpointManager.save.__doc__ or ""
-    assert "not crash-atomic" in save_doc
+    assert "Crash-atomic" in save_doc
     assert "same-step overwrite" in save_doc
+
+
+def test_same_step_overwrite_crash_preserves_prior_checkpoint(
+    tmp_run_dir, monkeypatch
+) -> None:
+    """C1: a crash mid same-step-overwrite must leave the previously-committed
+    step_<n>/ fully loadable — the staging-swap restores the prior good copy
+    instead of leaving a half-overwritten mixed file set.
+    """
+    mgr = CheckpointManager(tmp_run_dir, keep_last_n=5)
+    mgr.save(
+        5,
+        {"model": {"w": torch.ones(2)}, "optimizer": {"s": torch.zeros(1)}},
+        kind="step",
+    )
+    target = mgr.ckpt_dir / "step_5"
+    assert mgr.load(target)["model"]["w"].tolist() == [1.0, 1.0]
+
+    # Fail the swap-in (staging -> step_5) specifically, after the prior copy has
+    # been renamed aside. _commit_dir must restore the previous good copy.
+    real_replace = os.replace
+
+    def boom(src, dst):
+        if str(dst).endswith("step_5") and ".tmp." in str(src) and os.path.isdir(src):
+            raise RuntimeError("disk full mid-swap")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", boom)
+    with pytest.raises(RuntimeError, match="disk full"):
+        mgr.save(5, {"model": {"w": torch.full((2,), 9.0)}}, kind="step")
+    monkeypatch.undo()
+
+    # The previous good checkpoint is intact: OLD weights + OLD optimizer remain.
+    loaded = mgr.load(target)
+    assert loaded["model"]["w"].tolist() == [1.0, 1.0]
+    assert "optimizer" in loaded
+    # No orphan staging/backup dirs leak into the step listing.
+    assert [p.name for p in mgr.list_steps()] == ["step_5"]
+
+
+def test_orphan_staging_dirs_swept_on_construction(tmp_run_dir) -> None:
+    """C1: stale ``*.tmp.*`` / ``*.old.*`` dirs from a crashed run are removed
+    when a new CheckpointManager is constructed."""
+    mgr = CheckpointManager(tmp_run_dir)
+    (mgr.ckpt_dir / "step_3.tmp.999.deadbeef").mkdir()
+    (mgr.ckpt_dir / "step_3.old.cafe").mkdir()
+    mgr.save(3, {"model": {"w": torch.ones(1)}}, kind="step")
+
+    CheckpointManager(tmp_run_dir)  # construction sweeps orphans
+    names = {p.name for p in mgr.ckpt_dir.iterdir() if p.is_dir()}
+    assert "step_3.tmp.999.deadbeef" not in names
+    assert "step_3.old.cafe" not in names
+    assert "step_3" in names
 
 
 # --------------------------------------------------------------------------- #
