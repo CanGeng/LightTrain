@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.4.3"
+version = "0.4.4"
 description = "PyTorch training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -105,6 +105,10 @@ python_version = "3.12"
 # Gate authority = the full *typed* env (CPU torch installed in CI types job;
 # see constraints.txt). "Zero tolerance" = the gate is green (no reported
 # errors), NOT one-shot strict. strict is intentionally off; ratchet later.
+# Scope = package + test tree (`mypy lighttrain tests`, since v0.4.4). Tests
+# carry targeted `# type: ignore[...]` for intentional duck-typed / wrong-type
+# seams; ~108 `annotation-unchecked` notes remain (untyped test bodies) —
+# non-blocking, a marker for the future `check_untyped_defs` ratchet.
 # warn_unused_ignores is on: stale `# type: ignore` comments are flagged so they
 # don't accumulate. Optional/untyped third-party imports are handled by the
 # per-module ignore_missing_imports overrides below (NOT inline ignores), so the

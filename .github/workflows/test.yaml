@@ -58,7 +58,7 @@ jobs:
           pip install -e ".[dev]" -c constraints.txt
 
       - name: Run mypy
-        run: python -m mypy lighttrain
+        run: python -m mypy lighttrain tests
 
   test:
     name: Python ${{ matrix.python-version }}
