@@ -186,7 +186,7 @@ _FakeQLoRAAdapter.__name__ = "QLoRAAdapter"
 
 def test_invariant_import_peft_returns_peft_module():
     """``import_peft()`` returns the real ``peft`` module when it is installed."""
-    import peft as _peft
+    _peft = pytest.importorskip("peft")
     result = import_peft()
     assert result is _peft
 
@@ -366,7 +366,7 @@ def test_invariant_is_peft_wrapped_false_for_plain_module_with_peft_installed():
     """Lines 82-83: when peft is installed, a plain nn.Module that is NOT a
     peft.PeftModel returns False.
     """
-    import peft  # noqa: F401 — just assert it's importable
+    pytest.importorskip("peft")
     m = _PlainModel()
     assert is_peft_wrapped(m) is False
 
@@ -375,7 +375,7 @@ def test_invariant_is_peft_wrapped_true_for_raw_peft_model(monkeypatch):
     """Lines 82-83: a real ``peft.PeftModel`` (or stub subclass) returns True via
     the ``isinstance`` check.
     """
-    import peft
+    peft = pytest.importorskip("peft")
 
     # Build a minimal PeftModel stub we can isinstance-check against.
     from lighttrain.builtin_plugins.models.text.tiny_lm import TinyCausalLM
