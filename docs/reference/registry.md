@@ -104,7 +104,7 @@ class StepOutput:
 - **trainers**: `pretrain`, `preference`, `reward_model`, `ppo`, `grpo`
 - **datasets**: `line_file_text`, `preference_jsonl`, `artifact_joined` · **collators**: `causal_lm`, `preference`, `multimodal`, `image` · **samplers**: `shuffle`, `sequential`, `length_grouped`, `curriculum`, `stateful_resumable` · **tokenizers**: `byte`
 - **prep_node**: `load`, `tokenize`, `chunk`, `pack`, `mix`, `join`, `index`, `validate`, `materialize`
-- **callbacks**: `ema`, `best_ckpt`, `throughput`, `early_stop`, `nan_skip`, `invariants`, `nan_hunter`, `frozen_step`, `loss_attribution`, `dead_neuron`, `grad_flow`, `sample_preview`, `dynamic_artifact`, `lineage_recorder`, `file_signals`
+- **callbacks**: `ema`, `target_ema`, `best_ckpt`, `throughput`, `early_stop`, `nan_skip`, `invariants`, `nan_hunter`, `frozen_step`, `loss_attribution`, `dead_neuron`, `grad_flow`, `sample_preview`, `dynamic_artifact`, `lineage_recorder`, `file_signals`
 - **loggers**: `console`, `jsonl`, `tensorboard`/`tb` · **judges**: plugin `verifier`, `pairwise_llm` · **rl_backend**: `hf_generate`, and plugin `vllm`
 - **grad_sync**: `noop`, `ddp`, `fsdp`, `deepspeed` · **model_parallel**: `tensor_parallel`, `tp_aware`, `sequence_parallel`*, `expert_parallel`* · **pipeline**: `1f1b`, `gpipe`, `interleaved_1f1b`
   - *`sequence_parallel` / `expert_parallel` are registered but **not yet wired into the train runtime** (the selector only picks `tensor_parallel`; EP is a skeleton). See the v0.2.3 changelog "Known issues".*

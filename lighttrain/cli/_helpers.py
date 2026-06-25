@@ -14,23 +14,9 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import typer
-
 from lighttrain.cli._context import console
 
 _log = logging.getLogger(__name__)
-
-
-def _todo(milestone: str, what: str = "") -> None:
-    """Emit a friendly not-yet-implemented message and exit non-zero.
-
-    TODO(P3): currently unused (no caller in the repo) — candidate for removal.
-    """
-    msg = f"[yellow]not yet implemented ({milestone})[/]"
-    if what:
-        msg = f"{msg} — {what}"
-    console.print(msg)
-    raise typer.Exit(code=2)
 
 
 def _flatten_patch_to_overrides(patch: object, prefix: str = "") -> list[str]:

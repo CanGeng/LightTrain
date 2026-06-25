@@ -793,13 +793,14 @@ class EMACallback:
 | name | 说明 | 文件 |
 |------|------|------|
 | `ema` | 指数移动平均影子权重 | [builtin_plugins/callbacks/builtins/ema.py](../../lighttrain/builtin_plugins/callbacks/builtins/ema.py) |
+| `target_ema` | 各优化器步后调用模型自身 `update_ema()`（JEPA 等内部 EMA 目标；无该方法的模型为 no-op） | [builtin_plugins/callbacks/builtins/target_ema.py](../../lighttrain/builtin_plugins/callbacks/builtins/target_ema.py) |
 | `throughput` | 滚动窗口 tokens/sec + samples/sec 统计 | [builtin_plugins/callbacks/builtins/throughput.py](../../lighttrain/builtin_plugins/callbacks/builtins/throughput.py) |
 | `best_ckpt` | 按 metric 保留最优 checkpoint | [builtin_plugins/callbacks/builtins/best_ckpt.py](../../lighttrain/builtin_plugins/callbacks/builtins/best_ckpt.py) |
 | `early_stop` | 早停（patience + metric monitor） | [builtin_plugins/callbacks/builtins/early_stop.py](../../lighttrain/builtin_plugins/callbacks/builtins/early_stop.py) |
 | `nan_skip` | 检测到 NaN loss 跳过该 step | [builtin_plugins/callbacks/builtins/nan_skip.py](../../lighttrain/builtin_plugins/callbacks/builtins/nan_skip.py) |
 | `frozen_step` | 前 N 步冻结指定模块参数 | [builtin_plugins/callbacks/builtins/frozen_step.py](../../lighttrain/builtin_plugins/callbacks/builtins/frozen_step.py) |
 | `lineage_recorder` | 记录训练 lineage 元信息 | [builtin_plugins/callbacks/builtins/lineage_recorder.py](../../lighttrain/builtin_plugins/callbacks/builtins/lineage_recorder.py) |
-| `invariants` | 在每步运行一组 invariant 检查 | [builtin_plugins/callbacks/invariants.py](../../lighttrain/builtin_plugins/callbacks/invariants.py) |
+| `invariants` | 在每步运行一组 invariant 检查 | [builtin_plugins/callbacks/invariants/callback.py](../../lighttrain/builtin_plugins/callbacks/invariants/callback.py) |
 | `dynamic_artifact` | 训练中动态收集模型输出张量 | [builtin_plugins/data/artifacts/dynamic_producer.py](../../lighttrain/builtin_plugins/data/artifacts/dynamic_producer.py) |
 | `dead_neuron` | 检测死亡神经元比例 | [builtin_plugins/observability/diagnostics/dead_neuron.py](../../lighttrain/builtin_plugins/observability/diagnostics/dead_neuron.py) |
 | `grad_flow` | 梯度流可视化（各层 grad norm） | [builtin_plugins/observability/diagnostics/grad_flow.py](../../lighttrain/builtin_plugins/observability/diagnostics/grad_flow.py) |
