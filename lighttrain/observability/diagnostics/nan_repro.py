@@ -30,9 +30,10 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from safetensors.torch import save_model as _save_model
 
 from lighttrain.observability.minimal import dump_spec
+
+from ._save import save_model_safe as _save_model
 
 _REPRO_TEMPLATE = '''\
 """Auto-generated NaN reproduction script.
@@ -105,10 +106,10 @@ def write_nan_repro(
     diag = run_dir / "diagnostics" / f"repro_nan_{int(time.time())}"
     diag.mkdir(parents=True, exist_ok=True)
 
-    # 1) model state — ``safetensors.torch.save_model`` handles tied weights
-    # (e.g. tiny_lm's ``tok_emb.weight is lm_head.weight``) by dropping the
-    # alias instead of refusing to save. ``load_state(..., strict=False)``
-    # picks the surviving copy back up.
+    # 1) model state — ``save_model_safe`` tolerates tied weights (e.g.
+    # tiny_lm's ``tok_emb.weight is lm_head.weight``): plain
+    # ``safetensors.save_model`` refuses to save aliased storage, so it clones
+    # to break the sharing. ``load_state(..., strict=False)`` reloads it.
     _save_model(model, str(diag / "model_state.safetensors"))
 
     # 2) batch — torch.save with weights_only-compatible tensors.
