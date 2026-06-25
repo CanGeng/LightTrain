@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+import torch
 import torch.nn as nn
 
 
@@ -145,7 +146,7 @@ def _fallback_base_spec(model: nn.Module | None) -> dict[str, Any]:
     return {"_target_": f"{cls.__module__}:{cls.__name__}", "params": {}}
 
 
-def adapter_state_dict(model: nn.Module) -> dict[str, torch.Tensor]:  # noqa: F821
+def adapter_state_dict(model: nn.Module) -> dict[str, torch.Tensor]:
     """Return adapter-only state dict via peft helpers."""
     peft = import_peft()
     return peft.get_peft_model_state_dict(model)

@@ -83,7 +83,7 @@ class LoRAAdapter(nn.Module):
         target_modules: list[str] | str | None = None,
         lora_dropout: float = 0.0,
         bias: str = "none",
-        task_type: str = "CAUSAL_LM",
+        task_type: str | None = "CAUSAL_LM",
         modules_to_save: list[str] | None = None,
         init_lora_weights: bool | str = True,
         use_rslora: bool = False,
@@ -160,7 +160,7 @@ class LoRAAdapter(nn.Module):
     ) -> Any:
         _ = strict  # peft handles missing keys quietly
         load_adapter_state_dict(self.inner, state_dict)
-        return torch.nn.modules.module._IncompatibleKeys([], [])  # type: ignore[attr-defined]
+        return torch.nn.modules.module._IncompatibleKeys([], [])
 
     def full_state_dict(self) -> dict[str, torch.Tensor]:
         """Escape hatch: returns base + adapter weights (large)."""
