@@ -127,7 +127,7 @@ class Trainer:
         if model is not None:
             self.ctx.model = model
         if device is not None:
-            self.device = torch.device(device)
+            self.device: torch.device | None = torch.device(device)
             if model is not None:
                 self.model = model.to(self.device)
                 self.ctx.model = self.model

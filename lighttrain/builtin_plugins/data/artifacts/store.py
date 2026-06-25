@@ -23,7 +23,7 @@ import logging
 import os
 from collections.abc import Iterator, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
 
@@ -509,7 +509,7 @@ def open_artifact_store(
     else:
         raise ValueError(f"unknown artifact_store backend {backend!r}")
     store._finalized = True
-    return store
+    return cast(ArtifactStoreProtocol, store)
 
 
 __all__ = [
