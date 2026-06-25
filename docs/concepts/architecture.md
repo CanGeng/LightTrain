@@ -44,16 +44,17 @@ lighttrain defines five clean seams; everything else stays straightforward.
 `setup_run_from_config` then `trainer.fit()`:
 
 1. **Config load** — YAML → defaults → overrides → interpolation → Pydantic.
-2. **Prepare** — import `user_modules` (decorators register), `seed_everything`,
-   create run dir, write `config.snapshot.yaml` + `env.json`.
+2. **Prepare** — import `user_modules` (decorators register), `seed_everything`;
+   topology (3-A) initializes *first* so **rank 0 owns the timestamped run dir
+   and broadcasts its path** to every rank (otherwise each rank stamps its own
+   `datetime.now()` and a launch straddling a one-second boundary splits ranks
+   across sibling dirs); then write `config.snapshot.yaml` + `env.json`.
 3. **Components (strict order)**
    - **A — topology**: `parallel_ctx` (single-GPU fallback or process group +
-     DeviceMesh); `device` derived from it.
-   - **B — model + TP surgery** (must precede FSDP/DDP wrapping — sharding
-     needs the post-surgery shapes; SP/EP would slot in here once wired —
-     today they are rejected with a `ConfigError`).
-   - **C — pipeline split** (when `pp > 1`).
-   - **D — grad-sync wrap** (`noop`/`ddp`/`fsdp`/`deepspeed`; FSDP builds the
+     1-D `dp` DeviceMesh); `device` derived from it.
+   - **B — model**: build the primary model from its spec (data-parallel only —
+     no model surgery before the grad-sync wrap).
+   - **C — grad-sync wrap** (`noop`/`ddp`/`fsdp`/`deepspeed`; FSDP builds the
      optimizer *after* wrapping via an `optimizer_factory`).
    - **common**: data_module → scheduler → loss → callbacks → logger → ckpt.
 4. **Engine assembly** — update_rule + accelerator + loss into `StandardEngine`.
@@ -61,8 +62,8 @@ lighttrain defines five clean seams; everything else stays straightforward.
    `optimizers` to the trainer; lab-mode diagnostics callbacks auto-attach.
 6. **Training loop** — `trainer.fit()` runs the epoch/signal/log/ckpt loop.
 
-Key invariants: topology before everything; TP/SP/EP before FSDP/DDP; FSDP
-optimizer built post-wrap; rank-0 gates checkpoint and logging IO (run-metadata
+Key invariants: topology before everything (rank 0 owns and broadcasts the run
+dir); FSDP optimizer built post-wrap; rank-0 gates checkpoint and logging IO (run-metadata
 init and PrepGraph are not yet fully rank-0-coordinated); `loss_fn` is a separate
 component (swappable via `loss:`); `manifest.json` written last.
 

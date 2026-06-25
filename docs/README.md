@@ -25,7 +25,7 @@ has an English version (`<topic>.md`) and a Chinese version (`<topic>.zh-CN.md`)
 
 | Topic | What's inside |
 | ----- | ------------- |
-| [Distributed training](operations/distributed.md) | The `parallel:` block: DDP / FSDP / ZeRO / TP / PP (SP / EP registered but not yet wired) |
+| [Distributed training](operations/distributed.md) | The `parallel:` block: data-parallel only — DDP / FSDP / DeepSpeed ZeRO |
 | [Diagnostics](operations/diagnostics.md) | Failure-first: invariants, NaN hunter, frozen steps, crash bundles, `doctor` |
 
 ## Extending
@@ -70,7 +70,7 @@ has an English version (`<topic>.md`) and a Chinese version (`<topic>.zh-CN.md`)
 
 | 主题 | 内容 |
 | ---- | ---- |
-| [分布式训练](operations/distributed.zh-CN.md) | `parallel:` 块：DDP / FSDP / ZeRO / TP / PP（SP / EP 已注册但尚未接入） |
+| [分布式训练](operations/distributed.zh-CN.md) | `parallel:` 块：仅数据并行——DDP / FSDP / DeepSpeed ZeRO |
 | [诊断](operations/diagnostics.zh-CN.md) | failure-first：invariant、NaN 溯源、冻结步、崩溃现场、`doctor` |
 
 ### 扩展开发

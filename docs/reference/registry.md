@@ -28,7 +28,7 @@ register_category("my_plugin_category")      # add a category beyond the built-i
 
 Source: [lighttrain/registry/_core.py](../../lighttrain/registry/_core.py).
 
-## Categories (35 `KNOWN_CATEGORIES`)
+## Categories (33 `KNOWN_CATEGORIES`)
 
 | Group | Categories (YAML mount) |
 | ----- | ----------------------- |
@@ -37,7 +37,7 @@ Source: [lighttrain/registry/_core.py](../../lighttrain/registry/_core.py).
 | Frontier | `generation_strategy`, `judge`, `environment`, `retriever`, `chunker`, `probe` |
 | Artifact & data | `artifact_producer`, `artifact_store`, `prep_node` (list), `data_module` (`data:`), `tokenizer` |
 | Failure-first & RL | `invariant` (list), `rl_backend`, `value_head`, `reward_adapter` |
-| Distributed | `grad_sync_strategy`, `model_parallel_strategy`, `pipeline_schedule` |
+| Distributed | `grad_sync_strategy` (data-parallel only: DDP / FSDP / ZeRO) |
 | Sweep | `sweep_backend` (`sweep --strategy optuna`) |
 
 ## Shared dataclasses (`lighttrain/protocols.py`)
@@ -106,8 +106,7 @@ class StepOutput:
 - **prep_node**: `load`, `tokenize`, `chunk`, `pack`, `mix`, `join`, `index`, `validate`, `materialize`
 - **callbacks**: `ema`, `target_ema`, `best_ckpt`, `throughput`, `early_stop`, `nan_skip`, `invariants`, `nan_hunter`, `frozen_step`, `loss_attribution`, `dead_neuron`, `grad_flow`, `sample_preview`, `dynamic_artifact`, `lineage_recorder`, `file_signals`
 - **loggers**: `console`, `jsonl`, `tensorboard`/`tb` · **judges**: plugin `verifier`, `pairwise_llm` · **rl_backend**: `hf_generate`, and plugin `vllm`
-- **grad_sync**: `noop`, `ddp`, `fsdp`, `deepspeed` · **model_parallel**: `tensor_parallel`, `tp_aware`, `sequence_parallel`*, `expert_parallel`* · **pipeline**: `1f1b`, `gpipe`, `interleaved_1f1b`
-  - *`sequence_parallel` / `expert_parallel` are registered but **not yet wired into the train runtime** (the selector only picks `tensor_parallel`; EP is a skeleton). See the v0.2.3 changelog "Known issues".*
+- **grad_sync**: `noop`, `ddp`, `fsdp`, `deepspeed` (data-parallel only; tensor / pipeline / expert / sequence parallelism were removed in v0.4.5)
 - **sweep_backend**: plugin `optuna` (requires `pip install -e '.[sweep]'`)
 
 ## Exceptions

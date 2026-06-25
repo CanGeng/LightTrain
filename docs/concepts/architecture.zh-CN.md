@@ -41,14 +41,14 @@ lighttrain 定义五个清晰的缝，其余部分保持直白。
 `setup_run_from_config` 然后 `trainer.fit()`：
 
 1. **配置加载** —— YAML → defaults → overrides → 插值 → Pydantic。
-2. **准备** —— 导入 `user_modules`（装饰器注册）、`seed_everything`、建 run 目录、
-   写 `config.snapshot.yaml` + `env.json`。
+2. **准备** —— 导入 `user_modules`（装饰器注册）、`seed_everything`；拓扑（3-A）
+   *先*初始化，从而 **rank 0 拥有带时间戳的 run 目录并把路径广播**给所有 rank
+   （否则各 rank 各自 `datetime.now()`，跨整秒的 launch 会把各 rank 劈进相邻目录）；
+   随后写 `config.snapshot.yaml` + `env.json`。
 3. **组件（严格顺序）**
-   - **A — 拓扑**：`parallel_ctx`（单卡退化或进程组 + DeviceMesh）；`device` 由它得出。
-   - **B — 模型 + TP 手术**（必须先于 FSDP/DDP 包装——sharding 需要手术后形状；
-     SP/EP 接入后也在这里，目前会被 `ConfigError` 拒绝）。
-   - **C — pipeline 切分**（`pp > 1` 时）。
-   - **D — grad-sync 包装**（`noop`/`ddp`/`fsdp`/`deepspeed`；FSDP 经
+   - **A — 拓扑**：`parallel_ctx`（单卡退化或进程组 + 1 维 `dp` DeviceMesh）；`device` 由它得出。
+   - **B — 模型**：按 spec 构建主模型（仅数据并行——grad-sync 包装前无模型手术）。
+   - **C — grad-sync 包装**（`noop`/`ddp`/`fsdp`/`deepspeed`；FSDP 经
      `optimizer_factory` 在包装*之后*建优化器）。
    - **公共**：data_module → scheduler → loss → callbacks → logger → ckpt。
 4. **引擎组装** —— update_rule + accelerator + loss 装入 `StandardEngine`。
@@ -56,7 +56,7 @@ lighttrain 定义五个清晰的缝，其余部分保持直白。
    trainer；lab 模式诊断 callback 自动挂载。
 6. **训练循环** —— `trainer.fit()` 跑 epoch/信号/log/ckpt 循环。
 
-关键不变量：拓扑先于一切；TP/SP/EP 先于 FSDP/DDP；FSDP 优化器后置；rank-0 门控
+关键不变量：拓扑先于一切（rank 0 拥有并广播 run 目录）；FSDP 优化器后置；rank-0 门控
 checkpoint 与日志 IO（run 元数据初始化与 PrepGraph 尚未完全按 rank-0 协调）；
 `loss_fn` 是独立组件（经 `loss:` 替换）；`manifest.json` 最后写。
 

@@ -73,7 +73,7 @@ exists = contains("model", "hf_causal") # → True
 
 ### 新增自定义类别
 
-预声明 35 个 `KNOWN_CATEGORIES`（见第 2 节）以外的类别需先注册：
+预声明 33 个 `KNOWN_CATEGORIES`（见第 2 节）以外的类别需先注册：
 
 ```python
 register_category("my_plugin_category")
@@ -150,10 +150,8 @@ class MyImpl:
 | 类别 | 已注册名称 | 对应 Protocol | YAML 挂载节点 |
 |------|-----------|--------------|--------------|
 | `grad_sync_strategy` | `noop` · `ddp` · `fsdp` · `deepspeed` | `GradSyncStrategy` | `parallel.grad_sync.name:` |
-| `model_parallel_strategy` | `tensor_parallel` · `tp_aware` · `sequence_parallel`\* · `expert_parallel`\* | `ModelParallelStrategy` | `parallel.tensor_parallel:` |
-| `pipeline_schedule` | `1f1b` · `gpipe` · `interleaved_1f1b` | `PipelineSchedule` | `parallel.pipeline.schedule:` |
 
-> \* `sequence_parallel` / `expert_parallel` 已注册但**尚未接入训练 runtime**（选择器只接 `tensor_parallel`，EP 仍是 skeleton）。
+> 仅支持数据并行；张量 / 流水线 / 专家 / 序列并行（`model_parallel_strategy` · `pipeline_schedule`）已于 v0.4.5 移除。
 
 ### Sweep
 
@@ -1172,68 +1170,6 @@ class GradSyncStrategy(Protocol):
 | `ddp` | `torch.nn.parallel.DistributedDataParallel` | [lighttrain/builtin_plugins/distributed/strategies/ddp.py](../../lighttrain/builtin_plugins/distributed/strategies/ddp.py) |
 | `fsdp` | `torch.distributed.fsdp.FullyShardedDataParallel` | [lighttrain/builtin_plugins/distributed/strategies/fsdp.py](../../lighttrain/builtin_plugins/distributed/strategies/fsdp.py) |
 | `deepspeed` | DeepSpeed ZeRO-1/2/3 engine | [lighttrain/builtin_plugins/distributed/strategies/zero.py](../../lighttrain/builtin_plugins/distributed/strategies/zero.py) |
-
----
-
-### 4.29 `model_parallel_strategy`
-
-**源文件**：[lighttrain/distributed/_protocols.py](../../lighttrain/distributed/_protocols.py)
-
-```python
-class ModelParallelStrategy(Protocol):
-    def apply(
-        self,
-        model: nn.Module,
-        parallel_ctx: "ParallelContext",
-    ) -> nn.Module: ...
-    # Applies in-place tensor/sequence/expert parallelism surgery; returns the modified model
-
-    @property
-    def is_stateless(self) -> bool: ...
-    # True if apply() does not add trainable parameters (e.g., TP / SP)
-```
-
-**内置注册项**
-
-| name | 说明 | 文件 |
-|------|------|------|
-| `tensor_parallel` | ColWise/RowWise Linear 手术（llama / gpt2 / mistral 内置方案） | [lighttrain/builtin_plugins/distributed/model_parallel/tp_auto.py](../../lighttrain/builtin_plugins/distributed/model_parallel/tp_auto.py) |
-| `tp_aware` | 对已实现 `tp_plan()` 方法的模型做 TP 适配 | [lighttrain/builtin_plugins/distributed/model_parallel/tp_aware.py](../../lighttrain/builtin_plugins/distributed/model_parallel/tp_aware.py) |
-| `sequence_parallel` | 沿 seq 维度切分，与 TP 配合使用 | [lighttrain/builtin_plugins/distributed/model_parallel/sp.py](../../lighttrain/builtin_plugins/distributed/model_parallel/sp.py) |
-| `expert_parallel` | MoE 专家层 all-to-all dispatch | [lighttrain/builtin_plugins/distributed/model_parallel/ep.py](../../lighttrain/builtin_plugins/distributed/model_parallel/ep.py) |
-
----
-
-### 4.30 `pipeline_schedule`
-
-**源文件**：[lighttrain/distributed/_protocols.py](../../lighttrain/distributed/_protocols.py)
-
-```python
-class PipelineSchedule(Protocol):
-    def prepare(
-        self,
-        model: nn.Module,
-        parallel_ctx: "ParallelContext",
-        n_microbatches: int,
-    ) -> Any: ...
-    # Returns a schedule object bound to the pipeline stages
-
-    def run_step(
-        self,
-        schedule: Any,
-        batch: Any,
-        loss_fn: Callable,
-    ) -> torch.Tensor: ...
-    # Executes one full pipeline step (all microbatches); returns aggregated loss
-```
-
-**内置注册项**
-
-| name | 说明 | 文件 |
-|------|------|------|
-| `1f1b` | One-Forward-One-Backward（均衡内存与效率） | [lighttrain/builtin_plugins/distributed/pipeline/schedules.py](../../lighttrain/builtin_plugins/distributed/pipeline/schedules.py) |
-| `gpipe` | GPipe 全前向后全后向（简单但峰值内存高） | [lighttrain/builtin_plugins/distributed/pipeline/schedules.py](../../lighttrain/builtin_plugins/distributed/pipeline/schedules.py) |
-| `interleaved_1f1b` | 交错 1F1B（多块 stage，进一步降低 bubble） | [lighttrain/builtin_plugins/distributed/pipeline/schedules.py](../../lighttrain/builtin_plugins/distributed/pipeline/schedules.py) |
 
 ---
 

@@ -3,8 +3,8 @@
 > [中文版](distributed.zh-CN.md) · [Docs index](../README.md)
 
 > **Status:** Only **data parallelism** is supported — DDP, FSDP, and DeepSpeed
-> ZeRO via the `grad_sync` strategy. DDP and FSDP have been validated on a real
-> single-node multi-GPU box (NCCL); DeepSpeed ZeRO and multi-node have not.
+> ZeRO via the `grad_sync` strategy. DDP, FSDP, and DeepSpeed ZeRO-2 have been
+> validated on a real single-node multi-GPU box (NCCL); multi-node has not.
 > Tensor / pipeline / expert / sequence parallelism (TP / PP / EP / SP) were
 > **removed**.
 >

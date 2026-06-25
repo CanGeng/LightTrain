@@ -3,7 +3,7 @@
 > [English](distributed.md) · [文档索引](../README.md)
 
 > **状态：** 仅支持**数据并行**——DDP、FSDP、以及通过 `grad_sync` 的 DeepSpeed
-> ZeRO。DDP 与 FSDP 已在真实单机多卡（NCCL）上验证；DeepSpeed ZeRO 与多机尚未验证。
+> ZeRO。DDP、FSDP、DeepSpeed ZeRO-2 已在真实单机多卡（NCCL）上验证；多机尚未验证。
 > 张量 / 流水线 / 专家 / 序列并行（TP / PP / EP / SP）已**移除**。
 >
 > **失败模式：** 请求了某个 `grad_sync` 策略但无法构建（名称未注册、缺可选依赖如
