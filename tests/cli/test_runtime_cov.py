@@ -52,11 +52,9 @@ from lighttrain.cli._runtime import (
     _build_engine,
     _build_grad_sync_strategy,
     _build_logger,
-    _build_model_parallel_strategy,
     _build_optimizer,
     _build_optimizer_factory,
     _build_optimizer_for,
-    _build_pipeline_schedule,
     _build_primary_model,
     _build_trainable_core,
     _build_trainer,
@@ -633,12 +631,9 @@ def test_invariant_build_logger_tensorboard_injects_run_dir(tmp_path: Path) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_invariant_init_parallel_with_section_all_degrees_1(tmp_path: Path) -> None:
-    """cfg.parallel present but all dp/tp/pp/ep = 1 → single_gpu (lines 357-362)."""
-    cfg = _load(
-        tmp_path,
-        "mode: lab\nparallel:\n  dp: 1\n  tp: 1\n  pp: 1\n  ep: 1\n",
-    )
+def test_invariant_init_parallel_with_section_dp_1(tmp_path: Path) -> None:
+    """cfg.parallel present but dp == 1 → single_gpu context."""
+    cfg = _load(tmp_path, "mode: lab\nparallel:\n  dp: 1\n")
     ctx = _init_parallel(cfg)
     assert type(ctx).__name__ == "ParallelContext"
 
@@ -743,55 +738,6 @@ def test_invariant_grad_sync_non_noop_else_branch(
     result = _build_grad_sync_strategy(_FakeCfg())  # type: ignore[arg-type]
     assert result is not None
     assert result.kwargs == {}
-
-
-# ---------------------------------------------------------------------------
-# _build_model_parallel_strategy  (lines 436-439)
-# ---------------------------------------------------------------------------
-
-
-def test_invariant_mp_strategy_tp_model_dump_branch(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """tp > 1 with tensor_parallel block: kwargs come from tp_cfg.model_dump()
-    (lines 436-439) and are forwarded to the strategy constructor."""
-
-    class _FakeMP:
-        def __init__(self, **kwargs: Any) -> None:
-            self.kwargs = kwargs
-
-    monkeypatch.setattr(_runtime, "_registry_get", lambda cat, name: _FakeMP)
-    cfg = _load(
-        tmp_path,
-        "mode: lab\nparallel:\n  tp: 4\n  tensor_parallel:\n    layers: [linear]\n",
-    )
-    result = _build_model_parallel_strategy(cfg)
-    assert result is not None
-    assert type(result).__name__ == "_FakeMP"
-
-
-# ---------------------------------------------------------------------------
-# _build_pipeline_schedule  (lines 469-470)
-# ---------------------------------------------------------------------------
-
-
-def test_invariant_pipeline_schedule_ctor_failure_raises_configerror(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When the selected schedule class raises in __init__, a ConfigError is re-raised
-    (lines 469-472)."""
-
-    class _BoomSchedule:
-        def __init__(self, **kw: Any) -> None:
-            raise ValueError("ctor kaboom")
-
-    monkeypatch.setattr(_runtime, "_registry_get", lambda cat, name: _BoomSchedule)
-    cfg = _load(
-        tmp_path,
-        "mode: lab\nparallel:\n  pp: 2\n  pipeline:\n    schedule: gpipe\n",
-    )
-    with pytest.raises(ConfigError, match="failed to construct"):
-        _build_pipeline_schedule(cfg)
 
 
 # ---------------------------------------------------------------------------
@@ -1178,56 +1124,10 @@ _TINY_ENTRY: dict[str, Any] = {
 }
 
 
-def test_invariant_build_primary_model_no_strategy(tmp_path: Path) -> None:
-    """Without mp_strategy or pipeline_schedule the model passes through unchanged."""
-    cfg = _load(tmp_path, "mode: lab\n")
-    ctx = ParallelContext.single_gpu()
-    model = _build_primary_model(
-        cfg, _TINY_ENTRY, mp_strategy=None, pipeline_schedule=None, parallel_ctx=ctx
-    )
+def test_invariant_build_primary_model_resolves_spec(tmp_path: Path) -> None:
+    """``_build_primary_model`` resolves the entry spec into the model instance."""
+    model = _build_primary_model(_TINY_ENTRY)
     assert type(model).__name__ == "TinyCausalLM"
-
-
-def test_invariant_build_primary_model_mp_strategy_failure_raises(
-    tmp_path: Path,
-) -> None:
-    """mp_strategy.apply raising a non-ConfigError wraps it as ConfigError (line 772)."""
-
-    class _BoomMP:
-        def apply(self, model: Any, parallel_ctx: Any) -> Any:
-            raise RuntimeError("mp crash")
-
-    cfg = _load(tmp_path, "mode: lab\nparallel:\n  tp: 1\n")
-    ctx = ParallelContext.single_gpu()
-    with pytest.raises(ConfigError, match="tensor-parallel apply failed"):
-        _build_primary_model(
-            cfg,
-            _TINY_ENTRY,
-            mp_strategy=_BoomMP(),
-            pipeline_schedule=None,
-            parallel_ctx=ctx,
-        )
-
-
-def test_invariant_build_primary_model_pipeline_failure_raises(
-    tmp_path: Path,
-) -> None:
-    """pipeline_schedule.prepare raising a non-ConfigError wraps it as ConfigError (line 781-784)."""
-
-    class _BoomPP:
-        def prepare(self, model: Any, parallel_ctx: Any) -> Any:
-            raise RuntimeError("pp crash")
-
-    cfg = _load(tmp_path, "mode: lab\nparallel:\n  pp: 2\n")
-    ctx = ParallelContext.single_gpu()
-    with pytest.raises(ConfigError, match="pipeline parallel.*failed to prepare"):
-        _build_primary_model(
-            cfg,
-            _TINY_ENTRY,
-            mp_strategy=None,
-            pipeline_schedule=_BoomPP(),
-            parallel_ctx=ctx,
-        )
 
 
 # ---------------------------------------------------------------------------

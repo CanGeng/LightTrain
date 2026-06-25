@@ -20,6 +20,21 @@ from lighttrain.config import ConfigError, dump_resolved, load_config
 _log = logging.getLogger(__name__)
 
 
+def _teardown_distributed() -> None:
+    """Best-effort NCCL/gloo process-group teardown at the end of a run.
+
+    Without this, a multi-rank ``torchrun`` exit leaves the process group
+    undestroyed and torch warns about leaked resources on every rank.
+    """
+    try:
+        import torch.distributed as dist
+
+        if dist.is_available() and dist.is_initialized():
+            dist.destroy_process_group()
+    except Exception:  # noqa: BLE001 — teardown must never mask the run's outcome
+        _log.warning("cli: destroy_process_group() failed during teardown", exc_info=True)
+
+
 def train_cmd(
     config: Path = typer.Option(..., "-c", "--config", help="Recipe YAML path."),
     overrides: list[str] = typer.Argument(None, help="OmegaConf-style overrides."),
@@ -139,6 +154,7 @@ def train_cmd(
     finally:
         if bundle.get("logger") is not None:
             bundle["logger"].close()
+        _teardown_distributed()
     wall_seconds = _time.perf_counter() - t0
 
     # Post-fit eval (only on a clean run).
@@ -228,6 +244,7 @@ def resume_cmd(
     finally:
         if bundle.get("logger") is not None:
             bundle["logger"].close()
+        _teardown_distributed()
     console.print("[green]resume complete[/]")
 
 

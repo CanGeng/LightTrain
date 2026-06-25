@@ -168,10 +168,10 @@ def test_parallel_section_defaults_yield_single_gpu():
     """ParallelSection construction with no overrides matches single-GPU defaults.
 
     Input: ``ParallelSection()``.
-    Expected: dp==tp==pp==ep==1, backend=='nccl', force_cpu==False.
+    Expected: dp==1, backend=='nccl', force_cpu==False.
     """
     p = ParallelSection()
-    assert p.dp == 1 and p.tp == 1 and p.pp == 1 and p.ep == 1
+    assert p.dp == 1
     assert p.backend == "nccl"
     assert p.force_cpu is False
 

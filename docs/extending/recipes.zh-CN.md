@@ -60,18 +60,18 @@
 
 ## 分布式
 
-这些演示并行拓扑。**`ddp` / `fsdp` / `zero2` / `tp_ddp` / `3d_parallel` 是 overlay**
-——只含 `parallel:` / `engine:` / `trainer:` 拓扑，没有 `model:` / `data:`，需叠加到
-一个完整 recipe（如 `pretrain_causal`）之上；且要用多进程启动器（`torchrun` /
-`deepspeed`），不能用单进程 `lighttrain train` 直接跑。
+这些演示数据并行拓扑。**`ddp` / `fsdp` / `zero2` 是 overlay**——只含 `parallel:` /
+`engine:` / `trainer:` 拓扑，没有 `model:` / `data:`，需叠加到一个完整 recipe（如
+`pretrain_causal`）之上；且要用多进程启动器（`torchrun` / `deepspeed`），不能用单进程
+`lighttrain train` 直接跑。
+
+仅支持数据并行（DDP / FSDP / DeepSpeed ZeRO）。张量 / 流水线 / 专家 / 序列并行已移除。
 
 | Recipe | 演示 |
 | ------ | ---- |
 | `ddp` | 单机 4 卡 DDP 数据并行（overlay） |
 | `fsdp` | FSDP 全分片（overlay） |
 | `zero2` | ZeRO-2 优化器分片（overlay） |
-| `tp_ddp` | 张量并行 × DDP（overlay） |
-| `3d_parallel` | TP × PP × DP 3D 并行（overlay） |
 | `nano_model` | gloo + CPU 多进程冒烟测试（完整 recipe，`torchrun --nproc_per_node 4`） |
 
 ## 相关

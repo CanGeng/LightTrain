@@ -17,12 +17,9 @@ from pathlib import Path
 
 import pytest
 
-import lighttrain.cli._runtime as _runtime
 from lighttrain.cli._runtime import (
     _IMPORTED_USER_MODULES,
     _auto_attach_m4_callbacks,
-    _build_model_parallel_strategy,
-    _build_pipeline_schedule,
     _import_user_modules,
     setup_run_from_config,
 )
@@ -147,36 +144,6 @@ def _cfg(tmp_path: Path, body: str):
     return load_config(p)
 
 
-def test_tp_disabled_returns_none(tmp_path: Path):
-    """No parallel section, or ``tp <= 1``, is the normal single-GPU path —
-    returns None, never raises."""
-    assert _build_model_parallel_strategy(_cfg(tmp_path, "mode: lab\n")) is None
-    cfg = _cfg(tmp_path, "mode: lab\nparallel: {tp: 1}\n")
-    assert _build_model_parallel_strategy(cfg) is None
-
-
-def test_tp_requested_without_block_raises(tmp_path: Path):
-    """``parallel.tp > 1`` but no ``tensor_parallel:`` block previously
-    returned None silently (user thinks they're parallel, but aren't).
-    It must now fail loud."""
-    cfg = _cfg(tmp_path, "mode: lab\nparallel: {tp: 4}\n")
-    with pytest.raises(ConfigError, match="tensor_parallel"):
-        _build_model_parallel_strategy(cfg)
-
-
-def test_tp_strategy_unregistered_raises(tmp_path: Path, monkeypatch):
-    """``tp > 1`` with a ``tensor_parallel:`` block but no registered strategy
-    (plugins not loaded) must raise, not return None."""
-    cfg = _cfg(tmp_path, "mode: lab\nparallel:\n  tp: 4\n  tensor_parallel: {}\n")
-
-    def _boom(*_a, **_k):
-        raise KeyError("model_parallel_strategy/tensor_parallel")
-
-    monkeypatch.setattr(_runtime, "_registry_get", _boom)
-    with pytest.raises(ConfigError, match="not registered"):
-        _build_model_parallel_strategy(cfg)
-
-
 # ===========================================================================
 # Auto-attached diagnostics — construction failures must not be swallowed:
 # critical InvariantsCallback fails loud; non-critical ones warn & skip.
@@ -235,74 +202,6 @@ def test_auto_attach_noncritical_failure_warns(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(fs_mod, "FrozenStepCallback", _Boom)
     with pytest.warns(UserWarning, match="FrozenStepCallback"):
         _auto_attach_m4_callbacks(_cfg(tmp_path, "mode: lab\n"), _FakeTrainer(), [])
-
-
-# ===========================================================================
-# SP / EP — registered but not wired into the runtime: must fail loud.
-# ===========================================================================
-
-
-def test_sp_requested_fails_loud(tmp_path: Path):
-    """`parallel.sp: true` is registered but not wired into the selector — it
-    must fail loud instead of silently no-op'ing."""
-    cfg = _cfg(tmp_path, "mode: lab\nparallel: {sp: true}\n")
-    with pytest.raises(ConfigError, match="sequence parallelism"):
-        _build_model_parallel_strategy(cfg)
-
-
-def test_ep_requested_fails_loud(tmp_path: Path):
-    """`parallel.ep > 1` is a skeleton (no real all-to-all) — must fail loud."""
-    cfg = _cfg(tmp_path, "mode: lab\nparallel: {ep: 2}\n")
-    with pytest.raises(ConfigError, match="expert parallelism"):
-        _build_model_parallel_strategy(cfg)
-
-
-# ===========================================================================
-# Pipeline schedule selection — honors `parallel.pipeline.schedule`, fails loud
-# on an unknown schedule, and drops the `schedule` selector key from ctor kwargs.
-# ===========================================================================
-
-
-def test_pipeline_schedule_disabled_returns_none(tmp_path: Path):
-    """No parallel section, or `pp <= 1`, is the normal path — None, no raise."""
-    assert _build_pipeline_schedule(_cfg(tmp_path, "mode: lab\n")) is None
-    cfg = _cfg(tmp_path, "mode: lab\nparallel: {pp: 1}\n")
-    assert _build_pipeline_schedule(cfg) is None
-
-
-def test_pipeline_schedule_gpipe_selected(tmp_path: Path):
-    """`schedule: gpipe` selects GPipeSchedule, and the `schedule` selector key
-    is dropped from ctor kwargs (GPipeSchedule.__init__ takes no `schedule=`)."""
-    from lighttrain.config._components import import_all_components
-
-    import_all_components()
-    cfg = _cfg(tmp_path, "mode: lab\nparallel:\n  pp: 2\n  pipeline: {schedule: gpipe}\n")
-    sched = _build_pipeline_schedule(cfg)
-    assert type(sched).__name__ == "GPipeSchedule"
-
-
-def test_pipeline_unknown_schedule_fails_loud(tmp_path: Path):
-    """An unknown `schedule:` must raise ConfigError, not silently fall back."""
-    cfg = _cfg(tmp_path, "mode: lab\nparallel:\n  pp: 2\n  pipeline: {schedule: nope}\n")
-    with pytest.raises(ConfigError, match="not registered"):
-        _build_pipeline_schedule(cfg)
-
-
-def test_setup_run_tp_misconfig_raises_configerror_not_rank(tmp_path: Path):
-    """Integration: a non-torchrun run with `parallel.tp > 1` but no
-    `tensor_parallel:` block must surface the precise ConfigError from the
-    parallel-config preflight — not a generic 'RANK expected' from process-group
-    init. The preflight runs before the run dir is created, so a misconfig must
-    also leave no polluting run dir under ``runs/``."""
-    run_root = tmp_path / "runs"
-    cfg = tmp_path / "recipe.yaml"
-    cfg.write_text(
-        f"mode: lab\nrun_root: {run_root}\nparallel: {{tp: 4}}\n",
-        encoding="utf-8",
-    )
-    with pytest.raises(ConfigError, match="tensor_parallel"):
-        setup_run_from_config(cfg)
-    assert not run_root.exists(), "invalid parallel config must not create a run dir"
 
 
 # ---------------------------------------------------------------------------

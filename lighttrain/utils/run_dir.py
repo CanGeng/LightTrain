@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from .env_capture import capture_env
 from .hashing import short_hash
@@ -66,4 +68,38 @@ def make_run_dir(
     return run_dir
 
 
-__all__ = ["make_run_dir", "slugify"]
+def broadcast_run_dir(
+    factory: Callable[[], Path],
+    *,
+    world_size: int,
+    is_main: bool,
+    device: Any,
+) -> Path:
+    """Make all ranks agree on one run dir: rank 0 creates it, then broadcasts.
+
+    ``make_run_dir`` timestamps the path with ``datetime.now()``, which each
+    rank evaluates independently — a multi-rank launch straddling a one-second
+    boundary would otherwise split ranks across sibling run dirs. Here only the
+    main process calls ``factory`` (the dir-creating side effect); the resulting
+    path string is broadcast so every rank uses it.
+
+    Single-process (or pre-dist) callers just call ``factory`` directly.
+
+    ``broadcast_object_list`` is a collective and thus a sync point: when it
+    returns, rank 0 has finished ``factory()`` (dir created + seeded), so the
+    path is safe to use on every rank. ``device`` must be the rank's local
+    device (cuda:local_rank for nccl, cpu for gloo/force_cpu).
+    """
+    import torch.distributed as dist
+
+    if world_size <= 1 or not dist.is_initialized():
+        return factory()
+    payload: list[str | None] = [None]
+    if is_main:
+        payload[0] = str(factory())
+    dist.broadcast_object_list(payload, src=0, device=device)
+    assert payload[0] is not None  # populated by src=0 broadcast
+    return Path(payload[0])
+
+
+__all__ = ["broadcast_run_dir", "make_run_dir", "slugify"]

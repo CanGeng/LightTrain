@@ -126,6 +126,10 @@ class FSDPStrategy:
         inner = getattr(optimizer, "optimizer", optimizer)
         inner.step()
 
+    def zero_grad(self, optimizer: Any) -> None:
+        inner = getattr(optimizer, "optimizer", optimizer)
+        inner.zero_grad(set_to_none=True)
+
     def unwrap_model(self, model: nn.Module) -> nn.Module:
         return model  # FSDP wrapper is the canonical state-dict carrier
 

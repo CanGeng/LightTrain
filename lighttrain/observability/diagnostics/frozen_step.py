@@ -44,10 +44,11 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from safetensors.torch import save_model as _save_model
 
 from lighttrain.observability.minimal import build_minimal_model, dump_spec, load_state
 from lighttrain.utils.seed import restore_rng_state, rng_state
+
+from ._save import save_model_safe as _save_model
 
 _log = logging.getLogger(__name__)
 

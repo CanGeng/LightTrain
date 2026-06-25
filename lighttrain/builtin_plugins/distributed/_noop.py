@@ -55,6 +55,9 @@ class NoopGradSyncStrategy:
     def optimizer_step(self, optimizer: Any, model: nn.Module) -> None:
         optimizer.step()
 
+    def zero_grad(self, optimizer: Any) -> None:
+        optimizer.zero_grad(set_to_none=True)
+
     def unwrap_model(self, model: nn.Module) -> nn.Module:
         return model
 

@@ -1,30 +1,23 @@
 """Real multi-process integration tests for ``ParallelContext.from_env``.
 
-Spawns 2–4 worker processes via ``torch.multiprocessing.spawn`` over the
-``gloo`` CPU backend so that the manual fallback path in ``_create_groups_manual``
-and ``_create_ep_groups`` is exercised end-to-end (DeviceMesh requires CUDA).
+Spawns worker processes via ``torch.multiprocessing.spawn`` over the ``gloo``
+CPU backend so the data-parallel manual fallback path is exercised end-to-end
+(DeviceMesh requires CUDA). ``cfg.force_cpu=True`` bypasses the CUDA DeviceMesh
+branch so the manual ``dist.new_group`` path actually runs.
 
 Marked ``@pytest.mark.slow``: skip with ``pytest -m 'not slow'`` for fast
 local iteration.
 
-Each test boots N processes that:
-  1. Call ``dist.init_process_group(backend="gloo", ...)`` with the
-     ``LOCAL_RANK``/``RANK``/``WORLD_SIZE``/``MASTER_ADDR``/``MASTER_PORT``
-     env vars set by the harness.
-  2. Construct ``ParallelContext.from_env(cfg)`` and write its observable
-     fields to a shared per-rank file. ``cfg.force_cpu=True`` bypasses the
-     CUDA DeviceMesh branch so the manual helpers actually run.
-  3. Perform a collective (broadcast / all_reduce) over the resulting
-     ``dp_group`` / ``ep_group`` whose result is predictable from rank
-     arithmetic.
-
-The parent test then reads the per-rank files and asserts the collective
-result + the rank arithmetic.
+Workers boot a process group, construct ``ParallelContext.from_env(cfg)``,
+perform a collective over ``dp_group`` (or pin the broadcast run dir), and
+write per-rank results to files the parent test asserts on.
 """
 from __future__ import annotations
 
 import json
 import os
+import time
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -67,9 +60,7 @@ def _worker_dp2_broadcast(rank: int, world_size: int, rendezvous_file: str, out_
     from lighttrain.distributed import ParallelContext
 
     _init_dist(rank, world_size, rendezvous_file)
-    cfg = SimpleNamespace(
-        backend="gloo", dp=2, tp=1, pp=1, ep=1, sp=False, force_cpu=True
-    )
+    cfg = SimpleNamespace(backend="gloo", dp=2, force_cpu=True)
     ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     if rank == 0:
@@ -83,8 +74,6 @@ def _worker_dp2_broadcast(rank: int, world_size: int, rendezvous_file: str, out_
     info = {
         "rank": ctx.rank,
         "dp_rank": ctx.dp_rank,
-        "tp_rank": ctx.tp_rank,
-        "pp_rank": ctx.pp_rank,
         "world_size": ctx.world_size,
     }
     Path(out_dir, f"rank{rank}.json").write_text(json.dumps(info), encoding="utf-8")
@@ -92,62 +81,33 @@ def _worker_dp2_broadcast(rank: int, world_size: int, rendezvous_file: str, out_
     dist.destroy_process_group()
 
 
-def _worker_dp2_tp2(rank: int, world_size: int, rendezvous_file: str, out_dir: str) -> None:
-    """4-proc dp=2 tp=2: assert (dp_rank, tp_rank) matches the layout formula.
+def _worker_run_dir_agreement(rank: int, world_size: int, rendezvous_file: str, out_dir: str) -> None:
+    """All ranks must end up with rank-0's run dir, never their own timestamp.
 
-    The layout is ``rank = dp_r * (tp*pp) + tp_r * pp + pp_r`` with pp=1, so
-    ``dp_rank = rank // 2`` and ``tp_rank = rank % 2``.
+    ``factory`` returns a ``datetime.now()`` path suffixed with the rank, and
+    rank 0 sleeps past a one-second boundary first — so a naive per-rank path
+    would diverge on both the timestamp *and* the suffix. ``broadcast_run_dir``
+    must make every rank report rank 0's path (``-r0``).
     """
-    from lighttrain.distributed import ParallelContext
+    from lighttrain.utils.run_dir import broadcast_run_dir
 
     _init_dist(rank, world_size, rendezvous_file)
-    cfg = SimpleNamespace(
-        backend="gloo", dp=2, tp=2, pp=1, ep=1, sp=False, force_cpu=True
+
+    def factory() -> Path:
+        if rank == 0:
+            time.sleep(1.2)  # force a cross-second skew to amplify the race
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        return Path(out_dir) / f"run-{ts}-r{rank}"
+
+    run_dir = broadcast_run_dir(
+        factory,
+        world_size=world_size,
+        is_main=(rank == 0),
+        device=torch.device("cpu"),
     )
-    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
-    info = {
-        "rank": ctx.rank,
-        "dp_rank": ctx.dp_rank,
-        "tp_rank": ctx.tp_rank,
-        "pp_rank": ctx.pp_rank,
-        "world_size": ctx.world_size,
-    }
-    Path(out_dir, f"rank{rank}.json").write_text(json.dumps(info), encoding="utf-8")
-    dist.destroy_process_group()
-
-
-def _worker_dp4_ep2(rank: int, world_size: int, rendezvous_file: str, out_dir: str) -> None:
-    """4-proc dp=4 ep=2: ``ep_group`` all_reduce sums must match the analytical answer.
-
-    With dp=4, ep=2 the DP global ranks are [0,1,2,3]. ``_create_ep_groups``
-    slices them into ``[[0,1], [2,3]]``. ep_rank = dp_rank % 2 (= rank % 2
-    here, because tp=pp=1 → dp_rank == rank).
-
-    Each rank contributes ``rank+1`` to an all_reduce on the ep_group, so
-    the sums must be ``1+2 = 3`` for the {0,1} group and ``3+4 = 7`` for
-    {2,3}. Pre-fix (DIST_EP_01) the EP groups would have been mis-formed
-    (using local positional indices passed to ``new_group``) which would
-    yield a different rank-pairing — for any wrong pairing the sum would
-    differ from {3, 3, 7, 7}.
-    """
-    from lighttrain.distributed import ParallelContext
-
-    _init_dist(rank, world_size, rendezvous_file)
-    cfg = SimpleNamespace(
-        backend="gloo", dp=4, tp=1, pp=1, ep=2, sp=False, force_cpu=True
+    Path(out_dir, f"rank{rank}.json").write_text(
+        json.dumps({"run_dir": str(run_dir)}), encoding="utf-8"
     )
-    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
-
-    contribution = torch.tensor([float(rank + 1)])
-    dist.all_reduce(contribution, op=dist.ReduceOp.SUM, group=ctx.ep_group)
-
-    info = {
-        "rank": ctx.rank,
-        "dp_rank": ctx.dp_rank,
-        "ep_rank": ctx.ep_rank,
-        "ep_sum": float(contribution.item()),
-    }
-    Path(out_dir, f"rank{rank}.json").write_text(json.dumps(info), encoding="utf-8")
     dist.destroy_process_group()
 
 
@@ -190,61 +150,22 @@ def test_spawn_2procs_dp2_broadcast(tmp_path: Path) -> None:
     assert info1["dp_rank"] == 1
 
 
-def test_spawn_4procs_dp2_tp2_local_ranks(tmp_path: Path) -> None:
-    """Each rank's ``(dp_rank, tp_rank)`` matches the analytical layout formula.
+def test_regression_run_dir_agreement_spawn_4procs(tmp_path: Path) -> None:
+    """All 4 ranks share rank-0's run dir despite a forced timestamp skew.
 
-    Input: 4 procs, dp=2 tp=2 pp=1. Analytical:
-        rank 0 → (dp=0, tp=0)
-        rank 1 → (dp=0, tp=1)
-        rank 2 → (dp=1, tp=0)
-        rank 3 → (dp=1, tp=1)
+    Pins the run-dir timestamp race: ``make_run_dir`` stamps
+    ``datetime.now()`` per rank, so a launch crossing a one-second boundary
+    used to split ranks across sibling dirs (same config hash, different
+    ``HHMMSS``). ``broadcast_run_dir`` has rank 0 own the path and broadcast it.
+
+    Input: 4 procs; ``factory`` returns ``run-<ts>-r<rank>`` and rank 0 sleeps
+    1.2s first. Pre-fix every rank keeps its own ``-r<rank>`` path → 4 distinct
+    dirs. Post-fix all report rank 0's ``-r0`` path → exactly one dir.
     """
-    _spawn(_worker_dp2_tp2, 4, tmp_path)
-    expected = {0: (0, 0), 1: (0, 1), 2: (1, 0), 3: (1, 1)}
-    for r in range(4):
-        info = json.loads((tmp_path / f"rank{r}.json").read_text(encoding="utf-8"))
-        assert (info["dp_rank"], info["tp_rank"]) == expected[r], (
-            f"rank {r} got dp={info['dp_rank']}, tp={info['tp_rank']}"
-        )
-
-
-def test_regression_DIST_EP_01_spawn_4procs_dp4_ep2_real_groups(tmp_path: Path) -> None:
-    """Integration-level pin of DIST_EP_01 over real gloo processes.
-
-    Pre-fix bug: ``_create_ep_groups`` used DP-positional indices instead of
-    real global ranks when calling ``dist.new_group``; ``dp_degree>1,ep>1``
-    EP groups would have wrong members and the all_reduce sums would not
-    match the analytical {3, 3, 7, 7} pattern (see docs/changelog/v0.1.4:
-    'EP 组用局部 rank 调用 dist.new_group').
-
-    Input: 4 procs, dp=4 ep=2. Each rank ``r`` contributes ``r+1`` to an
-    all_reduce summed over its ep_group.
-
-    Analytical solution:
-        EP groups (post-fix)  = {0,1}, {2,3}
-        sum for {0,1}         = 1+2 = 3
-        sum for {2,3}         = 3+4 = 7
-        ep_rank               = rank % 2 (because dp_rank==rank here)
-
-    Verifies rank 0 and 1 see sum=3, rank 2 and 3 see sum=7.
-    """
-    _spawn(_worker_dp4_ep2, 4, tmp_path)
-    sums = {}
-    ep_ranks = {}
-    for r in range(4):
-        info = json.loads((tmp_path / f"rank{r}.json").read_text(encoding="utf-8"))
-        sums[r] = info["ep_sum"]
-        ep_ranks[r] = info["ep_rank"]
-
-    torch.testing.assert_close(
-        torch.tensor([sums[0], sums[1]]),
-        torch.tensor([3.0, 3.0]),
-        atol=1e-5, rtol=1e-4,
-    )
-    torch.testing.assert_close(
-        torch.tensor([sums[2], sums[3]]),
-        torch.tensor([7.0, 7.0]),
-        atol=1e-5, rtol=1e-4,
-    )
-    # ep_rank = dp_rank % ep ; here dp_rank == rank
-    assert ep_ranks == {0: 0, 1: 1, 2: 0, 3: 1}
+    _spawn(_worker_run_dir_agreement, 4, tmp_path)
+    dirs = [
+        json.loads((tmp_path / f"rank{r}.json").read_text(encoding="utf-8"))["run_dir"]
+        for r in range(4)
+    ]
+    assert len(set(dirs)) == 1, f"ranks disagreed on run_dir: {dirs}"
+    assert dirs[0].endswith("-r0"), f"expected rank-0's path, got {dirs[0]}"
