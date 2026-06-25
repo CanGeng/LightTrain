@@ -9,7 +9,10 @@ updates to either side don't bleed across.
 
 from __future__ import annotations
 
+from typing import cast
+
 import torch.nn as nn
+from torch import Tensor
 
 from ._replace import get_submodule
 
@@ -27,10 +30,12 @@ def tie_weights(model: nn.Module, src_path: str, dst_path: str) -> None:
             f"Both src ({src_path}) and dst ({dst_path}) must expose a "
             f"``.weight`` Parameter."
         )
-    if src.weight.shape != dst.weight.shape:
+    src_w = cast(Tensor, src.weight)
+    dst_w = cast(Tensor, dst.weight)
+    if src_w.shape != dst_w.shape:
         raise ValueError(
-            f"Shape mismatch: {src_path}.weight {tuple(src.weight.shape)} vs "
-            f"{dst_path}.weight {tuple(dst.weight.shape)}"
+            f"Shape mismatch: {src_path}.weight {tuple(src_w.shape)} vs "
+            f"{dst_path}.weight {tuple(dst_w.shape)}"
         )
     dst.weight = src.weight  # shared storage; preserves Parameter-ness
 
@@ -41,8 +46,9 @@ def untie_weights(model: nn.Module, path: str) -> None:
     sub = get_submodule(model, path)
     if not _has_weight(sub):
         raise TypeError(f"{path!r} does not expose a ``.weight`` Parameter.")
-    cloned = sub.weight.detach().clone()
-    sub.weight = nn.Parameter(cloned, requires_grad=sub.weight.requires_grad)
+    sub_w = cast(Tensor, sub.weight)
+    cloned = sub_w.detach().clone()
+    sub.weight = nn.Parameter(cloned, requires_grad=sub_w.requires_grad)
 
 
 __all__ = ["tie_weights", "untie_weights"]

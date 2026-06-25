@@ -172,11 +172,7 @@ module = [
     "lighttrain.builtin_plugins.trainers.grpo",
     "lighttrain.builtin_plugins.trainers.ppo",
     "lighttrain.builtin_plugins.trainers.rm",
-    "lighttrain.observability.diagnostics.oom_report",
     "lighttrain.lab.sweep",
-    "lighttrain.models.surgery._embedding",
-    "lighttrain.models.surgery._replace",
-    "lighttrain.models.surgery._tie",
     "lighttrain.trainers.base",
 ]
 ignore_errors = true
