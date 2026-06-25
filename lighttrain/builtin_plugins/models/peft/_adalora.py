@@ -180,7 +180,7 @@ class AdaLoRAAdapter(nn.Module):
             beta2=0.85,
             orth_reg_weight=0.5,
         )
-        return get_peft_model(base_model, cfg)
+        return get_peft_model(base_model, cfg)  # type: ignore[arg-type]  # peft accepts any nn.Module at runtime
 
     def _build_manual(self, base_model: nn.Module) -> nn.Module:
         """Replace target Linear layers with AdaLoRALinear."""

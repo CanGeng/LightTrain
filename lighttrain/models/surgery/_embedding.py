@@ -59,7 +59,7 @@ def resize_embedding(
     if inner is not None and hasattr(inner, "resize_token_embeddings"):
         inner.resize_token_embeddings(new_vocab_size)
         if hasattr(model, "vocab_size"):
-            model.vocab_size = int(new_vocab_size)
+            model.vocab_size = int(new_vocab_size)  # type: ignore[assignment]
         return
 
     # tiny_lm / generic adapters that expose ``tok_emb`` (+ optional ``lm_head``).
@@ -127,7 +127,7 @@ def resize_embedding(
             model.lm_head = new_head
 
     if hasattr(model, "vocab_size"):
-        model.vocab_size = int(new_vocab_size)
+        model.vocab_size = int(new_vocab_size)  # type: ignore[assignment]
 
 
 __all__ = ["resize_embedding"]

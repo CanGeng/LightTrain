@@ -45,7 +45,7 @@ class TPAwareStrategy:
                 "does not have this method. "
                 "Subclass TPAwareModelAdapter or add apply_tp_plan manually."
             )
-        model.apply_tp_plan(parallel_ctx)  # type: ignore[attr-defined]
+        model.apply_tp_plan(parallel_ctx)  # type: ignore[operator]
         return model
 
     def is_stateless(self) -> bool:

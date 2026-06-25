@@ -94,7 +94,7 @@ class MaskedDenoisingObjective:
             masked_indices & ~replace_with_mask & (torch.rand_like(probability_matrix) < 0.5)
         )
         random_tokens = torch.randint(
-            0, self.vocab_size, (replace_with_random.sum(),), device=input_ids.device
+            0, self.vocab_size, (int(replace_with_random.sum()),), device=input_ids.device
         )
         corrupted[replace_with_random] = random_tokens
 

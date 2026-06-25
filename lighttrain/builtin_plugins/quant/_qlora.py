@@ -22,7 +22,7 @@ import torch.nn as nn
 from lighttrain.registry import register
 
 from ..layer_offload._adapters import (
-    register_layered_view,  # type: ignore  # noqa: F401
+    register_layered_view,  # noqa: F401
 )
 from ._bnb import bnb_quantize
 
@@ -78,7 +78,7 @@ class QLoRAAdapter:
         wrapped = LoRAAdapter(base=base_module, **lora_kwargs)
         # Tag the wrapper so dump_peft_spec records the QLoRA provenance.
         wrapped._base_spec = base_spec
-        wrapped._qlora_kwargs = {
+        wrapped._qlora_kwargs = {  # type: ignore[assignment]
             "bits": int(bits),
             "lora": lora_kwargs,
             "skip": list(skip or ("lm_head",)),

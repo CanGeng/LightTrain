@@ -21,6 +21,7 @@ Two primitives:
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import cast
 
 import torch.nn as nn
 
@@ -105,7 +106,7 @@ def get_submodule(model: nn.Module, dotted_path: str) -> nn.Module:
     if not dotted_path:
         return model
     parts = dotted_path.split(".")
-    return _walk(model, parts[:-1]).__getattr__(parts[-1])
+    return cast(nn.Module, _walk(model, parts[:-1]).__getattr__(parts[-1]))
 
 
 __all__ = ["replace_module", "add_named_module", "get_submodule"]

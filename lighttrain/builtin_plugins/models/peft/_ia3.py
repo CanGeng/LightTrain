@@ -56,7 +56,7 @@ class IA3Adapter(nn.Module):
         base: Mapping[str, Any] | nn.Module,
         target_modules: list[str] | str | None = None,
         feedforward_modules: list[str] | str | None = None,
-        task_type: str = "CAUSAL_LM",
+        task_type: str | None = "CAUSAL_LM",
         modules_to_save: list[str] | None = None,
         init_ia3_weights: bool = True,
     ) -> None:
@@ -109,7 +109,7 @@ class IA3Adapter(nn.Module):
     ) -> Any:
         _ = strict
         load_adapter_state_dict(self.inner, state_dict)
-        return torch.nn.modules.module._IncompatibleKeys([], [])  # type: ignore[attr-defined]
+        return torch.nn.modules.module._IncompatibleKeys([], [])
 
     def full_state_dict(self) -> dict[str, torch.Tensor]:
         return dict(self.inner.state_dict())
