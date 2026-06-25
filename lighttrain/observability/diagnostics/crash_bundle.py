@@ -164,7 +164,7 @@ def write_crash_bundle(
                 f.write(json.dumps({"step": int(step), **{k: _scalar(v) for k, v in metrics.items()}}) + "\n")
         except Exception:  # noqa: BLE001
             _log.warning(
-                "crash_bundle: recent metrics write failed; bundle omits metrics_recent.jsonl",
+                "crash_bundle: recent metrics write failed; metrics_recent.jsonl may be empty or partial",
                 exc_info=True,
             )
 

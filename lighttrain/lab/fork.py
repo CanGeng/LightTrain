@@ -111,7 +111,15 @@ def _copy_checkpoint(
     ckpt_root.mkdir(parents=True, exist_ok=True)
     dst = ckpt_root / src.name
     if dst.exists() or dst.is_symlink():
-        shutil.rmtree(dst) if dst.is_dir() else dst.unlink()
+        if dst.is_symlink():
+            # ``is_dir()`` follows symlinks, so a symlink-to-dir would otherwise
+            # be sent to ``shutil.rmtree`` which raises OSError on py3.12+. Always
+            # unlink a symlink regardless of its target type.
+            dst.unlink()
+        elif dst.is_dir():
+            shutil.rmtree(dst)
+        else:
+            dst.unlink()
     if symlink:
         dst.symlink_to(src.resolve())
     else:

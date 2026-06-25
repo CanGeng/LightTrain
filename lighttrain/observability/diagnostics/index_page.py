@@ -46,9 +46,12 @@ def write_index_page(run_dir: str | Path, *, bus: Any | None = None) -> Path:
     )
 
     quarantined: list[str] = []
-    if bus is not None and hasattr(bus, "quarantined"):
+    if bus is not None:
+        # ``hasattr`` only swallows AttributeError; keep the access inside the
+        # try so a ``quarantined`` property that raises anything else can't escape.
         try:
-            quarantined = list(bus.quarantined)
+            if hasattr(bus, "quarantined"):
+                quarantined = list(bus.quarantined)
         except Exception:  # noqa: BLE001
             _log.warning(
                 "index_page: failed to read bus.quarantined; index lists no quarantined callbacks",

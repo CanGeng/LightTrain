@@ -38,12 +38,17 @@ def cycle_check(
     *,
     current_run_id: str,
     k: int = 4,
+    exclude_direct_parent: bool = False,
 ) -> list[CycleHit]:
     """Walk back through ``derived_from``+``produced_by`` edges K hops.
 
     A hit occurs when an ancestor's ``run_id`` matches ``current_run_id`` —
     i.e. the current run is consuming an artifact that an earlier step in the
     same run produced. Up-to-K BFS, so the cost is bounded.
+
+    ``exclude_direct_parent`` skips depth-1 hits: callers that have *just*
+    written a ``produced_by`` edge (run → artifact) use this so the freshly
+    written edge — which is by design, not a cycle — doesn't self-report.
     """
     hits: list[CycleHit] = []
     visited: set[int] = set()
@@ -53,9 +58,20 @@ def cycle_check(
         for node_id, depth in frontier:
             if node_id in visited or depth > k:
                 continue
-            visited.add(node_id)
             node = store.get_node(node_id)
-            if node and node.get("run_id") == current_run_id and node_id != start_node:
+            matches = bool(
+                node
+                and node.get("run_id") == current_run_id
+                and node_id != start_node
+            )
+            # The just-written produced_by edge makes the current run the
+            # freshly-finalized artifact's depth-1 parent — that's production,
+            # not a cycle. Skip it WITHOUT marking visited so a genuine deeper
+            # path back to the same run is still detected.
+            if matches and exclude_direct_parent and depth == 1:
+                continue
+            visited.add(node_id)
+            if matches:
                 hits.append(CycleHit(node_id=node_id, via_run_id=current_run_id, depth=depth))
             for kind in ("derived_from", "produced_by"):
                 for src in store.parents(node_id, edge_kind=kind):

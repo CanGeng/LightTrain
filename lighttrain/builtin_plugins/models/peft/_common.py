@@ -141,8 +141,6 @@ def _fallback_base_spec(model: nn.Module | None) -> dict[str, Any]:
         next_base = getattr(base, attr, None)
         if callable(next_base):
             base = next_base()
-        elif isinstance(next_base, nn.Module):
-            base = next_base
     cls = type(base)
     return {"_target_": f"{cls.__module__}:{cls.__name__}", "params": {}}
 

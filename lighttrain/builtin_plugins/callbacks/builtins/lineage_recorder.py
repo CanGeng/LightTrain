@@ -142,6 +142,9 @@ class LineageRecorderCallback:
                     int(artifact_node),
                     current_run_id=self._run_id,
                     k=self.cycle_depth,
+                    # The produced_by edge we just wrote makes this run the
+                    # artifact's depth-1 parent; that's by design, not a cycle.
+                    exclude_direct_parent=True,
                 )
                 apply_cycle_policy(
                     hits,
