@@ -284,7 +284,7 @@ class _EventRecorder:
     def __init__(self) -> None:
         self.events: list[str] = []
 
-    def _h(name: str):
+    def _h(name: str):  # type: ignore[misc]
         def _f(self, **_kw):
             self.events.append(name)
         return _f

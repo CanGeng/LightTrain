@@ -313,7 +313,7 @@ def test_pin_current_behavior_record_lineage_edge_returns_false_on_exception(tmp
         def __exit__(self, *a):
             pass
 
-    fake_store_mod.LineageStore = _BadStore
+    fake_store_mod.LineageStore = _BadStore  # type: ignore[attr-defined]
     old = sys.modules.get("lighttrain.observability.lineage.store")
     sys.modules["lighttrain.observability.lineage.store"] = fake_store_mod
 

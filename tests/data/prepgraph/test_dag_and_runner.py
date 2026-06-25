@@ -546,7 +546,7 @@ def test_chunk_node_splits_long_rows_within_max_len(tmp_path: Path) -> None:
     results = PrepRunner(PrepGraph.from_config(spec), store_root=tmp_path / "store").run()
     rows = results["chunked"].rows
     assert len(rows) > 1
-    assert all(len(r["input_ids"]) <= 64 for r in rows)
+    assert all(len(r["input_ids"]) <= 64 for r in rows)  # type: ignore[union-attr]
 
 
 def test_mix_node_round_robin_interleaves_sources(tmp_path: Path) -> None:
@@ -576,5 +576,5 @@ def test_mix_node_round_robin_interleaves_sources(tmp_path: Path) -> None:
     results = PrepRunner(PrepGraph.from_config(spec), store_root=tmp_path / "store").run()
     rows = results["mixed"].rows
     assert len(rows) == 6
-    assert rows[0]["text"].startswith("a")
-    assert rows[1]["text"].startswith("b")
+    assert rows[0]["text"].startswith("a")  # type: ignore[index]
+    assert rows[1]["text"].startswith("b")  # type: ignore[index]

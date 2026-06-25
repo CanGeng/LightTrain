@@ -505,7 +505,7 @@ def test_context_manager_closes_on_exit(tmp_path) -> None:
     """
     with LineageStore(tmp_path / "ctx.sqlite") as s:
         nid = s.upsert_node(kind="artifact", name="A")
-        assert s.get_node(nid)["name"] == "A"
+        assert s.get_node(nid)["name"] == "A"  # type: ignore[index]
     # Connection closed → using it raises ProgrammingError.
     import sqlite3
 

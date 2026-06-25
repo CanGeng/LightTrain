@@ -45,7 +45,7 @@ class _OrderedRecorder:
         self.events: list[str] = []
         self._signal_for = signal_for or {}
 
-    def _handler(name: str):
+    def _handler(name: str):  # type: ignore[misc]
         def _h(self, **_kw):
             self.events.append(name)
             return self._signal_for.get(name)

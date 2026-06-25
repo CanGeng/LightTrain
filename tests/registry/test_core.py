@@ -629,7 +629,7 @@ def _load_twice(tmp_path, body: str):
     for modname in ("lt_idem_A", "lt_idem_B"):
         spec = importlib.util.spec_from_file_location(modname, f)
         m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(m)
+        spec.loader.exec_module(m)  # type: ignore[union-attr]
         mods.append(m)
     return mods
 

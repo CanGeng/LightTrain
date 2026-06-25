@@ -276,7 +276,7 @@ def test_render_png_returns_early_when_all_metrics_none(tmp_path: Path):
     pytest.importorskip("matplotlib")
     out = tmp_path / "sub" / "out.png"
     report = _report({"loss": [None, None], "acc": [None, None]})
-    assert render_png(report, out) is None
+    assert render_png(report, out) is None  # type: ignore[func-returns-value]
     assert not out.exists()
     # parent dir was NOT created on the early return
     assert not out.parent.exists()
@@ -287,7 +287,7 @@ def test_render_png_returns_early_when_metrics_table_empty(tmp_path: Path):
     pytest.importorskip("matplotlib")
     out = tmp_path / "out.png"
     report = _report({})
-    assert render_png(report, out) is None
+    assert render_png(report, out) is None  # type: ignore[func-returns-value]
     assert not out.exists()
 
 
@@ -298,7 +298,7 @@ def test_render_png_writes_file_and_creates_parent_dir(tmp_path: Path):
     pytest.importorskip("matplotlib")
     out = tmp_path / "nested" / "deeper" / "compare.png"
     report = _report({"loss": [0.5, None], "acc": [0.9, 0.8]})
-    result = render_png(report, out)
+    result = render_png(report, out)  # type: ignore[func-returns-value]
     assert result is None
     assert out.exists()
     assert out.stat().st_size > 0

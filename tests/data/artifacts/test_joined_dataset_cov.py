@@ -227,7 +227,7 @@ def test_invariant_iter_skips_dropped_samples(tmp_path) -> None:
         base,
         join=[{"store": str(root), "namespace": "ns", "missing": "drop"}],
     )
-    rows = list(ds)
+    rows = list(ds)  # type: ignore[call-overload]
     assert len(rows) == 2
     assert all(r["id"] == "s1" for r in rows)
 
@@ -242,7 +242,7 @@ def test_iter_empty_when_all_dropped(tmp_path) -> None:
         base,
         join=[{"store": str(root), "namespace": "ns", "missing": "drop"}],
     )
-    assert list(ds) == []
+    assert list(ds) == []  # type: ignore[call-overload]
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ def test_join_entry_path_alias_accepted(tmp_path) -> None:
         join=[{"path": str(root), "namespace": "ns", "missing": "require"}],
     )
     row = ds[0]
-    assert "aux.ns.v" in row
+    assert "aux.ns.v" in row  # type: ignore[operator]
 
 
 # ---------------------------------------------------------------------------

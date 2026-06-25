@@ -542,7 +542,7 @@ def test_invariant_processor_path_attention_mask_defaults_to_ones(
     proc = _FakeProc(output={"input_ids": [1, 2, 3]})
     monkeypatch.setattr(_mod, "_build_processor", lambda spec: proc)
 
-    rows = [{"messages": []}]
+    rows = [{"messages": []}]  # type: ignore[var-annotated]
     node = TokenizeNode(
         name="tok",
         inputs=["up"],
@@ -562,7 +562,7 @@ def test_invariant_processor_path_labels_default_to_input_ids(
     proc = _FakeProc(output={"input_ids": [10, 20]})
     monkeypatch.setattr(_mod, "_build_processor", lambda spec: proc)
 
-    rows = [{"messages": []}]
+    rows = [{"messages": []}]  # type: ignore[var-annotated]
     node = TokenizeNode(
         name="tok",
         inputs=["up"],

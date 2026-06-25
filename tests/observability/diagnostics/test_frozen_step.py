@@ -444,7 +444,7 @@ def _make_real_bundle(tmp_path: Path) -> Path:
         },
         model=model, optimizer=opt,
     )
-    return writer.commit(reason="scheduled")
+    return writer.commit(reason="scheduled")  # type: ignore[return-value]
 
 
 def test_invariant_replay_no_model_spec_raises():

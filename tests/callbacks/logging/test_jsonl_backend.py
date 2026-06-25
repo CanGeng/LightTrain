@@ -188,7 +188,7 @@ def test_invariant_non_numeric_scalar_logged_as_string(tmp_path: Path):
     """
     p = tmp_path / "metrics.jsonl"
     j = JSONLLogger(path=p)
-    j.log_scalars({"label": "good", "loss": 0.5}, step=1)
+    j.log_scalars({"label": "good", "loss": 0.5}, step=1)  # type: ignore[dict-item]
     j.close()
     rec = json.loads(p.read_text(encoding="utf-8").strip())
     assert rec["label"] == "good"

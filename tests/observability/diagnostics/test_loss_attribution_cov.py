@@ -85,7 +85,7 @@ class _BadHandle:
 class _BadHookChild(_ConstChild):
     """Child that hands back a handle whose ``remove`` raises."""
 
-    def register_forward_hook(self, _hook: Any) -> Any:  # noqa: D401
+    def register_forward_hook(self, _hook: Any) -> Any:  # type: ignore[override]  # noqa: D401
         return _BadHandle()
 
 

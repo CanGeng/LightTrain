@@ -177,7 +177,7 @@ def test_invariant_log_scalars_skips_unconvertible_value_continues(tmp_path: Pat
         def __float__(self):
             raise TypeError("cannot convert")
 
-    logger.log_scalars({"bad": _BadFloat(), "loss": 0.3}, step=1)
+    logger.log_scalars({"bad": _BadFloat(), "loss": 0.3}, step=1)  # type: ignore[dict-item]
     assert mock_writer.add_scalar.call_count == 1
     mock_writer.add_scalar.assert_called_once_with("loss", 0.3, 1)
 
@@ -194,7 +194,7 @@ def test_invariant_log_scalars_skips_value_error_continues(tmp_path: Path):
         def __float__(self):
             raise ValueError("bad value")
 
-    logger.log_scalars({"skip": _BadValue(), "keep": 0.7}, step=5)
+    logger.log_scalars({"skip": _BadValue(), "keep": 0.7}, step=5)  # type: ignore[dict-item]
     assert mock_writer.add_scalar.call_count == 1
     mock_writer.add_scalar.assert_called_once_with("keep", 0.7, 5)
 
