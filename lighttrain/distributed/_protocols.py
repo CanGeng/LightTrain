@@ -1,17 +1,13 @@
 """Distributed strategy protocols.
 
-Three protocols cover the full parallelism spectrum:
+* ``GradSyncStrategy`` — model-agnostic DP: DDP / FSDP / ZeRO
 
-* ``GradSyncStrategy``      — model-agnostic DP: DDP / FSDP / ZeRO
-* ``ModelParallelStrategy`` — model-aware intra-op: TP / SP / EP
-* ``PipelineSchedule``      — layer-structure-aware: PP (1F1B / GPipe)
-
-Implementations live in ``builtin_plugins/distributed/``.  The protocols
-themselves live here (core) so that ``StandardEngine``, ``StandardUpdateRule``,
-and ``CheckpointManager`` can type-check against them without pulling in
+Implementations live in ``builtin_plugins/distributed/``.  The protocol
+itself lives here (core) so that ``StandardEngine``, ``StandardUpdateRule``,
+and ``CheckpointManager`` can type-check against it without pulling in
 heavy optional dependencies (torch.distributed, deepspeed, etc.).
 
-All three protocols use structural subtyping (duck-typing) — no inheritance
+The protocol uses structural subtyping (duck-typing) — no inheritance
 required.  The ``runtime_checkable`` decorator allows ``isinstance`` checks
 in tests.
 """
@@ -113,61 +109,6 @@ class GradSyncStrategy(Protocol):
     def load_state_dict(self, sd: dict[str, Any]) -> None: ...
 
 
-@runtime_checkable
-class ModelParallelStrategy(Protocol):
-    """Model-aware parallelism surgery: TP, SP, EP.
-
-    Must be applied **before** ``GradSyncStrategy.prepare()`` and before
-    any FSDP wrapping, because FSDP needs to see already-sharded parameters.
-    """
-
-    def apply(self, model: nn.Module, parallel_ctx: ParallelContext) -> nn.Module:
-        """Return the model with TP/SP/EP surgery applied.
-
-        For TP: replaces ``nn.Linear`` layers with DTensor column/row shards.
-        For SP: replaces sequence-consuming layers with sequence-sharded variants.
-        For EP: routes MoE expert layers to assigned ranks and installs all-to-all hooks.
-        """
-        ...
-
-    def is_stateless(self) -> bool:
-        """True for strategies that only reshard weights (TP, SP).
-        False for EP where routing state is rank-specific.
-        """
-        ...
-
-
-@runtime_checkable
-class PipelineSchedule(Protocol):
-    """Layer-structure-aware pipeline parallelism: 1F1B, GPipe, Interleaved.
-
-    Must be applied **after** ``ModelParallelStrategy.apply()`` (TP surgery)
-    and **before** ``GradSyncStrategy.prepare()`` (FSDP/DDP wrapping on DP dim).
-    """
-
-    def prepare(
-        self, model: nn.Module, parallel_ctx: ParallelContext
-    ) -> Any:
-        """Split model into PP stages and return the local stage module.
-
-        The returned object is what ``ctx.model`` will be set to for the
-        duration of training on this rank.
-        """
-        ...
-
-    def run_step(
-        self, stage: Any, microbatches: list[dict[str, Any]], ctx: Any
-    ) -> torch.Tensor:
-        """Execute one global step via micro-batch schedule.
-
-        Returns the loss scalar (valid only on ``pp_last_stage`` rank;
-        other ranks return a zero tensor that should not be logged).
-        """
-        ...
-
-
 __all__ = [
     "GradSyncStrategy",
-    "ModelParallelStrategy",
-    "PipelineSchedule",
 ]

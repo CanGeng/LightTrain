@@ -20,40 +20,20 @@ class GradSyncConfig(BaseModel):
     name: str = "noop"
 
 
-class TPConfig(BaseModel):
-    """Config for tensor parallelism surgery."""
-
-    model_config = ConfigDict(extra="allow")
-
-    auto_plan_for: str | None = None
-    plan: list[dict] | None = None
-
-
-class PipelineConfig(BaseModel):
-    """Config for pipeline parallelism schedule."""
-
-    model_config = ConfigDict(extra="allow")
-
-    n_microbatches: int = 4
-    schedule: str = "1f1b"
-    stage_spec: list[dict] | None = None
-
-
 class ParallelSection(BaseModel):
-    """Distributed topology knobs. Absent = single-GPU degenerate mode."""
+    """Distributed topology knobs. Absent = single-GPU degenerate mode.
+
+    Only data parallelism is supported (DDP / FSDP / DeepSpeed ZeRO via
+    ``grad_sync``). Tensor / pipeline / expert / sequence parallelism were
+    removed.
+    """
 
     model_config = ConfigDict(extra="allow")
 
     backend: Literal["nccl", "gloo"] = "nccl"
     dp: int = 1
-    tp: int = 1
-    pp: int = 1
-    ep: int = 1
-    sp: bool = False
     force_cpu: bool = False
     grad_sync: GradSyncConfig = Field(default_factory=GradSyncConfig)
-    tensor_parallel: TPConfig | None = None
-    pipeline: PipelineConfig | None = None
 
 
 class ComponentSpec(BaseModel):
@@ -153,8 +133,6 @@ __all__ = [
     "EngineSection",
     "GradSyncConfig",
     "ParallelSection",
-    "PipelineConfig",
     "RootConfig",
-    "TPConfig",
     "TrainerSection",
 ]

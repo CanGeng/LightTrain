@@ -6,15 +6,8 @@ lazily imported inside each strategy's methods.
 
 Strategies registered here:
   grad_sync_strategy:       ddp, fsdp, deepspeed
-  model_parallel_strategy:  tensor_parallel, tp_aware, sequence_parallel, expert_parallel
-  pipeline_schedule:        1f1b, gpipe, interleaved_1f1b
 """
 
-from .model_parallel.ep import ExpertParallelStrategy
-from .model_parallel.sp import SequenceParallelStrategy
-from .model_parallel.tp_auto import TensorParallelStrategy
-from .model_parallel.tp_aware import TPAwareModelAdapter, TPAwareStrategy
-from .pipeline.schedules import GPipeSchedule, Interleaved1F1BSchedule, OneFOneBSchedule
 from .strategies.ddp import DDPStrategy
 from .strategies.fsdp import FSDPStrategy
 
@@ -25,13 +18,5 @@ except ImportError:
 
 __all__ = [
     "DDPStrategy",
-    "ExpertParallelStrategy",
     "FSDPStrategy",
-    "GPipeSchedule",
-    "Interleaved1F1BSchedule",
-    "OneFOneBSchedule",
-    "SequenceParallelStrategy",
-    "TPAwareModelAdapter",
-    "TPAwareStrategy",
-    "TensorParallelStrategy",
 ]

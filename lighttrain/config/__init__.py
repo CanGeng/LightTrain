@@ -10,9 +10,7 @@ from ._schema import (
     EngineSection,
     GradSyncConfig,
     ParallelSection,
-    PipelineConfig,
     RootConfig,
-    TPConfig,
     TrainerSection,
 )
 
@@ -24,9 +22,7 @@ __all__ = [
     "EngineSection",
     "GradSyncConfig",
     "ParallelSection",
-    "PipelineConfig",
     "RootConfig",
-    "TPConfig",
     "TrainerSection",
     "dump_resolved",
     "load_config",

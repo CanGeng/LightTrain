@@ -20,12 +20,6 @@ import torch
 from .distributed._protocols import (
     GradSyncStrategy as GradSyncStrategyProtocol,
 )
-from .distributed._protocols import (
-    ModelParallelStrategy as ModelParallelStrategyProtocol,
-)
-from .distributed._protocols import (
-    PipelineSchedule as PipelineScheduleProtocol,
-)
 
 # ---------------------------------------------------------------------------
 # Generic data carriers
@@ -299,13 +293,6 @@ CALLBACK_EVENTS: tuple[str, ...] = (
     "on_artifact_new_version",
     # distributed
     "on_distributed_init",
-    "on_pipeline_schedule_begin",
-    "on_pipeline_schedule_end",
-    "on_microbatch_forward_pre",
-    "on_microbatch_forward_post",
-    "on_microbatch_backward_pre",
-    "on_microbatch_backward_post",
-    "on_pipeline_bubble",
     "on_rank_sync_pre",
     "on_rank_sync_post",
 )
@@ -452,11 +439,9 @@ __all__ = [
     "LoggerProtocol",
     "MetricProtocol",
     "ModelOutput",
-    "ModelParallelStrategyProtocol",
     "ModelProtocol",
     "ObjectiveProtocol",
     "OptimizerWrapperProtocol",
-    "PipelineScheduleProtocol",
     "PrepNodeProtocol",
     "ProbeProtocol",
     "ProcessorProtocol",

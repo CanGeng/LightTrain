@@ -63,8 +63,6 @@ KNOWN_CATEGORIES: tuple[str, ...] = (
     "reward_adapter",
     # Distributed strategies (implementations live in builtin_plugins/distributed/)
     "grad_sync_strategy",
-    "model_parallel_strategy",
-    "pipeline_schedule",
     # Hyperparameter sweep backends (implementations live in builtin_plugins/lab/sweep_backends/)
     "sweep_backend",
 )

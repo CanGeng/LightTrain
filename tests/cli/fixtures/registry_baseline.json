@@ -101,22 +101,11 @@
     "qlora",
     "tiny_lm"
   ],
-  "model_parallel_strategy": [
-    "expert_parallel",
-    "sequence_parallel",
-    "tensor_parallel",
-    "tp_aware"
-  ],
   "objective": [],
   "optimizer": [
     "adamw",
     "cpu_offload",
     "lion"
-  ],
-  "pipeline_schedule": [
-    "1f1b",
-    "gpipe",
-    "interleaved_1f1b"
   ],
   "prep_node": [
     "chunk",

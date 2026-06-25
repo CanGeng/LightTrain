@@ -13,7 +13,7 @@ parallel:
 
 engine:
   name: standard
-  mixed_precision: no  # FSDP handles mixed precision internally
+  mixed_precision: "no"  # FSDP handles mixed precision internally
 
 trainer:
   name: pretrain

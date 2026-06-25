@@ -2,41 +2,27 @@
 
 > [中文版](distributed.zh-CN.md) · [Docs index](../README.md)
 
-> **Status:** DDP/FSDP/ZeRO/TP/PP strategies are implemented and unit-tested via
-> CPU-based multiprocess (gloo) spawn tests. They have **not** been validated at
-> scale on multi-node GPU clusters. Use at your own risk for production.
+> **Status:** Only **data parallelism** is supported — DDP, FSDP, and DeepSpeed
+> ZeRO via the `grad_sync` strategy. DDP and FSDP have been validated on a real
+> single-node multi-GPU box (NCCL); DeepSpeed ZeRO and multi-node have not.
+> Tensor / pipeline / expert / sequence parallelism (TP / PP / EP / SP) were
+> **removed**.
 >
-> **Known limitation (SP/EP):** the `sequence_parallel` / `expert_parallel`
-> strategies are registered, but the train runtime's strategy selector only
-> wires `tensor_parallel`, and EP is still a skeleton (no all-to-all). They are
-> **not usable from a recipe**: requesting `parallel.sp: true` or
-> `parallel.ep > 1` raises a `ConfigError` (rather than silently no-op'ing). The
-> full list of files to touch when wiring them is tracked in the v0.2.3 changelog
-> "Known issues".
->
-> **Fail mode:** parallelism that is requested but cannot be applied — a missing
-> `tensor_parallel:` block, an unregistered strategy, an unknown pipeline
-> `schedule`, the not-yet-wired `parallel.sp` / `parallel.ep`, or a TP-apply /
-> PP-prepare failure — raises `ConfigError` rather than silently falling back to
-> single-GPU.
+> **Fail mode:** a `grad_sync` strategy that is requested but cannot be built
+> (unregistered name, missing optional dependency such as `deepspeed`) raises a
+> `ConfigError` rather than silently falling back to single-GPU.
 
 The `parallel:` block scales a run from single-GPU to multi-GPU **without
-changing model or trainer code**. Omitting it is equivalent to `dp=tp=pp=ep=1`.
+changing model or trainer code**. Omitting it is equivalent to `dp=1`.
 
 ## `parallel:` fields
 
 | Field | Default | Notes |
 | ----- | ------- | ----- |
 | `backend` | `nccl` | `gloo` for CPU / CI |
-| `dp` | 1 | data-parallel replicas |
-| `tp` | 1 | tensor-parallel shards (TP×DP×PP = total GPUs) |
-| `pp` | 1 | pipeline stages |
-| `ep` | 1 | expert-parallel size; must divide `dp` |
-| `sp` | false | sequence parallelism (pairs with TP) |
+| `dp` | 1 | data-parallel replicas (must equal the total GPU count) |
 | `force_cpu` | false | all tensors on CPU; pair with `gloo` for GPU-free comm tests |
 | `grad_sync` | `{name: noop}` | gradient-sync strategy (below) |
-| `tensor_parallel` | null | TP surgery plan |
-| `pipeline` | null | PP schedule |
 
 ### `grad_sync` strategies
 
@@ -45,25 +31,7 @@ changing model or trainer code**. Omitting it is equivalent to `dp=tp=pp=ep=1`.
 | `noop` | single-GPU passthrough (default) |
 | `ddp` | `DistributedDataParallel` (extra: `find_unused_parameters`) |
 | `fsdp` | `FullyShardedDataParallel` (extra: `sharding_strategy`, `state_dict_type`) |
-| `deepspeed` | DeepSpeed ZeRO-1/2/3 |
-
-### Tensor / pipeline blocks
-
-```yaml
-tensor_parallel:
-  auto_plan_for: llama        # built-in: llama / gpt2 / mistral
-  # or manual:
-  # plan:
-  #   - { path: "model.layers.*.self_attn.q_proj", style: colwise }
-  #   - { path: "model.layers.*.self_attn.o_proj", style: rowwise }
-
-pipeline:
-  n_microbatches: 8
-  schedule: 1f1b              # 1f1b / gpipe / interleaved_1f1b
-  stage_spec:
-    - { layers: "model.embed_tokens,model.layers.0-15" }
-    - { layers: "model.layers.16-31,model.norm,lm_head" }
-```
+| `deepspeed` | DeepSpeed ZeRO-1/2/3 (requires the `deepspeed` package) |
 
 ## Launching
 
@@ -96,5 +64,4 @@ Full recipe examples live under
 
 ## See also
 
-- [Architecture § init order](../concepts/architecture.md) — why TP/SP/EP precede FSDP/DDP
 - [reference/registry.md](../reference/registry.md) — distributed strategy entries

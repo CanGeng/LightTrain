@@ -1,19 +1,17 @@
 """lighttrain.distributed — distributed topology and strategy interfaces.
 
-Always importable: ``ParallelContext.single_gpu()`` and the three Protocol
-types work without ``torch.distributed`` or NCCL being installed/initialized.
+Always importable: ``ParallelContext.single_gpu()`` and the ``GradSyncStrategy``
+Protocol work without ``torch.distributed`` or NCCL being installed/initialized.
 
-Concrete strategy implementations (DDP, FSDP, ZeRO, TP, PP, SP, EP) live
-in ``builtin_plugins/distributed/`` and are only imported when the user
+Concrete strategy implementations (DDP, FSDP, ZeRO) live in
+``builtin_plugins/distributed/`` and are only imported when the user
 selects them via config.
 """
 
 from ._context import ParallelContext
-from ._protocols import GradSyncStrategy, ModelParallelStrategy, PipelineSchedule
+from ._protocols import GradSyncStrategy
 
 __all__ = [
     "GradSyncStrategy",
-    "ModelParallelStrategy",
     "ParallelContext",
-    "PipelineSchedule",
 ]

@@ -13,7 +13,7 @@ parallel:
 
 engine:
   name: standard
-  mixed_precision: no  # DeepSpeed handles precision internally
+  mixed_precision: "no"  # DeepSpeed handles precision internally
 
 trainer:
   name: pretrain

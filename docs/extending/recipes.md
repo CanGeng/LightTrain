@@ -61,19 +61,20 @@ the exception — they layer onto a full recipe and need a multi-process launche
 
 ## Distributed
 
-These demonstrate parallel topologies. **`ddp` / `fsdp` / `zero2` / `tp_ddp` /
-`3d_parallel` are overlays** — they carry only the `parallel:` / `engine:` /
-`trainer:` topology (no `model:` / `data:`), so they must be layered onto a
-complete recipe (e.g. `pretrain_causal`) and launched with a multi-process
-launcher (`torchrun` / `deepspeed`), not a single-process `lighttrain train`.
+These demonstrate data-parallel topologies. **`ddp` / `fsdp` / `zero2` are
+overlays** — they carry only the `parallel:` / `engine:` / `trainer:` topology
+(no `model:` / `data:`), so they must be layered onto a complete recipe (e.g.
+`pretrain_causal`) and launched with a multi-process launcher (`torchrun` /
+`deepspeed`), not a single-process `lighttrain train`.
+
+Only data parallelism is supported (DDP / FSDP / DeepSpeed ZeRO). Tensor /
+pipeline / expert / sequence parallelism were removed.
 
 | Recipe | Demonstrates |
 | ------ | ------------ |
 | `ddp` | Single-node 4-GPU DDP data parallelism (overlay) |
 | `fsdp` | FSDP full sharding (overlay) |
 | `zero2` | ZeRO-2 optimizer sharding (overlay) |
-| `tp_ddp` | Tensor parallel × DDP (overlay) |
-| `3d_parallel` | TP × PP × DP 3-D parallelism (overlay) |
 | `nano_model` | gloo + CPU multi-process smoke test (complete recipe; `torchrun --nproc_per_node 4`) |
 
 ## See also

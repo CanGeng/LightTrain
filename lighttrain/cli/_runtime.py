@@ -45,7 +45,7 @@ from ..engine.checkpoint.manager import CheckpointManager
 from ..optim.architectures.profile import ArchitectureProfile, LossOnlyObjective
 from ..registry import get as _registry_get
 from ..utils.accelerate import build_accelerator
-from ..utils.run_dir import make_run_dir, slugify
+from ..utils.run_dir import broadcast_run_dir, make_run_dir, slugify
 from ..utils.seed import seed_everything
 
 _log = logging.getLogger(__name__)
@@ -345,20 +345,16 @@ def _select_device() -> torch.device:
 def _init_parallel(cfg: RootConfig) -> ParallelContext:
     """Return ParallelContext from config.
 
-    When ``cfg.parallel`` is absent or all degrees==1, returns a plain
+    When ``cfg.parallel`` is absent or ``dp==1``, returns a plain
     single_gpu() context without touching torch.distributed.
-    When ``cfg.parallel`` is present with dp/tp/pp > 1, initializes the
+    When ``cfg.parallel`` is present with ``dp > 1``, initializes the
     process group and DeviceMesh from the torchrun environment variables.
     """
     par = getattr(cfg, "parallel", None)
     if par is None:
         return ParallelContext.single_gpu()
-    # Presence of parallel section doesn't mean we need dist — check degrees.
-    dp = int(getattr(par, "dp", 1))
-    tp = int(getattr(par, "tp", 1))
-    pp = int(getattr(par, "pp", 1))
-    ep = int(getattr(par, "ep", 1))
-    if dp * tp * pp * ep == 1:
+    # Presence of parallel section doesn't mean we need dist — check the degree.
+    if int(getattr(par, "dp", 1)) == 1:
         return ParallelContext.single_gpu()
     return ParallelContext.from_env(par)
 
@@ -391,85 +387,6 @@ def _build_grad_sync_strategy(cfg: RootConfig) -> Any | None:
         if k != "name":
             kwargs[k] = v
     return strategy_cls(**kwargs)
-
-
-def _build_model_parallel_strategy(cfg: RootConfig) -> Any | None:
-    """Build a ModelParallelStrategy from cfg.parallel.tensor_parallel, or None.
-
-    Fails loud (``ConfigError``) when parallelism is requested but cannot be
-    applied — a missing ``tensor_parallel:`` block, an unregistered strategy, or
-    the not-yet-wired ``sp`` / ``ep`` degrees would otherwise silently fall back
-    to single-GPU (the user would think they were parallel when they weren't).
-    """
-    par = getattr(cfg, "parallel", None)
-    if par is None:
-        return None
-    # SP / EP are registered but not wired into the runtime selector (only
-    # `tensor_parallel` is applied) — fail loud rather than silently no-op.
-    if bool(getattr(par, "sp", False)):
-        raise ConfigError(
-            "parallel.sp (sequence parallelism) is registered but not yet wired "
-            "into the train runtime; remove it (see operations/distributed)."
-        )
-    if int(getattr(par, "ep", 1)) > 1:
-        raise ConfigError(
-            "parallel.ep (expert parallelism) is a skeleton not yet wired into "
-            "the train runtime; set ep=1 (see operations/distributed)."
-        )
-    tp = int(getattr(par, "tp", 1))
-    if tp <= 1:
-        return None
-    tp_cfg = getattr(par, "tensor_parallel", None)
-    if tp_cfg is None:
-        raise ConfigError(
-            f"parallel.tp={tp} requests tensor parallelism but no "
-            "`parallel.tensor_parallel:` block is configured."
-        )
-    try:
-        strategy_cls = _registry_get("model_parallel_strategy", "tensor_parallel")
-    except Exception as exc:  # strategy not registered (plugins not loaded)
-        raise ConfigError(
-            f"parallel.tp={tp} requested but the `tensor_parallel` "
-            "model_parallel_strategy is not registered "
-            "(distributed plugins not loaded?)."
-        ) from exc
-    kwargs: dict[str, Any] = {}
-    if hasattr(tp_cfg, "model_dump"):
-        kwargs = {k: v for k, v in tp_cfg.model_dump().items() if v is not None}
-    return strategy_cls(**kwargs)
-
-
-def _build_pipeline_schedule(cfg: RootConfig) -> Any | None:
-    """Build a PipelineSchedule from cfg.parallel.pipeline, or None when pp<=1.
-
-    Mirrors ``_build_model_parallel_strategy``: fails loud (``ConfigError``) when
-    ``parallel.pp > 1`` but the configured schedule can't be resolved or
-    constructed. The ``schedule`` key selects the implementation and is dropped
-    from the constructor kwargs (it is not a ctor arg for every schedule, e.g.
-    ``gpipe``).
-    """
-    par = getattr(cfg, "parallel", None)
-    if par is None or int(getattr(par, "pp", 1)) <= 1:
-        return None
-    pipeline_cfg = getattr(par, "pipeline", None)
-    schedule = str(getattr(pipeline_cfg, "schedule", "1f1b") or "1f1b")
-    try:
-        ps_cls = _registry_get("pipeline_schedule", schedule)
-    except Exception as exc:  # unknown schedule / plugins not loaded
-        raise ConfigError(
-            f"pipeline schedule {schedule!r} is not registered "
-            "(unknown schedule, or distributed plugins not loaded)."
-        ) from exc
-    ps_kwargs: dict[str, Any] = {}
-    if pipeline_cfg is not None and hasattr(pipeline_cfg, "model_dump"):
-        ps_kwargs = {k: v for k, v in pipeline_cfg.model_dump().items() if v is not None}
-    ps_kwargs.pop("schedule", None)  # selector key, not a ctor arg
-    try:
-        return ps_cls(**ps_kwargs)
-    except Exception as exc:
-        raise ConfigError(
-            f"pipeline schedule {schedule!r} failed to construct: {exc}"
-        ) from exc
 
 
 def _build_optimizer_factory(cfg: RootConfig):
@@ -670,16 +587,6 @@ def _resolve_config(
     return cfg, config_path, snapshot_yaml, resolved_yaml
 
 
-def _preflight_parallel(cfg: RootConfig) -> tuple[Any | None, Any | None]:
-    """Validate TP/PP config *before* any run-dir side effects (fail clean).
-
-    Resolving here (rather than at apply time) means the precise ConfigError
-    beats _init_parallel's generic "RANK expected" when running without a
-    launcher, and a pure-config error never pollutes ``runs/``.
-    """
-    return _build_model_parallel_strategy(cfg), _build_pipeline_schedule(cfg)
-
-
 def _prepare_run_dir(
     cfg: RootConfig,
     *,
@@ -752,37 +659,9 @@ def _require_optim_spec(entry: dict[str, Any], optimizers_cfg: Any) -> Any:
     return spec
 
 
-def _build_primary_model(
-    cfg: RootConfig,
-    primary_entry: dict[str, Any],
-    *,
-    mp_strategy: Any | None,
-    pipeline_schedule: Any | None,
-    parallel_ctx: ParallelContext,
-) -> Any:
-    """Phase B/C: build the primary model, TP/SP/EP surgery, then PP split."""
-    # Phase B: model surgery (TP/SP/EP) — must run on bare model before FSDP/DDP.
-    model = _resolve(primary_entry["spec"], category="model")
-    if mp_strategy is not None:
-        try:
-            model = mp_strategy.apply(model, parallel_ctx)
-        except ConfigError:
-            raise
-        except Exception as exc:  # apply failed (e.g. missing device_mesh)
-            raise ConfigError(f"tensor-parallel apply failed: {exc}") from exc
-    # Phase C: pipeline splitting (PP) — after TP surgery, before DP wrap. PP is
-    # fail-loud: a requested pp>1 that cannot be applied raises ConfigError.
-    if pipeline_schedule is not None:
-        try:
-            model = pipeline_schedule.prepare(model, parallel_ctx)
-        except ConfigError:
-            raise
-        except Exception as exc:  # prepare failed
-            raise ConfigError(
-                f"pipeline parallel (pp={int(getattr(cfg.parallel, 'pp', 1))}) "
-                f"failed to prepare: {exc}"
-            ) from exc
-    return model
+def _build_primary_model(primary_entry: dict[str, Any]) -> Any:
+    """Resolve the primary model from its spec (data-parallel only)."""
+    return _resolve(primary_entry["spec"], category="model")
 
 
 def _build_trainable_core(
@@ -1097,21 +976,33 @@ def setup_run_from_config(
     if print_config_only:
         return {"cfg": cfg, "resolved_yaml": resolved_yaml}
 
-    # Parallel-config preflight runs *before* any run-dir side effects so a
-    # pure-config error never pollutes ``runs/``.
-    mp_strategy, pipeline_schedule = _preflight_parallel(cfg)
-    run_dir = _prepare_run_dir(
-        cfg,
-        config_path=config_path,
-        snapshot_yaml=snapshot_yaml,
-        resolved_yaml=resolved_yaml,
-        existing_run_dir=existing_run_dir,
-    )
-
     # Phase A: distributed topology (single_gpu() when cfg.parallel is absent).
+    # Init the process group *before* creating the run dir so rank 0 can own the
+    # timestamped path and broadcast it — otherwise each rank stamps its own
+    # ``datetime.now()`` and a launch straddling a one-second boundary splits
+    # ranks across sibling run dirs.
     parallel_ctx = _init_parallel(cfg)
     device = parallel_ctx.local_device
-    lineage_store = _open_lineage_store(run_dir)
+
+    run_dir = broadcast_run_dir(
+        lambda: _prepare_run_dir(
+            cfg,
+            config_path=config_path,
+            snapshot_yaml=snapshot_yaml,
+            resolved_yaml=resolved_yaml,
+            existing_run_dir=existing_run_dir,
+        ),
+        world_size=parallel_ctx.world_size,
+        is_main=parallel_ctx.is_main_process,
+        device=device,
+    )
+
+    # Lineage is a per-run SQLite store owned by rank 0; opening the same file
+    # from every rank just contends on the WAL lock (the recurring
+    # ``database is locked``). None on non-main is the existing soft-fail path.
+    lineage_store = (
+        _open_lineage_store(run_dir) if parallel_ctx.is_main_process else None
+    )
 
     # Normalise model/optimizer declaration into the internal set form (a lone
     # model:/optim: desugars to a one-entry set).
@@ -1119,13 +1010,7 @@ def setup_run_from_config(
     _primary_name, _primary_entry = primary_trainable(models_cfg)
     _n_trainable = sum(1 for e in models_cfg.values() if e["trainable"])
 
-    model = _build_primary_model(
-        cfg,
-        _primary_entry,
-        mp_strategy=mp_strategy,
-        pipeline_schedule=pipeline_schedule,
-        parallel_ctx=parallel_ctx,
-    )
+    model = _build_primary_model(_primary_entry)
     _primary_optim = _require_optim_spec(_primary_entry, optimizers_cfg)
     model, optimizer, scheduler, data_module, grad_sync = _build_trainable_core(
         cfg,
