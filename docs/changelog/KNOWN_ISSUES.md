@@ -8,35 +8,33 @@
 
 ## 开放（Open）
 
-### A1 — PPO 未接入 reference-KL（`_ref_policy` 冻结后从未消费）
-[ppo.py:195](../../lighttrain/builtin_plugins/trainers/ppo.py#L195) 在 `fit()` 里 `freeze_as_ref()` 建了参考策略，但全文件无人读它；[PPOSurrogateLoss](../../lighttrain/builtin_plugins/losses/rl.py#L57) 无 `beta_kl` 参数、loss 里无 KL 项（仅算 approx_kl 供监控）。→ PPO 实际不施加 ref-KL，冻结的 ref 是死重。GRPO 侧已有完整 k3 KL 模板可照搬。
-**状态：开放**（登记于 v0.3.1「新登记（转后续）」）
-
-### A2 — GRPO `lora_base_as_ref=True` + KL 未接线（fail-loud 占位）
-[grpo.py:188](../../lighttrain/builtin_plugins/trainers/grpo.py#L188) 与 [ref_policy.py:81-87](../../lighttrain/builtin_plugins/rl/ref_policy.py#L81) 对 `per_token=True` + `lora_base_as_ref=True` 直接 `raise`。adapter toggling 已实现（[`_lora_base_log_probs`](../../lighttrain/builtin_plugins/rl/ref_policy.py#L123) 的 disable/enable + try/finally），但只支持序列级，缺 per-token 分支，故 LoRA-base 作 ref 的 KL 路径不可用。
-**状态：开放**（登记于 v0.3.1「新登记（转后续）」）
-
 ### B1 — mypy `ignore_errors` 隔离区未清空
-[pyproject.toml](../../pyproject.toml) 的 `[[tool.mypy.overrides]] ignore_errors=true` 仍隔离一批携带历史类型债的模块，目标 ratchet 到空。其中 architectures（diffusion_unet / jepa / mamba / rwkv）与 distributed（ddp / fsdp / zero）为 **torch-stub 相关**：本机 nightly-torch 与 CI 的 CPU-torch 类型推导分叉，**本机绿 ≠ CI 绿**，不可凭本机删 ignore（见 v0.3.1 告诫）；`_preference_base` / `grpo` / `ppo` / `joined_dataset` / `producer` 为中等难度逻辑/协议类型债。
-**状态：开放**（torch-stub 批与中难批留 CI-verified 后续 PR）
+[pyproject.toml](../../pyproject.toml) 的 `[[tool.mypy.overrides]] ignore_errors=true` 仍隔离一批携带历史类型债的模块，目标 ratchet 到空。**v0.5.0 已清死条目 + 5 个易批（名单 18 → 12）**，剩余：
+- **torch-stub 批**（architectures：diffusion_unet / jepa / mamba / rwkv；distributed：ddp / fsdp / zero）—— 本机 nightly-torch 与 CI 的 CPU-torch 类型推导分叉，**本机绿 ≠ CI 绿**，不可凭本机删 ignore（见 v0.3.1 告诫），需在 CI types job 验证。
+- **中难批**（trainers `_preference_base` / `grpo` / `ppo`，data `joined_dataset` / `producer`）—— 逻辑/协议类型债。
+
+**状态：开放**（剩余批留 CI-verified 后续 PR）
 
 ### B2 — `check_untyped_defs` 未启用
 `[tool.mypy]` 未开 `check_untyped_defs`；开启后约 +89 错（tests/ 未注解函数体为主），另有 ~108 个 `annotation-unchecked` note。作为未来 types ratchet，成本约 5-7 个分批 PR。
 **状态：开放**（显式 defer）
 
+## 已解决 / 已勾销（Resolved / Dismissed）
+
+### A1 — PPO 未接入 reference-KL
+✅ 已解决 → v0.5.0（见 [v0.5.0](v0/v0.5/v0.5.0.md)）：PPOSurrogateLoss 加 `beta_kl` + k3 KL 项，PPOTrainer 仅 beta_kl>0 时建 ref 并注入 per-token `log_probs_ref`。
+
+### A2 — GRPO/PPO `lora_base_as_ref=True` + KL 未接线
+✅ 已解决 → v0.5.0（见 [v0.5.0](v0/v0.5/v0.5.0.md)）：ReferencePolicy 新增 `_lora_base_log_probs_per_token`，去掉拒绝守卫，trainer 注入时传 `live_model`。
+
 ### C1 — Checkpoint 同 step 覆写非 crash-atomic
-[manager.py save()](../../lighttrain/engine/checkpoint/manager.py#L102) 原地覆写固定文件名（`step_<n>/` 下各文件），同 step 覆写中途崩溃会留混合文件集、毁掉上一份本来完好的 checkpoint。
-**状态：开放**（v0.2.6 决策点）
+✅ 已解决 → v0.5.0（见 [v0.5.0](v0/v0.5/v0.5.0.md)）：save() 改为 staging 目录 + 原子 swap，崩溃绝不毁掉上一份已提交 checkpoint。
 
 ### D1 — hot-loop 日志可能刷屏
-少数 warning 位于逐 step / 逐 layer / 逐 metric 循环内（[standard.py](../../lighttrain/builtin_plugins/engine/update_rules/standard.py) RETRY_STEP、[file_signals.py](../../lighttrain/builtin_plugins/callbacks/realtime_control/file_signals.py) 轮询、[lineage_recorder.py](../../lighttrain/builtin_plugins/callbacks/builtins/lineage_recorder.py) metric 转换），可复用 [`_warn_once`](../../lighttrain/builtin_plugins/callbacks/builtins/frozen_step.py#L42) 模式去重。
-**状态：开放**（v0.3.2 登记）
+✅ 已解决 → v0.5.0（见 [v0.5.0](v0/v0.5/v0.5.0.md)）：新增 `lighttrain/utils/log.py::warn_once`，套到 standard/file_signals/lineage_recorder 的逐 step/逐 metric 站点。
 
 ### F1 — test_sam.py module docstring 陈旧
-[test_sam.py:15](../../tests/engine/update_rules/test_sam.py#L15) 仍写「SAM does NOT honor SKIP_STEP (pinned via xfail)」，但 [sam.py](../../lighttrain/builtin_plugins/engine/update_rules/sam.py) 早已 honor（检测 SKIP_STEP→清零梯度→早返回）、对应测试 `test_sam_honors_skip_step_signal_from_on_loss_computed` 通过、全 suite 无 active xfail。
-**状态：开放**（顺手清）
-
-## 已勾销 / 非缺陷（Dismissed）
+✅ 已解决 → v0.5.0（见 [v0.5.0](v0/v0.5/v0.5.0.md)）：改为如实描述 SAM 自 v0.1.6 起 honor SKIP_STEP。
 
 ### A3 — GRPO rollout 每 ppo_epoch 重算 → 非缺陷
 经核：buffer 已正确「每 outer step 仅 rollout 一次、内层 ppo_epochs 复用同 buffer」（标准 on-policy 模式）。**非缺陷，不予修复。**
