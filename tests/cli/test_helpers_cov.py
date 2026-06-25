@@ -1,7 +1,6 @@
 """Coverage tests for ``lighttrain.cli._helpers`` (currently 74% covered).
 
 Targets every uncovered branch identified in the coverage report:
-  lines 29-33   : _todo() with and without a ``what`` argument
   lines 61-62, 68: _flatten_patch_to_overrides yaml-dump exception fallback
   lines 82, 87, 90-91: _final_loss_from_run — missing file, json error, loss key
   lines 108, 115, 119-122: _eval_perplexity — None guards, loader fallbacks, exc
@@ -20,7 +19,6 @@ from unittest.mock import patch
 
 import pytest
 
-import lighttrain.cli._helpers as _helpers_mod
 import lighttrain.eval.metrics as _metrics_mod
 from lighttrain.cli._helpers import (
     _append_run_summary,
@@ -28,65 +26,7 @@ from lighttrain.cli._helpers import (
     _final_loss_from_run,
     _flatten_patch_to_overrides,
     _fmt_metric,
-    _todo,
 )
-
-# ---------------------------------------------------------------------------
-# _todo  (lines 29-33)
-# ---------------------------------------------------------------------------
-
-
-def test_invariant_todo_with_what_exits_code_2_and_includes_what():
-    """``_todo('P1', 'do X')`` must raise ``typer.Exit(code=2)`` and emit a
-    message containing both the milestone and the ``what`` string (line 31)."""
-    import typer
-
-    with pytest.raises(typer.Exit) as exc_info:
-        _todo("P1", "do X")
-
-    assert exc_info.value.exit_code == 2
-
-
-def test_invariant_todo_without_what_exits_code_2():
-    """``_todo('P3')`` (no ``what``) still raises ``typer.Exit(code=2)`` via
-    line 33; the branch on line 30 that appends ``— {what}`` is skipped."""
-    import typer
-
-    with pytest.raises(typer.Exit) as exc_info:
-        _todo("P3")
-
-    assert exc_info.value.exit_code == 2
-
-
-def test_pin_current_behavior_todo_message_format(capsys, monkeypatch):
-    """Pin the rendered string format: with ``what`` the separator is `` — ``."""
-    import typer
-
-    # Capture console.print output by patching it
-    printed: list[str] = []
-    monkeypatch.setattr(_helpers_mod.console, "print", lambda msg, **kw: printed.append(msg))
-
-    with pytest.raises(typer.Exit):
-        _todo("P2", "some feature")
-
-    assert len(printed) == 1
-    assert "P2" in printed[0]
-    assert "some feature" in printed[0]
-
-
-def test_pin_current_behavior_todo_no_what_message_no_dash(monkeypatch):
-    """Without ``what`` the message must NOT contain `` — `` (line 30 skipped)."""
-    import typer
-
-    printed: list[str] = []
-    monkeypatch.setattr(_helpers_mod.console, "print", lambda msg, **kw: printed.append(msg))
-
-    with pytest.raises(typer.Exit):
-        _todo("P3")
-
-    assert " — " not in printed[0]
-    assert "P3" in printed[0]
-
 
 # ---------------------------------------------------------------------------
 # _flatten_patch_to_overrides — yaml dump exception fallback (lines 61-62, 68)

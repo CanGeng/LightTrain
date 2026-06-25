@@ -40,6 +40,10 @@ dev = [
 ]
 peft = ["peft>=0.7"]
 quant = ["bitsandbytes>=0.43; platform_system == 'Linux'"]
+# Reserved extras (no hard dep today): the CPU/layer-offload path is pure-torch,
+# and the vLLM rl_backend lazy-imports ``vllm`` only at use time. Kept for API
+# symmetry — ``pip install '.[offload]'`` / ``'.[vllm]'`` are accepted no-ops;
+# populate when a backend grows a required dependency.
 offload = []
 vllm = []
 sweep = ["optuna>=3.0"]
