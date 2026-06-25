@@ -119,7 +119,7 @@ def test_invariant_verify_fn_float_cast():
     """verify_fn return value is cast to float (int return is accepted)."""
 
     def _int_return(p: str, r: str) -> float:
-        return 1  # type: ignore[return-value]
+        return 1
 
     j = VerifierJudge(verify_fn=_int_return)
     scores = j.score([("p", "r")])

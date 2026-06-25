@@ -514,10 +514,10 @@ def test_invariant_offload_estimate_mode_selection(
 def test_invariant_estimate_raises_type_error_for_non_mapping_cfg():
     """``estimate()`` raises ``TypeError`` when cfg is not a Mapping (line 312)."""
     with pytest.raises(TypeError, match="estimate: cfg must be a mapping"):
-        estimate("not a dict")  # type: ignore[arg-type]
+        estimate("not a dict")
 
     with pytest.raises(TypeError, match="estimate: cfg must be a mapping"):
-        estimate(42)  # type: ignore[arg-type]
+        estimate(42)
 
 
 # ---------------------------------------------------------------------------

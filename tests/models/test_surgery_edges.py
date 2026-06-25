@@ -88,7 +88,7 @@ def test_init_rows_mean_mode_is_guarded():
 def test_init_rows_unknown_mode_raises():
     """``_init_rows`` rejects an unknown mode."""
     with pytest.raises(ValueError, match="Unknown init mode"):
-        _init_rows(torch.zeros(2, 4), mode="bogus")  # type: ignore[arg-type]
+        _init_rows(torch.zeros(2, 4), mode="bogus")
 
 
 def test_resize_embedding_tied_head_with_bias_copies_and_zeros():

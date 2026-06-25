@@ -172,7 +172,7 @@ def test_init_stores_hyperparams():
 
 def test_init_n_infer_accepts_float_string_coercion():
     """n_infer is int-cast from its argument (type coercion guard)."""
-    rule = PCNUpdateRule(n_infer=3.9)  # type: ignore[arg-type]
+    rule = PCNUpdateRule(n_infer=3.9)
     assert rule.n_infer == 3
 
 

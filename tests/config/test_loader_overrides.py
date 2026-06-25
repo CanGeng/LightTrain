@@ -366,4 +366,4 @@ def test_apply_overrides_through_load_config_round_trip(tmp_yaml):
     cfg = load_config(p, overrides=["++mode=lab", "++seed=99", "++custom=x"])
     assert cfg.mode == "lab"
     assert cfg.seed == 99
-    assert cfg.custom == "x"  # type: ignore[attr-defined]
+    assert cfg.custom == "x"

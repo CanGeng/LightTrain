@@ -135,11 +135,11 @@ def _expected_token_logprob(vocab_size: int, token_id: int) -> float:
 def test_invariant_init_coerces_field_types():
     """Constructor casts numeric/bool args to their declared types."""
     be = HFGenerateBackend(
-        max_new_tokens="8",  # type: ignore[arg-type]
-        do_sample=1,  # type: ignore[arg-type]
-        temperature="0.5",  # type: ignore[arg-type]
-        top_p="0.9",  # type: ignore[arg-type]
-        num_return_sequences="3",  # type: ignore[arg-type]
+        max_new_tokens="8",
+        do_sample=1,
+        temperature="0.5",
+        top_p="0.9",
+        num_return_sequences="3",
     )
     assert be.max_new_tokens == 8 and isinstance(be.max_new_tokens, int)
     assert be.do_sample is True

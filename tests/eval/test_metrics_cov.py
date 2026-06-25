@@ -327,7 +327,7 @@ def test_invariant_lm_eval_harness_hook_import_error():
     lm_eval is not installed (lines 275-278)."""
     # Temporarily make `lm_eval` unimportable
     original = sys.modules.get("lm_eval", None)
-    sys.modules["lm_eval"] = None  # type: ignore[assignment]
+    sys.modules["lm_eval"] = None
     try:
         with pytest.raises(ImportError, match="lm-eval"):
             lm_eval_harness_hook("hellaswag", model=None, tokenizer=None)

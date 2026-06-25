@@ -93,7 +93,7 @@ class _LoRAWrapper(nn.Module):
         self._adapters_enabled = True
         self.enable_calls += 1
 
-    def parameters(self):  # type: ignore[override]
+    def parameters(self):
         return self._base.parameters()
 
     def forward(self, input_ids, attention_mask=None):

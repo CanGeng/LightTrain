@@ -185,7 +185,7 @@ def test_invariant_hook_skips_non_tensor_input_side_leaving_cache_empty():
     """
 
     class _IntInputModule(nn.Module):
-        def forward(self, x: int) -> torch.Tensor:  # type: ignore[override]
+        def forward(self, x: int) -> torch.Tensor:
             return torch.tensor([float(x)])
 
     model = _wrap(_IntInputModule())
@@ -342,7 +342,7 @@ def test_invariant_flatten_skips_non_tensor_items_in_attentions():
     """
     a0 = torch.ones(1, 2, 4)
     a1 = torch.ones(1, 2, 4) * 2.0
-    mo = ModelOutput(outputs={}, attentions=(a0, "garbage", a1))  # type: ignore[arg-type]
+    mo = ModelOutput(outputs={}, attentions=(a0, "garbage", a1))
     flat = flatten_model_output_tensors(mo)
     assert flat["attentions_layers"].shape[0] == 2
 
@@ -351,7 +351,7 @@ def test_invariant_flatten_omits_attentions_key_when_all_non_tensor():
     """If every element in ``attentions`` is a non-tensor, ``ats`` is empty
     so ``if ats:`` is False and ``"attentions_layers"`` is not emitted.
     """
-    mo = ModelOutput(outputs={}, attentions=("a", "b"))  # type: ignore[arg-type]
+    mo = ModelOutput(outputs={}, attentions=("a", "b"))
     flat = flatten_model_output_tensors(mo)
     assert "attentions_layers" not in flat
 

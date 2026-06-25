@@ -139,7 +139,7 @@ def test_pin_root_config_extra_allow(tmp_yaml):
     """
     p = tmp_yaml("mode: lab\nmy_experimental_field: 42\n")
     cfg = load_config(p)
-    assert cfg.my_experimental_field == 42  # type: ignore[attr-defined]
+    assert cfg.my_experimental_field == 42
 
 
 def test_root_config_invalid_mode_raises_at_load(tmp_yaml):
