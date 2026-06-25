@@ -120,19 +120,6 @@ class CheckpointManager:
         self.ckpt_dir = self.run_dir / "checkpoints"
         self.ckpt_dir.mkdir(parents=True, exist_ok=True)
         self.keep_last_n = int(keep_last_n)
-        self._sweep_orphans()
-
-    def _sweep_orphans(self) -> None:
-        """Remove staging/backup dirs left by a crashed prior run.
-
-        ``save()`` builds each step in a ``*.tmp.<pid>.<token>`` dir and may leave
-        a ``*.old.<token>`` backup if it died mid-swap. Neither matches
-        ``_STEP_RE`` (so they're already ignored by list/load/prune), but we
-        still sweep them so they don't accumulate across restarts.
-        """
-        for child in self.ckpt_dir.iterdir():
-            if child.is_dir() and (".tmp." in child.name or ".old." in child.name):
-                shutil.rmtree(child, ignore_errors=True)
 
     # ---- write paths -------------------------------------------------------
 
@@ -162,9 +149,9 @@ class CheckpointManager:
         and then committed by an atomic directory swap. A crash at any point
         leaves the previously-committed ``step_<n>/`` intact — ``step_<n>/`` is
         only ever a complete committed directory or absent, never a half-
-        overwritten mixed file set. Orphaned ``*.tmp.*`` / ``*.old.*`` dirs from
-        a crashed prior run are swept on manager construction; ``_STEP_RE`` does
-        not match them, so listing/loading/pruning ignore them either way.
+        overwritten mixed file set. A crash may leave an inert ``*.tmp.*`` /
+        ``*.old.*`` dir behind; ``_STEP_RE`` does not match them, so
+        listing/loading/pruning ignore them.
         """
         if parallel_ctx is not None and not parallel_ctx.is_main_process:
             return None

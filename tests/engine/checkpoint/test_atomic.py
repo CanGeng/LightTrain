@@ -558,23 +558,9 @@ def test_same_step_overwrite_crash_preserves_prior_checkpoint(
     loaded = mgr.load(target)
     assert loaded["model"]["w"].tolist() == [1.0, 1.0]
     assert "optimizer" in loaded
-    # No orphan staging/backup dirs leak into the step listing.
+    # No orphan staging/backup dirs leak into the step listing (they don't match
+    # _STEP_RE, so list_steps ignores them whether or not they linger on disk).
     assert [p.name for p in mgr.list_steps()] == ["step_5"]
-
-
-def test_orphan_staging_dirs_swept_on_construction(tmp_run_dir) -> None:
-    """C1: stale ``*.tmp.*`` / ``*.old.*`` dirs from a crashed run are removed
-    when a new CheckpointManager is constructed."""
-    mgr = CheckpointManager(tmp_run_dir)
-    (mgr.ckpt_dir / "step_3.tmp.999.deadbeef").mkdir()
-    (mgr.ckpt_dir / "step_3.old.cafe").mkdir()
-    mgr.save(3, {"model": {"w": torch.ones(1)}}, kind="step")
-
-    CheckpointManager(tmp_run_dir)  # construction sweeps orphans
-    names = {p.name for p in mgr.ckpt_dir.iterdir() if p.is_dir()}
-    assert "step_3.tmp.999.deadbeef" not in names
-    assert "step_3.old.cafe" not in names
-    assert "step_3" in names
 
 
 # --------------------------------------------------------------------------- #
