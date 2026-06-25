@@ -12,7 +12,9 @@ Key contracts we pin:
   - Accumulation boundary skips the SAM perturbation (early-return path).
   - optimizer.step receives params at the ORIGINAL θ (not perturbed).
   - SAM does NOT use grad_sync (documented gap).
-  - SAM does NOT honor SKIP_STEP (documented gap, pinned via xfail).
+  - SAM honors SKIP_STEP (since v0.1.6): on SKIP_STEP it zeroes grads and
+    early-returns without an optimizer.step (pinned by
+    test_sam_honors_skip_step_signal_from_on_loss_computed).
 """
 
 from __future__ import annotations
