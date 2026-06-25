@@ -38,18 +38,18 @@ class _OrderedRecorder:
 
         return _f
 
-    on_step_begin = _h("on_step_begin")
-    on_forward_pre = _h("on_forward_pre")
-    on_forward_post = _h("on_forward_post")
-    on_loss_computed = _h("on_loss_computed")
-    on_backward_pre = _h("on_backward_pre")
-    on_backward_post = _h("on_backward_post")
-    on_clip_grad = _h("on_clip_grad")
-    on_optimizer_step_pre = _h("on_optimizer_step_pre")
-    on_optimizer_step_post = _h("on_optimizer_step_post")
-    on_zero_grad = _h("on_zero_grad")
-    on_scheduler_step = _h("on_scheduler_step")
-    on_step_end = _h("on_step_end")
+    on_step_begin = _h("on_step_begin")  # type: ignore[arg-type]
+    on_forward_pre = _h("on_forward_pre")  # type: ignore[arg-type]
+    on_forward_post = _h("on_forward_post")  # type: ignore[arg-type]
+    on_loss_computed = _h("on_loss_computed")  # type: ignore[arg-type]
+    on_backward_pre = _h("on_backward_pre")  # type: ignore[arg-type]
+    on_backward_post = _h("on_backward_post")  # type: ignore[arg-type]
+    on_clip_grad = _h("on_clip_grad")  # type: ignore[arg-type]
+    on_optimizer_step_pre = _h("on_optimizer_step_pre")  # type: ignore[arg-type]
+    on_optimizer_step_post = _h("on_optimizer_step_post")  # type: ignore[arg-type]
+    on_zero_grad = _h("on_zero_grad")  # type: ignore[arg-type]
+    on_scheduler_step = _h("on_scheduler_step")  # type: ignore[arg-type]
+    on_step_end = _h("on_step_end")  # type: ignore[arg-type]
 
 
 class _SpyModel(nn.Module):

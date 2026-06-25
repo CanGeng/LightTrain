@@ -379,7 +379,7 @@ def test_dp_times_tp_times_pp_mismatch_raises(monkeypatch) -> None:
     monkeypatch.setattr("os.environ", {"LOCAL_RANK": "0"})
 
     with pytest.raises(ValueError, match="world_size"):
-        ParallelContext.from_env(cfg)
+        ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
 
 # --------------------------------------------------------------------------- #

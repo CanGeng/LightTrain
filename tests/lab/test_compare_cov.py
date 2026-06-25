@@ -312,7 +312,7 @@ def test_render_png_accepts_string_path(tmp_path: Path):
     pytest.importorskip("matplotlib")
     out = tmp_path / "as_string.png"
     report = _report({"loss": [1.0, 2.0]})
-    render_png(report, str(out))
+    render_png(report, str(out))  # type: ignore[arg-type]
     assert out.exists()
 
 

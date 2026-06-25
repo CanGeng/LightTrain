@@ -158,7 +158,7 @@ def test_invariant_log_scalars_coerces_step_to_int(tmp_path: Path):
     Setup: pass float step=3.7; expected: add_scalar called with step=3.
     """
     logger, mock_writer = _patched_logger(tmp_path / "logs")
-    logger.log_scalars({"loss": 0.5}, step=3.7)
+    logger.log_scalars({"loss": 0.5}, step=3.7)  # type: ignore[arg-type]
     mock_writer.add_scalar.assert_called_once()
     _name, _val, step_arg = mock_writer.add_scalar.call_args[0]
     assert step_arg == 3
@@ -229,7 +229,7 @@ def test_invariant_log_text_coerces_step_to_int(tmp_path: Path):
     Expected: add_text called with step=2 (int).
     """
     logger, mock_writer = _patched_logger(tmp_path / "logs")
-    logger.log_text("msg", step=2.9)
+    logger.log_text("msg", step=2.9)  # type: ignore[arg-type]
     _tag, _text, step_arg = mock_writer.add_text.call_args[0]
     assert step_arg == 2
     assert isinstance(step_arg, int)

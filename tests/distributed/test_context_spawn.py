@@ -70,7 +70,7 @@ def _worker_dp2_broadcast(rank: int, world_size: int, rendezvous_file: str, out_
     cfg = SimpleNamespace(
         backend="gloo", dp=2, tp=1, pp=1, ep=1, sp=False, force_cpu=True
     )
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     if rank == 0:
         # Known payload that rank-1 cannot produce locally.
@@ -104,7 +104,7 @@ def _worker_dp2_tp2(rank: int, world_size: int, rendezvous_file: str, out_dir: s
     cfg = SimpleNamespace(
         backend="gloo", dp=2, tp=2, pp=1, ep=1, sp=False, force_cpu=True
     )
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
     info = {
         "rank": ctx.rank,
         "dp_rank": ctx.dp_rank,
@@ -136,7 +136,7 @@ def _worker_dp4_ep2(rank: int, world_size: int, rendezvous_file: str, out_dir: s
     cfg = SimpleNamespace(
         backend="gloo", dp=4, tp=1, pp=1, ep=2, sp=False, force_cpu=True
     )
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     contribution = torch.tensor([float(rank + 1)])
     dist.all_reduce(contribution, op=dist.ReduceOp.SUM, group=ctx.ep_group)

@@ -267,7 +267,7 @@ def test_invariant_on_train_start_resolved_yaml_none_becomes_empty(tmp_path) -> 
     """``trainer._resolved_yaml = None`` is coerced to ``''`` (line 81)."""
     cb = FrozenStepCallback()
     ctx = _Ctx(run_dir=tmp_path)
-    trainer = _Trainer(run_dir=tmp_path, yaml=None)
+    trainer = _Trainer(run_dir=tmp_path, yaml=None)  # type: ignore[arg-type]
     cb.on_train_start(ctx=ctx, trainer=trainer)
     assert cb._config_yaml == ""
 

@@ -132,7 +132,7 @@ class _FakeEngine:
 
 def test_invariant_inject_stale_noop_on_non_dict() -> None:
     """Non-dict input to _inject_allow_stale_artifact must return without error."""
-    _inject_allow_stale_artifact("not a dict")  # must not raise
+    _inject_allow_stale_artifact("not a dict")  # type: ignore[arg-type]  # must not raise
     _inject_allow_stale_artifact(None)  # type: ignore[arg-type]
     _inject_allow_stale_artifact(42)  # type: ignore[arg-type]
 
@@ -1441,7 +1441,7 @@ def test_invariant_build_trainer_removed_preference_trainer_raises(
             optimizer=None,
             scheduler=None,
             callbacks=[],
-            logger=None,
+            logger=None,  # type: ignore[arg-type]
             ckpt_manager=None,
             model=None,
             models={},

@@ -124,7 +124,7 @@ def test_from_env_calls_init_process_group_when_not_initialized(monkeypatch) -> 
 
     cfg = _make_cfg(backend="gloo", force_cpu=True)
 
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert init_called == ["gloo"], (
         f"init_process_group should be called once with backend='gloo', got {init_called}"
@@ -154,7 +154,7 @@ def test_from_env_force_cpu_takes_manual_fallback_and_returns_context(monkeypatc
     _patch_dist(monkeypatch, rank=0, world_size=2)
     cfg = _make_cfg(dp=2, tp=1, pp=1, ep=1, force_cpu=True)
 
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert ctx.rank == 0
     assert ctx.local_rank == 0
@@ -185,7 +185,7 @@ def test_from_env_force_cpu_dp2_tp2_rank1(monkeypatch) -> None:
     _patch_dist(monkeypatch, rank=1, world_size=4)
     cfg = _make_cfg(dp=2, tp=2, pp=1, ep=1, force_cpu=True)
 
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert ctx.rank == 1
     assert ctx.world_size == 4
@@ -204,7 +204,7 @@ def test_from_env_force_cpu_mesh_is_none_in_returned_ctx(monkeypatch) -> None:
     _patch_dist(monkeypatch, rank=0, world_size=1)
     cfg = _make_cfg(dp=1, tp=1, pp=1, ep=1, force_cpu=True)
 
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert ctx.device_mesh is None
 
@@ -217,7 +217,7 @@ def test_from_env_sp_enabled_propagates(monkeypatch) -> None:
     _patch_dist(monkeypatch, rank=0, world_size=1)
     cfg = _make_cfg(dp=1, tp=1, pp=1, ep=1, force_cpu=True, sp=True)
 
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert ctx.sp_enabled is True
 
@@ -232,7 +232,7 @@ def test_from_env_logs_warning_on_fallback(monkeypatch, caplog) -> None:
     cfg = _make_cfg(force_cpu=True)
 
     with caplog.at_level(logging.WARNING, logger="lighttrain.distributed._context"):
-        ParallelContext.from_env(cfg)
+        ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     messages = [r.message for r in caplog.records]
     assert any("falling back" in m.lower() for m in messages), (
@@ -257,7 +257,7 @@ def test_from_env_ep_gt_1_populates_ep_rank_and_ep_group(monkeypatch) -> None:
     _patch_dist(monkeypatch, rank=0, world_size=2)
     cfg = _make_cfg(dp=2, tp=1, pp=1, ep=2, force_cpu=True)
 
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert ctx.ep_degree == 2
     assert ctx.ep_rank == 0
@@ -272,7 +272,7 @@ def test_from_env_ep_gt_1_rank1(monkeypatch) -> None:
     _patch_dist(monkeypatch, rank=1, world_size=2)
     cfg = _make_cfg(dp=2, tp=1, pp=1, ep=2, force_cpu=True)
 
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert ctx.ep_rank == 1
     assert ctx.ep_group is not None
@@ -299,7 +299,7 @@ def test_from_env_ep_eq_1_skips_ep_group_creation(monkeypatch) -> None:
     monkeypatch.setattr(_ctx_mod, "_create_ep_groups", _spy)
 
     cfg = _make_cfg(dp=1, tp=1, pp=1, ep=1, force_cpu=True)
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert ctx.ep_rank == 0
     assert ctx.ep_group is None
@@ -348,7 +348,7 @@ def test_from_env_devicemesh_success_path_uses_mesh_groups(monkeypatch) -> None:
     )
 
     cfg = _make_cfg(dp=2, tp=1, pp=1, ep=1, force_cpu=False)
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     # Mesh was not None → device_mesh should be the fake instance
     assert ctx.device_mesh is _fake_mesh_instance
@@ -379,7 +379,7 @@ def test_from_env_devicemesh_exception_triggers_fallback(monkeypatch) -> None:
     )
 
     cfg = _make_cfg(dp=1, tp=1, pp=1, ep=1, force_cpu=False)
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     # Fallback engaged: device_mesh must be None
     assert ctx.device_mesh is None
@@ -405,7 +405,7 @@ def test_from_env_devicemesh_import_error_triggers_fallback(monkeypatch) -> None
 
     cfg = _make_cfg(dp=1, tp=1, pp=1, ep=1, force_cpu=False)
     try:
-        ctx = ParallelContext.from_env(cfg)
+        ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
         # If it succeeds, verify fallback path was taken
         assert ctx.device_mesh is None
     except Exception:  # noqa: BLE001
@@ -455,7 +455,7 @@ def test_from_env_sp_field_round_trips(monkeypatch, sp: bool) -> None:
     """
     _patch_dist(monkeypatch, rank=0, world_size=1)
     cfg = _make_cfg(force_cpu=True, sp=sp)
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
     assert ctx.sp_enabled is sp
 
 
@@ -468,7 +468,7 @@ def test_from_env_local_rank_from_env_var(monkeypatch) -> None:
     _patch_dist(monkeypatch, rank=0, world_size=1)
     monkeypatch.setattr("os.environ", {"LOCAL_RANK": "3"})
     cfg = _make_cfg(force_cpu=True)
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
     assert ctx.local_rank == 3
 
 
@@ -480,7 +480,7 @@ def test_from_env_missing_local_rank_defaults_to_zero(monkeypatch) -> None:
     _patch_dist(monkeypatch, rank=0, world_size=1)
     monkeypatch.setattr("os.environ", {})  # no LOCAL_RANK
     cfg = _make_cfg(force_cpu=True)
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
     assert ctx.local_rank == 0
 
 
@@ -494,7 +494,7 @@ def test_from_env_full_field_inventory_force_cpu(monkeypatch) -> None:
     monkeypatch.setattr("os.environ", {"LOCAL_RANK": "2"})
     # 4-rank mesh: dp=2, tp=2, pp=1
     cfg = _make_cfg(dp=2, tp=2, pp=1, ep=1, force_cpu=True, sp=True)
-    ctx = ParallelContext.from_env(cfg)
+    ctx = ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert ctx.rank == 2
     assert ctx.local_rank == 2
@@ -536,7 +536,7 @@ def test_from_env_backend_gloo_passed_to_init(monkeypatch) -> None:
     monkeypatch.setattr("os.environ", {"LOCAL_RANK": "0"})
 
     cfg = _make_cfg(backend="gloo", force_cpu=True)
-    ParallelContext.from_env(cfg)
+    ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert captured == ["gloo"], f"Expected ['gloo'], got {captured}"
 
@@ -564,6 +564,6 @@ def test_from_env_already_initialized_skips_init_call(monkeypatch) -> None:
     monkeypatch.setattr("os.environ", {"LOCAL_RANK": "0"})
 
     cfg = _make_cfg(force_cpu=True)
-    ParallelContext.from_env(cfg)
+    ParallelContext.from_env(cfg)  # type: ignore[arg-type]
 
     assert init_called == [], "init_process_group should NOT be called when already initialized"

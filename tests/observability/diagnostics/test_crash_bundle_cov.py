@@ -69,7 +69,7 @@ def _minimal_bundle(tmp_path: Path, **kw) -> Path:
     """Call write_crash_bundle with only the required args, allowing overrides."""
     defaults = dict(exception=_exc(), step=1)
     defaults.update(kw)
-    return write_crash_bundle(tmp_path, **defaults)
+    return write_crash_bundle(tmp_path, **defaults)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

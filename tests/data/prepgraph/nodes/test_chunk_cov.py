@@ -314,7 +314,7 @@ def test_invariant_run_short_rows_pass_through_unchanged(tmp_path: Path) -> None
     """Rows shorter than max_len are returned as-is (L23-28 path)."""
     rows = [{"input_ids": [1, 2]}, {"input_ids": [3]}]
     result = _run(rows, max_len=10, tmp_path=tmp_path)
-    assert len(result.rows) == 2
+    assert len(result.rows) == 2  # type: ignore[arg-type]
     assert result.rows[0]["input_ids"] == [1, 2]  # type: ignore[index]
     assert result.rows[1]["input_ids"] == [3]  # type: ignore[index]
 
@@ -323,7 +323,7 @@ def test_invariant_run_long_row_is_split(tmp_path: Path) -> None:
     """A row longer than max_len is split into multiple output rows."""
     rows = [{"input_ids": list(range(10))}]
     result = _run(rows, max_len=4, tmp_path=tmp_path)
-    assert len(result.rows) == 3  # 4 + 4 + 2
+    assert len(result.rows) == 3  # type: ignore[arg-type]  # 4 + 4 + 2
     assert result.extras["row_count"] == 3
 
 
@@ -349,7 +349,7 @@ def test_invariant_run_overlap_applies_to_all_rows(tmp_path: Path) -> None:
     rows = [{"input_ids": [1, 2, 3, 4, 5, 6]}]
     result = _run(rows, max_len=4, overlap=2, tmp_path=tmp_path)
     # step=2, starts 0 and 2 only (second window covers the tail → break)
-    assert len(result.rows) == 2
+    assert len(result.rows) == 2  # type: ignore[arg-type]
     assert result.rows[0]["input_ids"] == [1, 2, 3, 4]  # type: ignore[index]
     assert result.rows[1]["input_ids"] == [3, 4, 5, 6]  # type: ignore[index]
 
@@ -358,7 +358,7 @@ def test_invariant_run_overlap_default_is_zero(tmp_path: Path) -> None:
     """When overlap is not in config it defaults to 0 (no overlapping windows)."""
     rows = [{"input_ids": [1, 2, 3, 4, 5, 6]}]
     result = _run(rows, max_len=3, tmp_path=tmp_path)
-    assert len(result.rows) == 2  # 3+3, no overlap
+    assert len(result.rows) == 2  # type: ignore[arg-type]  # 3+3, no overlap
 
 
 def test_invariant_run_result_schema_kind_is_chunked_rows(tmp_path: Path) -> None:
@@ -377,7 +377,7 @@ def test_invariant_run_extras_row_count_matches_len_of_rows(tmp_path: Path) -> N
     """extras['row_count'] must exactly equal len(result.rows)."""
     rows = [{"input_ids": list(range(6))}]
     result = _run(rows, max_len=4, tmp_path=tmp_path)
-    assert result.extras["row_count"] == len(result.rows)
+    assert result.extras["row_count"] == len(result.rows)  # type: ignore[arg-type]
 
 
 # ===========================================================================

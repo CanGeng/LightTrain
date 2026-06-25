@@ -441,7 +441,7 @@ def test_save_load_tied_weights(tmp_run_dir) -> None:
         vocab_size=64, d_model=32, n_layers=1, n_heads=2,
         max_seq_len=32, tie_weights=True,
     )
-    ckpt = mgr.load(saved)
+    ckpt = mgr.load(saved)  # type: ignore[arg-type]
     fresh.load_state_dict(ckpt["model"])
 
     assert torch.equal(fresh.lm_head.weight, model.tok_emb.weight), (
@@ -483,7 +483,7 @@ def test_save_round_trips_data_module_and_full_rng(tmp_run_dir) -> None:
     assert manifest["files"]["data_module"] == "data_module.pt"
     assert manifest["files"]["rng"] == "rng.pt"
 
-    loaded = mgr.load(target)
+    loaded = mgr.load(target)  # type: ignore[arg-type]
     assert "data_module" in loaded
     assert loaded["data_module"]["sampler"]["consumed"] == 8
     rng = loaded["rng"]

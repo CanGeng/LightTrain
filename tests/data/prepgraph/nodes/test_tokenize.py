@@ -199,7 +199,7 @@ def test_invariant_tokenizer_path_produces_input_ids_and_labels(
 
     assert result.schema_kind == "tokenized_rows"
     assert result.extras["row_count"] == 2
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert len(out) == 2
 
     r0 = out[0]
@@ -225,7 +225,7 @@ def test_invariant_tokenizer_path_custom_text_field(
     )
     rows = [{"raw": "a b c", "text": "should be ignored"}]
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert out[0]["input_ids"] == tok.encode("a b c")
 
 
@@ -242,7 +242,7 @@ def test_invariant_tokenizer_path_empty_text_becomes_empty_ids(
         config={"tokenizer": {"name": "dummy"}},
     )
     result = node.run(_make_ctx([{"other_field": "x"}], tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     # encode("") → []
     assert out[0]["input_ids"] == []
     assert out[0]["labels"] == []
@@ -263,7 +263,7 @@ def test_invariant_tokenizer_path_preserves_extra_row_fields(
     )
     rows = [{"text": "hi", "id": "sample-42", "meta": {"split": "train"}}]
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert out[0]["id"] == "sample-42"
     assert out[0]["meta"] == {"split": "train"}
 
@@ -290,7 +290,7 @@ def test_invariant_processor_path_uses_messages_field(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert out[0]["input_ids"] == [1, 2, 3]
     assert len(proc.calls) == 1
     assert proc.calls[0][0] == turns
@@ -313,7 +313,7 @@ def test_invariant_processor_path_fallback_to_turns_key(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert out[0]["input_ids"] == [5, 6]
     assert proc.calls[0][0] == turns
 
@@ -335,7 +335,7 @@ def test_invariant_processor_path_fallback_to_conversations_key(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert out[0]["input_ids"] == [7]
     assert proc.calls[0][0] == convs
 
@@ -362,7 +362,7 @@ def test_invariant_processor_path_synthetic_turn_when_no_turns_field(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    list(result.rows)  # consume to trigger processing
+    list(result.rows)  # type: ignore[arg-type]  # consume to trigger processing
     assert len(captured) == 1
     synthetic = captured[0]
     assert isinstance(synthetic, list)
@@ -387,7 +387,7 @@ def test_invariant_processor_path_response_only_mask_forwarded(
         config={"processor": {"name": "chat_template"}, "response_only_mask": True},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    list(result.rows)
+    list(result.rows)  # type: ignore[arg-type]
     assert len(proc.calls) == 1
     _, kwargs = proc.calls[0]
     assert kwargs.get("response_only_mask") is True
@@ -409,7 +409,7 @@ def test_invariant_processor_path_response_only_mask_false_forwarded(
         config={"processor": {"name": "chat_template"}, "response_only_mask": False},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    list(result.rows)
+    list(result.rows)  # type: ignore[arg-type]
     _, kwargs = proc.calls[0]
     assert "response_only_mask" in kwargs
     assert kwargs["response_only_mask"] is False
@@ -431,7 +431,7 @@ def test_invariant_processor_path_no_response_only_mask_no_kwarg(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    list(result.rows)
+    list(result.rows)  # type: ignore[arg-type]
     _, kwargs = proc.calls[0]
     assert "response_only_mask" not in kwargs
 
@@ -460,7 +460,7 @@ def test_invariant_processor_path_modality_inputs_carried_through(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert "modality_inputs" in out[0]
     assert out[0]["modality_inputs"]["pixel_values"] == pixel_values
     assert out[0]["modality"] == "image"
@@ -482,7 +482,7 @@ def test_invariant_processor_path_no_modality_inputs_key_absent(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert "modality_inputs" not in out[0]
 
 
@@ -502,7 +502,7 @@ def test_invariant_processor_path_messages_field_removed_from_output(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert "messages" not in out[0]
     assert out[0]["id"] == "s0"  # other fields preserved
 
@@ -524,7 +524,7 @@ def test_invariant_processor_path_custom_turns_field(
         config={"processor": {"name": "chat_template"}, "turns_field": "chat"},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    list(result.rows)
+    list(result.rows)  # type: ignore[arg-type]
     assert proc.calls[0][0] == turns
 
 
@@ -549,7 +549,7 @@ def test_invariant_processor_path_attention_mask_defaults_to_ones(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert out[0]["attention_mask"] == [1, 1, 1]
 
 
@@ -569,7 +569,7 @@ def test_invariant_processor_path_labels_default_to_input_ids(
         config={"processor": {"name": "chat_template"}},
     )
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert out[0]["labels"] == [10, 20]
 
 
@@ -622,7 +622,7 @@ def test_invariant_run_result_extras_row_count_matches_rows(
     )
     rows = [{"text": "a"}, {"text": "b"}]
     result = node.run(_make_ctx(rows, tmp_path))
-    out = list(result.rows)
+    out = list(result.rows)  # type: ignore[arg-type]
     assert result.extras["row_count"] == len(out) == 2
 
 

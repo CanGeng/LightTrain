@@ -181,7 +181,7 @@ def test_invariant_rows_layout_store_readable(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path, upstream={"src": _upstream_result(rows)})
     result = node.run(ctx)
     store = result.store
-    assert len(store) == 4
+    assert len(store) == 4  # type: ignore[arg-type]
     assert store[0]["text"] == "item0"  # type: ignore[index]
     assert store[3]["text"] == "item3"  # type: ignore[index]
 
@@ -192,7 +192,7 @@ def test_invariant_rows_layout_empty_upstream(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path, upstream={"src": _upstream_result([])})
     result = node.run(ctx)
     assert result.extras["row_count"] == 0
-    assert len(result.store) == 0
+    assert len(result.store) == 0  # type: ignore[arg-type]
 
 
 def test_invariant_rows_layout_custom_shard_size(tmp_path: Path) -> None:
@@ -399,7 +399,7 @@ def test_invariant_memmap_various_seq_lens(tmp_path: Path, seq_len: int) -> None
     ctx = _ctx(tmp_path, upstream={"src": _upstream_result(rows)})
     result = node.run(ctx)
     assert result.extras["seq_len"] == seq_len
-    assert len(result.store) == 2
+    assert len(result.store) == 2  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(

@@ -109,7 +109,7 @@ def test_pin_step_value_preserved_as_int_via_int_coercion(tmp_path: Path):
     """
     p = tmp_path / "metrics.jsonl"
     j = JSONLLogger(path=p)
-    j.log_scalars({"loss": 0.5}, step=3.7)
+    j.log_scalars({"loss": 0.5}, step=3.7)  # type: ignore[arg-type]
     j.close()
     rec = json.loads(p.read_text(encoding="utf-8").strip())
     assert rec["step"] == 3

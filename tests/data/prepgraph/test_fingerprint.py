@@ -67,15 +67,15 @@ def test_regression_FP_NONE_01_explicit_none_changes_fingerprint() -> None:
         input_fps=[],
     )
     fp_with_none = compose_fingerprint(
-        config={"lr": 0.001, "warmup": None}, **base
+        config={"lr": 0.001, "warmup": None}, **base  # type: ignore[arg-type]
     )
-    fp_without = compose_fingerprint(config={"lr": 0.001}, **base)
+    fp_without = compose_fingerprint(config={"lr": 0.001}, **base)  # type: ignore[arg-type]
     assert fp_with_none != fp_without, (
         "Pre-fix: None dropped, configs collapse to identical fingerprint"
     )
 
-    fp_none = compose_fingerprint(config={"a": None}, **base)
-    fp_empty = compose_fingerprint(config={"a": {}}, **base)
+    fp_none = compose_fingerprint(config={"a": None}, **base)  # type: ignore[arg-type]
+    fp_empty = compose_fingerprint(config={"a": {}}, **base)  # type: ignore[arg-type]
     assert fp_none != fp_empty
 
 
@@ -143,8 +143,8 @@ def test_canonical_config_bool_not_int() -> None:
         code_version="cv",
         input_fps=[],
     )
-    fp_bool = compose_fingerprint(config={"flag": True}, **base)
-    fp_int = compose_fingerprint(config={"flag": 1}, **base)
+    fp_bool = compose_fingerprint(config={"flag": True}, **base)  # type: ignore[arg-type]
+    fp_int = compose_fingerprint(config={"flag": 1}, **base)  # type: ignore[arg-type]
     assert fp_bool != fp_int
 
 

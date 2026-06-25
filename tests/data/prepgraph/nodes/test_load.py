@@ -456,7 +456,7 @@ def test_invariant_run_without_limit_returns_all_rows(tmp_path: Path) -> None:
     p = _write_jsonl(tmp_path / "d.jsonl", rows)
     node = LoadNode(name="n", config={"source": f"jsonl:{p}"})
     result = node.run(_ctx(tmp_path))
-    assert len(result.rows) == 10
+    assert len(result.rows) == 10  # type: ignore[arg-type]
     assert result.extras["row_count"] == 10
 
 
@@ -484,7 +484,7 @@ def test_invariant_run_limit_larger_than_file_returns_all(tmp_path: Path) -> Non
     p = _write_jsonl(tmp_path / "d.jsonl", [{"n": i} for i in range(3)])
     node = LoadNode(name="n", config={"source": f"jsonl:{p}", "limit": 9999})
     result = node.run(_ctx(tmp_path))
-    assert len(result.rows) == 3
+    assert len(result.rows) == 3  # type: ignore[arg-type]
 
 
 def test_invariant_run_limit_as_string_is_coerced(tmp_path: Path) -> None:
@@ -492,7 +492,7 @@ def test_invariant_run_limit_as_string_is_coerced(tmp_path: Path) -> None:
     p = _write_jsonl(tmp_path / "d.jsonl", [{"n": i} for i in range(5)])
     node = LoadNode(name="n", config={"source": f"jsonl:{p}", "limit": "2"})
     result = node.run(_ctx(tmp_path))
-    assert len(result.rows) == 2
+    assert len(result.rows) == 2  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
