@@ -257,21 +257,21 @@ def test_invariant_all_values_no_padding_needed_for_equal_length():
     assert result.shape == (3, 4)
 
 
-def test_pin_current_behavior_all_values_uses_first_episode_values_check():
-    """Pin: all_values() inspects only the FIRST episode's values field to decide
-    whether to return None or compute the stack.
-
-    NOTE: this is a debatable design choice — if later episodes have values but
-    the first does not, all_values() returns None and silently ignores the rest.
-    This test pins the current implemented behavior so any change is visible.
+def test_invariant_all_values_includes_later_episodes_when_first_lacks_values():
+    """Fixed: all_values() returns None only when NO episode has values. A first
+    episode without values is zero-padded rather than discarding the rest
+    (matching ``_collate``'s ``any(...)`` rule).
     """
     buf = RolloutBuffer(max_size=10)
     # First episode has no values; second does.
     buf.add(_ep(4, 1.0, with_values=False))
     buf.add(_ep(4, 2.0, with_values=True))
-    # Current code: checks only _episodes[0].values — returns None
     result = buf.all_values()
-    assert result is None
+    assert result is not None
+    assert result.shape == (2, 4)
+    # The values-less first episode is zero-padded; the second (real values) is
+    # included rather than discarded — proven by the (2, 4) shape + non-None.
+    torch.testing.assert_close(result[0], torch.zeros(4))
 
 
 # ---------------------------------------------------------------------------

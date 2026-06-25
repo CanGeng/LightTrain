@@ -569,24 +569,16 @@ def test_invariant_store_closed_after_error_path(runner: CliRunner, tmp_path: Pa
 # ---------------------------------------------------------------------------
 
 
-def test_pin_current_behavior_hash_ref_no_existence_check(
+def test_invariant_hash_ref_missing_node_exits_1(
     runner: CliRunner, tmp_path: Path
 ) -> None:
-    """Pin: ``#<id>`` refs return the integer id without checking that the node
-    exists in the db (``resolve_ref`` line 379). This means commands like
-    ``invalidate #9999`` exit 0 even when node 9999 doesn't exist, silently
-    no-op'ing. The current behavior is pinned here rather than treated as an
-    assertion error; the source-fix policy prohibits editing source.
-
-    Suspected bug: the missing existence check means GC/pin/tag on phantom
-    ids silently succeed instead of returning exit code 1.
+    """Fixed: ``#<id>`` refs verify node existence (``resolve_ref`` -> ``get_node``),
+    so ``invalidate #9999`` on a phantom id exits 1 with a clear message instead
+    of silently no-op'ing with exit 0.
     """
     db = _make_db(tmp_path)
     res = runner.invoke(
         app, ["lineage", "invalidate", "#9999", "--db", str(db)]
     )
-    # Current behavior: exits 0 (no existence check for #<id> refs).
-    assert res.exit_code == 0, (
-        "pin: #<id> refs bypass existence check — if this now fails with "
-        "exit 1, the store.resolve_ref behavior has been fixed upstream"
-    )
+    assert res.exit_code == 1
+    assert "no lineage node" in res.stdout.lower()

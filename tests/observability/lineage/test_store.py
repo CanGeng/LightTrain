@@ -420,16 +420,15 @@ def test_resolve_ref_single_token_returns_none(lineage_store_factory) -> None:
 
 
 def test_resolve_ref_hash_id_roundtrip(lineage_store_factory) -> None:
-    """A valid ``#<id>`` parses to the integer id even if no such node exists.
-
-    Pins current behaviour: ``#<int>`` short-circuits to ``int(ref[1:])``
-    without checking the node exists.
+    """A valid ``#<id>`` resolves to the integer id when the node exists, and
+    returns ``None`` for a well-formed but non-existent id — existence is now
+    verified (so ``invalidate #<phantom>`` exits 1 instead of silently passing).
     """
     store = lineage_store_factory()
     nid = store.upsert_node(kind="artifact", name="A")
     assert store.resolve_ref(f"#{nid}") == nid
-    # Non-existent but well-formed id still parses.
-    assert store.resolve_ref("#424242") == 424242
+    # Well-formed but non-existent id → None (existence is checked).
+    assert store.resolve_ref("#424242") is None
 
 
 # --------------------------------------------------------------------------- #

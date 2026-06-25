@@ -307,15 +307,11 @@ def test_invariant_default_namespace(name: str, expected_ns: str) -> None:
     assert _default_namespace(name) == expected_ns
 
 
-def test_pin_current_behavior_default_namespace_leading_underscore_empty() -> None:
-    """Pin: name starting with '_' → first segment is empty '' → falls back to 'aux' (L161).
-
-    DEBATABLE: this is likely unintentional (e.g. store named '_v1' gives ns='aux')
-    but pins the current short-circuit.
+def test_invariant_default_namespace_leading_underscore_returns_name() -> None:
+    """Fixed: a name whose first '_'-segment is empty (e.g. '_v1') falls back to
+    the full name, not a hardcoded 'aux', so the namespace stays meaningful.
     """
-    result = _default_namespace("_v1")
-    # First segment is empty string → `or "aux"` kicks in
-    assert result == "aux"
+    assert _default_namespace("_v1") == "_v1"
 
 
 # ---------------------------------------------------------------------------

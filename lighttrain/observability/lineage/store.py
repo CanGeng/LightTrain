@@ -376,9 +376,12 @@ class LineageStore:
         or ``"#<id>"`` to a node id. Returns ``None`` when not found."""
         if ref.startswith("#"):
             try:
-                return int(ref[1:])
+                node_id = int(ref[1:])
             except ValueError:
                 return None
+            # Verify the node exists — "Returns None when not found" must hold for
+            # ``#<id>`` refs too, so invalidate/pin/tag on a phantom id exit 1.
+            return node_id if self.get_node(node_id) is not None else None
         parts = ref.split(":")
         if len(parts) == 2:
             kind, name = parts

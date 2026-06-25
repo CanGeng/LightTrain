@@ -294,15 +294,11 @@ def test_invariant_artifact_finalized_adds_edge_to_run_node(lineage_store_factor
     assert any(e["dst"] == art_id for e in edges)
 
 
-def test_pin_current_behavior_artifact_finalized_cycle_check_warns_for_run_produced_artifact(lineage_store_factory):
-    """Lines 139-151 (pin current behavior): when on_artifact_finalized writes
-    a produced_by edge (run_node -> art_id) the cycle_check BFS walks that edge
-    back and finds the run node has the same run_id as current_run_id, firing a
-    cycle hit even for a fresh single-step graph.
-
-    This is arguably by design: the run is flagged as self-feeding because it
-    both produced and is now finalizing an artifact. With policy='warn' a
-    UserWarning is emitted.
+def test_invariant_artifact_finalized_no_false_cycle_for_direct_produce(lineage_store_factory):
+    """Fixed: finalizing a freshly-produced artifact does NOT fire a self-feeding
+    cycle warning. The just-written ``produced_by`` edge (run -> art) makes the
+    run a depth-1 parent of the artifact, which is by design; ``cycle_check`` is
+    called with ``exclude_direct_parent=True`` so that depth-1 hit is ignored.
     """
     store = lineage_store_factory()
     cb = LineageRecorderCallback(cycle_policy="warn", cycle_depth=2)
@@ -312,49 +308,42 @@ def test_pin_current_behavior_artifact_finalized_cycle_check_warns_for_run_produ
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         cb.on_artifact_finalized(path=None, step=1, artifact_node=art_id)
-    # cycle_check fires because the run node (run_id=="run-cycle") is a parent
-    # of the artifact via the produced_by edge just written
-    assert any("self-feeding cycle" in str(w.message) for w in rec)
+    assert not any("self-feeding cycle" in str(w.message) for w in rec)
 
 
-def test_invariant_artifact_finalized_forbid_policy_raises_on_cycle(lineage_store_factory):
-    """apply_cycle_policy raises RuntimeError when cycle_policy='forbid' and
-    a self-feeding cycle exists. We manually wire a cycle in the store."""
-    store = lineage_store_factory()
-    cb = LineageRecorderCallback(cycle_policy="forbid", cycle_depth=4)
-    trainer = SimpleNamespace(_run_dir="")
-    cb.on_train_start(trainer=trainer, ctx=_Ctx(store=store, run_id="run-forbid"))
-
-    # Create an artifact node that was "produced_by" run-forbid (a real cycle)
-    art_id = store.upsert_node(
-        kind="artifact", name="art", version="v0", run_id="run-forbid"
-    )
-    # Add edge: run_node -> art (produced_by), then a reverse ancestry
-    store.add_edge(cb._run_node_id, art_id, "produced_by", {})
-    # Now add a derived_from pointing back so cycle_check can find the run
-    store.add_edge(art_id, cb._run_node_id, "derived_from", {})
-
-    with pytest.raises(RuntimeError, match="self-feeding cycle"):
-        cb.on_artifact_finalized(path=None, step=2, artifact_node=art_id)
-
-
-def test_invariant_artifact_finalized_warn_policy_warns_on_cycle(lineage_store_factory):
-    """apply_cycle_policy emits a UserWarning when cycle_policy='warn'."""
+def test_invariant_artifact_finalized_warn_policy_warns_on_genuine_cycle(lineage_store_factory):
+    """cycle_policy='warn' emits a UserWarning on a GENUINE multi-hop cycle: the
+    run is an ancestor of the finalized artifact at depth > 1 (art2 -> art1 ->
+    run), beyond the just-written production edge that ``exclude_direct_parent``
+    suppresses.
+    """
     store = lineage_store_factory()
     cb = LineageRecorderCallback(cycle_policy="warn", cycle_depth=4)
     trainer = SimpleNamespace(_run_dir="")
     cb.on_train_start(trainer=trainer, ctx=_Ctx(store=store, run_id="run-warn"))
-
-    art_id = store.upsert_node(
-        kind="artifact", name="art", version="v0", run_id="run-warn"
-    )
-    store.add_edge(cb._run_node_id, art_id, "produced_by", {})
-    store.add_edge(art_id, cb._run_node_id, "derived_from", {})
-
+    art1 = store.upsert_node(kind="artifact", name="art1", version="v1")
+    art2 = store.upsert_node(kind="artifact", name="art2", version="v2")
+    store.add_edge(cb._run_node_id, art1, "produced_by", {})
+    store.add_edge(art1, art2, "derived_from", {})
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
-        cb.on_artifact_finalized(path=None, step=2, artifact_node=art_id)
+        cb.on_artifact_finalized(path=None, step=2, artifact_node=art2)
     assert any("self-feeding cycle" in str(w.message) for w in rec)
+
+
+def test_invariant_artifact_finalized_forbid_policy_raises_on_genuine_cycle(lineage_store_factory):
+    """cycle_policy='forbid' raises RuntimeError on the same genuine multi-hop
+    cycle (run reachable at depth > 1)."""
+    store = lineage_store_factory()
+    cb = LineageRecorderCallback(cycle_policy="forbid", cycle_depth=4)
+    trainer = SimpleNamespace(_run_dir="")
+    cb.on_train_start(trainer=trainer, ctx=_Ctx(store=store, run_id="run-forbid"))
+    art1 = store.upsert_node(kind="artifact", name="art1", version="v1")
+    art2 = store.upsert_node(kind="artifact", name="art2", version="v2")
+    store.add_edge(cb._run_node_id, art1, "produced_by", {})
+    store.add_edge(art1, art2, "derived_from", {})
+    with pytest.raises(RuntimeError, match="self-feeding cycle"):
+        cb.on_artifact_finalized(path=None, step=2, artifact_node=art2)
 
 
 def test_invariant_artifact_finalized_no_edge_when_run_node_none(lineage_store_factory):

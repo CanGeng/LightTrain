@@ -214,7 +214,9 @@ def _fmt_bytes(n: int) -> str:
         if n_f < 1024 or unit == "TiB":
             return f"{n_f:.1f} {unit}"
         n = int(n_f)
-    return f"{n} B"
+    # unreachable: the ``unit == "TiB"`` arm above always returns on the last
+    # iteration — fall back kept off to avoid dead code.
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def is_oom_exception(exc: BaseException) -> bool:

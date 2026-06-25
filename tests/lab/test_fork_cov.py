@@ -226,6 +226,34 @@ def test_invariant_copy_checkpoint_removes_existing_dst_file_symlink(tmp_path: P
     assert (dst_after / "model.bin").exists()
 
 
+def test_invariant_copy_checkpoint_replaces_existing_dst_dir_symlink(tmp_path: Path):
+    """Fixed: an existing dst that is a symlink *to a directory* is unlinked, not
+    sent to ``shutil.rmtree`` (which raises OSError on a symlink in py3.12+).
+    """
+    src = tmp_path / "step_10"
+    src.mkdir()
+    (src / "weights.bin").write_bytes(b"\x00" * 4)
+
+    new_run_dir = tmp_path / "new_run_symdir"
+    new_run_dir.mkdir()
+    ckpt_root = new_run_dir / "checkpoints"
+    ckpt_root.mkdir()
+    dst = ckpt_root / src.name
+
+    # Pre-create a symlink pointing to a *directory* — the py3.12 crash case.
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    (target_dir / "old.bin").write_bytes(b"\xde\xad")
+    dst.symlink_to(target_dir)
+    assert dst.is_symlink() and dst.is_dir()  # is_dir follows the symlink
+
+    _copy_checkpoint(src, new_run_dir, symlink=False)
+    dst_after = ckpt_root / src.name
+    assert dst_after.exists() and not dst_after.is_symlink()
+    assert (dst_after / "weights.bin").exists()
+    assert not (dst_after / "old.bin").exists()  # symlink replaced, not followed
+
+
 # ---------------------------------------------------------------------------
 # _record_lineage_edge (lines 172–173, 179)
 # ---------------------------------------------------------------------------

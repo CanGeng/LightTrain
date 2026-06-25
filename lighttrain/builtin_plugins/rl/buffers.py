@@ -164,8 +164,15 @@ class RolloutBuffer:
         return torch.tensor([ep.reward for ep in self._episodes])
 
     def all_values(self) -> torch.Tensor | None:
-        """Return (N, T_max) padded values or None if no value estimates."""
-        if not self._episodes or self._episodes[0].values is None:
+        """Return (N, T_max) padded values or None if no value estimates.
+
+        Returns ``None`` only when *no* episode carries values; episodes that
+        lack values are zero-padded (matching ``_collate``'s ``any(...)`` rule),
+        so a missing-values first episode no longer discards the rest.
+        """
+        if not self._episodes or not any(
+            ep.values is not None for ep in self._episodes
+        ):
             return None
         max_len = max(ep.values.size(0) for ep in self._episodes if ep.values is not None)
         out = []

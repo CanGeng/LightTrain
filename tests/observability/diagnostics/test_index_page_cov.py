@@ -50,6 +50,19 @@ class _BusWithQuarantine:
         self.quarantined = list(names)
 
 
+class _BusWithRaisingQuarantineProperty:
+    """Bus whose ``quarantined`` PROPERTY getter raises a non-AttributeError.
+
+    The old guard called ``hasattr(bus, "quarantined")`` OUTSIDE the try, and
+    hasattr only swallows AttributeError — so this RuntimeError used to escape
+    ``write_index_page``. The fix moves the hasattr access inside the try.
+    """
+
+    @property
+    def quarantined(self):
+        raise RuntimeError("quarantine property exploded")
+
+
 # ---------------------------------------------------------------------------
 # _crash_section — line 121 (no traceback.txt → short form)
 # ---------------------------------------------------------------------------
@@ -96,6 +109,18 @@ def test_invariant_bus_quarantine_exception_does_not_raise(tmp_path):
     # Must not raise — returns the output path normally
     result = write_index_page(tmp_path, bus=bus)
     assert result.exists()
+
+
+def test_invariant_bus_quarantined_property_getter_exception_does_not_propagate(tmp_path, caplog):
+    """Fixed: a ``quarantined`` PROPERTY that raises a non-AttributeError is
+    caught (the hasattr guard now lives inside the try), so write_index_page
+    completes with an empty quarantine list instead of propagating."""
+    bus = _BusWithRaisingQuarantineProperty()
+    with caplog.at_level(logging.WARNING, logger="lighttrain.observability.diagnostics.index_page"):
+        result = write_index_page(tmp_path, bus=bus)
+    assert result.exists()
+    assert "_none_" in result.read_text(encoding="utf-8")
+    assert "failed to read bus.quarantined" in caplog.text
 
 
 def test_invariant_bus_with_quarantined_list(tmp_path):

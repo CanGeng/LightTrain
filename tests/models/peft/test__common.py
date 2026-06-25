@@ -493,31 +493,11 @@ def test_invariant_fallback_base_spec_callable_get_base_model():
     assert "_InnerModel" in spec["_target_"]
 
 
-def test_pin_current_behavior_fallback_base_spec_base_model_module_attr_is_callable(monkeypatch):
-    """Pin (lines 144-145 are unreachable dead code):
-
-    ``_fallback_base_spec`` walks ``("get_base_model", "base_model")`` in order.
-    For each attr it checks ``callable(next_base)`` first and ``isinstance(...,
-    nn.Module)`` only in the elif.  Since every ``nn.Module`` instance IS
-    callable (it defines ``__call__``), the ``elif isinstance`` branch (lines
-    144-145) is never reached when ``base_model`` holds an nn.Module.
-
-    Instead, the callable branch (line 143) fires and invokes the module like a
-    function.  A real ``peft.PeftModel.base_model`` is not a plain nn.Module
-    but a ``BaseTuner`` that when called() returns another model — the code
-    works for peft's real objects but the ``elif isinstance`` guard is dead for
-    any attribute that is an ``nn.Module``.
-
-    We model this by giving ``base_model`` a *non-callable* stub (a plain
-    object) so that the ``elif isinstance`` branch would fire — but that stub
-    is NOT an nn.Module either, so neither branch fires and we fall through.
-    The point: the *only* way to land on lines 144-145 would require a Python
-    object that ``isinstance(_, nn.Module)`` is True yet ``callable(_)`` is
-    False — which is impossible because nn.Module always defines __call__.
-
-    This test pins the current reachable behaviour: a wrapper whose
-    ``base_model`` attribute is an nn.Module results in the callable branch
-    being taken, NOT the isinstance branch.
+def test_invariant_fallback_base_spec_module_base_model_uses_callable_branch(monkeypatch):
+    """A wrapper whose ``base_model`` is an nn.Module is resolved via the
+    callable branch (every nn.Module is callable), so the resulting spec encodes
+    the inner module that the call returns. The old ``elif isinstance(_, nn.Module)``
+    arm was unreachable (callable always matches first) and has been removed.
     """
 
     class _CoreModel(nn.Module):
