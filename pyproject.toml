@@ -131,6 +131,7 @@ module = [
     "lm_eval.*",
     "matplotlib.*",
     "optuna.*",
+    "peft.*",
     "pyarrow.*",
     "transformers.*",
     "vllm.*",
