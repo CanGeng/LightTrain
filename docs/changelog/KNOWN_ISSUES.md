@@ -8,18 +8,14 @@
 
 ## 开放（Open）
 
-### B1 — mypy `ignore_errors` 隔离区未清空
-[pyproject.toml](../../pyproject.toml) 的 `[[tool.mypy.overrides]] ignore_errors=true` 仍隔离一批携带历史类型债的模块，目标 ratchet 到空。**v0.5.0 已清死条目 + 5 个易批（名单 18 → 12）**，剩余：
-- **torch-stub 批**（architectures：diffusion_unet / jepa / mamba / rwkv；distributed：ddp / fsdp / zero）—— 本机 nightly-torch 与 CI 的 CPU-torch 类型推导分叉，**本机绿 ≠ CI 绿**，不可凭本机删 ignore（见 v0.3.1 告诫），需在 CI types job 验证。
-- **中难批**（trainers `_preference_base` / `grpo` / `ppo`，data `joined_dataset` / `producer`）—— 逻辑/协议类型债。
-
-**状态：开放**（剩余批留 CI-verified 后续 PR）
-
-### B2 — `check_untyped_defs` 未启用
-`[tool.mypy]` 未开 `check_untyped_defs`；开启后约 +89 错（tests/ 未注解函数体为主），另有 ~108 个 `annotation-unchecked` note。作为未来 types ratchet，成本约 5-7 个分批 PR。
-**状态：开放**（显式 defer）
+### B2 — `check_untyped_defs` 仅生产代码已纳入，tests/ 余量待清
+`[tool.mypy]` 已于 **v0.5.1 启用 `check_untyped_defs=true`**，整个 `lighttrain/` 生产代码 0 新错;但 `tests/` 仍有约 358 个未注解函数体错，经 `[[tool.mypy.overrides]] module=["tests.*"] check_untyped_defs=false` 收缩 opt-out 暂避。
+**状态：开放**（下一个 ratchet 目标 = 逐测试模块清，清完即删 `tests.*` opt-out；估 5-7 个分批 PR）
 
 ## 已解决 / 已勾销（Resolved / Dismissed）
+
+### B1 — mypy `ignore_errors` 隔离区未清空
+✅ 已解决 → v0.5.1（见 [v0.5.1](v0/v0.5/v0.5.1.md)）：建 CPU-torch parity venv 复现 CI 视角后，torch-stub 批 + 中难批一次真修到零，删除整个 `ignore_errors` 隔离块（12 → 0，env-invariant 双绿）。
 
 ### A1 — PPO 未接入 reference-KL
 ✅ 已解决 → v0.5.0（见 [v0.5.0](v0/v0.5/v0.5.0.md)）：PPOSurrogateLoss 加 `beta_kl` + k3 KL 项，PPOTrainer 仅 beta_kl>0 时建 ref 并注入 per-token `log_probs_ref`。
