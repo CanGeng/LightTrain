@@ -154,7 +154,7 @@ class PreferenceTrainer(Trainer):
 
     # ------------------------------------------------------------------ fit
 
-    def fit(self, *, steps: int | None = None) -> dict[str, Any]:  # type: ignore[override]
+    def fit(self, *, steps: int | None = None) -> dict[str, Any]:
         if self.model is None:
             raise RuntimeError(f"{type(self).__name__}.fit: model is not set.")
         if self.optimizer is None:
@@ -251,6 +251,7 @@ class PreferenceTrainer(Trainer):
             "chosen_input_ids", "chosen_labels",
             "rejected_input_ids", "rejected_labels",
         ], "PreferenceTrainer")
+        assert self.model is not None
         self.model.train()
 
         chosen_ids = batch["chosen_input_ids"]
@@ -297,7 +298,7 @@ class PreferenceTrainer(Trainer):
         self.ctx.model = self.model
         return self._rl_rule.step(self.model, enriched, self.ctx)
 
-    def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
+    def _step(self, batch: dict[str, Any]) -> StepOutput:
         """Bridge to _preference_step() for the unified train_step() protocol.
 
         Clears ``ctx.extras["loss_signal"]`` before the preference step so that
@@ -309,10 +310,10 @@ class PreferenceTrainer(Trainer):
 
     # ------------------------------------------------------------------ helpers
 
-    def eval(self, *args: Any, **kwargs: Any) -> dict[str, float]:  # type: ignore[override]
+    def eval(self, *args: Any, **kwargs: Any) -> dict[str, float]:
         return {}
 
-    def predict(self, *args: Any, **kwargs: Any) -> list[Any]:  # type: ignore[override]
+    def predict(self, *args: Any, **kwargs: Any) -> list[Any]:
         return []
 
     def _maybe_log(self, metrics: Mapping[str, Any]) -> None:
@@ -341,6 +342,7 @@ class PreferenceTrainer(Trainer):
             return
         if self.ctx.step % self.ckpt_every != 0:
             return
+        assert self.model is not None
         self.ckpt_manager.save(
             step=self.ctx.step,
             state={"model": self.model.state_dict(), "trainer": self.state_dict()},

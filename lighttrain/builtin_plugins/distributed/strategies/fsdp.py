@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import torch
 import torch.nn as nn
@@ -109,7 +109,7 @@ class FSDPStrategy:
         return wrapped, optimizer, loader
 
     def accumulate(self, model: nn.Module) -> Any:
-        return model.no_sync()  # type: ignore[attr-defined]
+        return cast(Any, model).no_sync()  # FSDP-only method, not on base nn.Module
 
     def backward(self, loss: torch.Tensor, model: nn.Module) -> None:
         loss.backward()
@@ -120,7 +120,7 @@ class FSDPStrategy:
         max_norm: float,
         parallel_ctx: ParallelContext,
     ) -> float:
-        return float(model.clip_grad_norm_(max_norm))  # type: ignore[attr-defined]
+        return float(cast(Any, model).clip_grad_norm_(max_norm))  # FSDP-only method
 
     def optimizer_step(self, optimizer: Any, model: nn.Module) -> None:
         inner = getattr(optimizer, "optimizer", optimizer)

@@ -16,11 +16,11 @@ import logging
 import time
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import torch
 
-from lighttrain.data.artifacts import ArtifactStoreProtocol
+from lighttrain.data.artifacts import ArtifactStoreBase, ArtifactStoreProtocol
 from lighttrain.data.core._schema import derive_sample_id
 from lighttrain.models.extras import (
     ExtraOutputSpec,
@@ -173,10 +173,12 @@ class ModelForwardProducer:
         self._t_start = time.time()
 
         # Push header overrides onto the store now (so finalize writes them).
+        # header/root live on the concrete base, not the (write) protocol.
         if header_overrides:
+            store_header = cast(ArtifactStoreBase, self.store).header
             for k, v in header_overrides.items():
-                if hasattr(self.store.header, k):
-                    setattr(self.store.header, k, v)
+                if hasattr(store_header, k):
+                    setattr(store_header, k, v)
 
     # ----- protocol --------------------------------------------------------
 
@@ -216,11 +218,12 @@ class ModelForwardProducer:
         if not isinstance(output, ModelOutput):
             output = _coerce_model_output(output)
         if self._hooks is not None:
+            output_extras = cast(dict[str, Any], output.extras)
             for name, payload in self._hooks.collect().items():
                 if isinstance(payload, Mapping):
-                    output.extras[name] = {k: v for k, v in payload.items()}
+                    output_extras[name] = {k: v for k, v in payload.items()}
                 else:
-                    output.extras[name] = payload
+                    output_extras[name] = payload
         flat = flatten_model_output_tensors(output)
         tensors_out: dict[str, torch.Tensor] = {}
         for k, v in flat.items():
@@ -239,16 +242,18 @@ class ModelForwardProducer:
         self.store.put(sid, tensors_out)
         self._sample_ids.append(sid)
         # update header schema map for parity with on-disk shapes
+        header = cast(ArtifactStoreBase, self.store).header
         for k, v in tensors_out.items():
-            self.store.header.field_schema.setdefault(k, str(tuple(v.shape)))
-            if not self.store.header.dtype:
-                self.store.header.dtype = str(v.dtype)
-        if not self.store.header.producer_signature:
-            self.store.header.producer_signature = self.producer_signature
+            header.field_schema.setdefault(k, str(tuple(v.shape)))
+            if not header.dtype:
+                header.dtype = str(v.dtype)
+        if not header.producer_signature:
+            header.producer_signature = self.producer_signature
         return tensors_out
 
     def finalize(self) -> Path:
-        manifest_path = self.store.finalize()
+        # finalize() lives on the concrete write store, not the read protocol.
+        manifest_path: Path = cast(Any, self.store).finalize()
         if self._hooks is not None:
             self._hooks.detach()
             self._hooks = None
@@ -259,18 +264,19 @@ class ModelForwardProducer:
         if ls is not None:
             import warnings
 
+            store_base = cast(ArtifactStoreBase, self.store)
             try:
                 artifact_id = ls.upsert_node(
                     kind="artifact",
-                    name=str(self.artifact_name or self.store.root.name),
+                    name=str(self.artifact_name or store_base.root.name),
                     version=str(self.artifact_version or "auto"),
                     schema_kind="artifact_header",
-                    schema_version=self.store.header.schema_version,
-                    payload_path=str(self.store.root),
+                    schema_version=store_base.header.schema_version,
+                    payload_path=str(store_base.root),
                     payload={
                         "producer_signature": self.producer_signature,
                         "samples_count": len(self._sample_ids),
-                        "header": self.store.header.to_dict(),
+                        "header": store_base.header.to_dict(),
                     },
                 )
                 run_id = self._run_node_id

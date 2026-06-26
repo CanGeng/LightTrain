@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
 import torch.nn as nn
@@ -108,7 +108,7 @@ class ZeROStrategy:
         return nullcontext()  # ZeRO handles gradient accumulation internally
 
     def backward(self, loss: torch.Tensor, model: nn.Module) -> None:
-        model.backward(loss)  # type: ignore[attr-defined]  # model is DS engine
+        cast(Any, model).backward(loss)  # model is DS engine
 
     def clip_grad_norm(
         self,
@@ -121,13 +121,13 @@ class ZeROStrategy:
         # step (get_global_grad_norm() returns None); later it reports the prior
         # step's norm. This value is informational only — report 0.0 when absent.
         try:
-            norm = model.get_global_grad_norm()  # type: ignore[attr-defined]
+            norm = cast(Any, model).get_global_grad_norm()
         except AttributeError:
             return 0.0
         return float(norm) if norm is not None else 0.0
 
     def optimizer_step(self, optimizer: Any, model: nn.Module) -> None:
-        model.step()  # type: ignore[attr-defined]  # model is DS engine; step() = clip+step+zero_grad
+        cast(Any, model).step()  # model is DS engine; step() = clip+step+zero_grad
 
     def zero_grad(self, optimizer: Any) -> None:
         # DeepSpeed's engine.step() already zeroed gradients; nothing to do.
@@ -135,7 +135,7 @@ class ZeROStrategy:
         return None
 
     def unwrap_model(self, model: nn.Module) -> nn.Module:
-        return model.module  # type: ignore[attr-defined]
+        return cast(nn.Module, cast(Any, model).module)
 
     def save_checkpoint(
         self,
@@ -146,7 +146,7 @@ class ZeROStrategy:
         path: Path,
     ) -> None:
         path.mkdir(parents=True, exist_ok=True)
-        model.save_checkpoint(str(path), tag=f"step_{step}")  # type: ignore[attr-defined]
+        cast(Any, model).save_checkpoint(str(path), tag=f"step_{step}")
 
     def load_checkpoint(
         self,
@@ -155,7 +155,7 @@ class ZeROStrategy:
         parallel_ctx: ParallelContext,
         path: Path,
     ) -> None:
-        model.load_checkpoint(str(path))  # type: ignore[attr-defined]
+        cast(Any, model).load_checkpoint(str(path))
 
     def state_dict(self) -> dict[str, Any]:
         return {

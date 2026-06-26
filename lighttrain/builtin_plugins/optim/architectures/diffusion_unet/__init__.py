@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import torch
 import torch.nn as nn
@@ -173,7 +173,9 @@ class TinyUNet(nn.Module):
         pred = self.out_conv(h)
 
         # Match input shape
-        if batch.get("noisy_x", batch.get("x")).dim() == 2:
+        x_in = batch.get("noisy_x", batch.get("x"))
+        assert x_in is not None
+        if x_in.dim() == 2:
             pred = pred.squeeze(1)
 
         return ModelOutput(outputs={"pred": pred})
@@ -184,9 +186,10 @@ class TinyUNet(nn.Module):
 # ---------------------------------------------------------------------------
 
 def _unet_blocks(model: nn.Module) -> Iterator[nn.Module]:
-    yield from model.enc_blocks
-    yield model.mid
-    yield from model.dec_blocks
+    m = cast(Any, model)  # enc_blocks/mid/dec_blocks are TinyUNet-specific
+    yield from m.enc_blocks
+    yield m.mid
+    yield from m.dec_blocks
 
 
 def diffusion_unet_profile() -> ArchitectureProfile:
@@ -195,8 +198,8 @@ def diffusion_unet_profile() -> ArchitectureProfile:
         loss_family="diffusion",
         state_mode="stateless",
         block_iterator_fn=_unet_blocks,
-        embedding_layer_fn=lambda m: m.enc_in,
-        head_layer_fn=lambda m: m.out_conv,
+        embedding_layer_fn=lambda m: cast(Any, m).enc_in,
+        head_layer_fn=lambda m: cast(Any, m).out_conv,
         reset_state_fn=None,
     )
 

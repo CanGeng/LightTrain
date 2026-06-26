@@ -165,7 +165,7 @@ class GRPOTrainer(Trainer):
 
     # ------------------------------------------------------------------ fit
 
-    def fit(self, *, steps: int | None = None) -> dict[str, Any]:  # type: ignore[override]
+    def fit(self, *, steps: int | None = None) -> dict[str, Any]:
         if self.model is None:
             raise RuntimeError("GRPOTrainer.fit: model is not set.")
         if self.optimizer is None:
@@ -285,6 +285,7 @@ class GRPOTrainer(Trainer):
         prompt_mask = batch.get("attention_mask", batch.get("prompt_attention_mask"))
 
         self._buffer.clear()
+        assert prompt_ids is not None and self.reward_fn is not None
         episodes = self._rollout_engine.rollout(
             self.model, prompt_ids, prompt_mask, self.reward_fn
         )
@@ -300,6 +301,7 @@ class GRPOTrainer(Trainer):
         validate_batch(batch, [
             "input_ids", "log_probs_old", "group_ids", "rewards",
         ], "GRPOTrainer")
+        assert self.model is not None
         self.model.train()
 
         input_ids = batch["input_ids"]
@@ -371,7 +373,7 @@ class GRPOTrainer(Trainer):
         self.ctx.model = self.model
         return self._rl_rule.step(self.model, batch, self.ctx)
 
-    def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
+    def _step(self, batch: dict[str, Any]) -> StepOutput:
         """Bridge to _grpo_step() for the unified train_step() protocol.
 
         For GRPOTrainer, train_step() / _step() corresponds to **one inner-epoch
@@ -382,10 +384,10 @@ class GRPOTrainer(Trainer):
         raw = self._grpo_step(batch)
         return StepOutput(loss=raw.get("loss"), metrics=dict(raw))
 
-    def eval(self, *args: Any, **kwargs: Any) -> dict[str, float]:  # type: ignore[override]
+    def eval(self, *args: Any, **kwargs: Any) -> dict[str, float]:
         return {}
 
-    def predict(self, *args: Any, **kwargs: Any) -> list[Any]:  # type: ignore[override]
+    def predict(self, *args: Any, **kwargs: Any) -> list[Any]:
         return []
 
 

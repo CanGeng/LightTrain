@@ -26,7 +26,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import torch
 import torch.nn as nn
@@ -255,10 +255,11 @@ class JEPAModel(nn.Module):
 # ---------------------------------------------------------------------------
 
 def _jepa_blocks(model: nn.Module) -> Iterator[nn.Module]:
+    m = cast(Any, model)  # encoder/predictor are JEPAModel-specific submodules
     if hasattr(model, "encoder"):
-        yield from model.encoder.blocks
+        yield from m.encoder.blocks
     if hasattr(model, "predictor"):
-        yield from model.predictor.blocks
+        yield from m.predictor.blocks
 
 
 def jepa_profile(model: JEPAModel | None = None) -> ArchitectureProfile:
@@ -267,8 +268,8 @@ def jepa_profile(model: JEPAModel | None = None) -> ArchitectureProfile:
         loss_family="jepa",
         state_mode="stateless",
         block_iterator_fn=_jepa_blocks,
-        embedding_layer_fn=lambda m: m.encoder.proj if hasattr(m, "encoder") else None,
-        head_layer_fn=lambda m: m.predictor.norm if hasattr(m, "predictor") else None,
+        embedding_layer_fn=lambda m: cast(nn.Module, cast(Any, m).encoder.proj if hasattr(m, "encoder") else None),
+        head_layer_fn=lambda m: cast(nn.Module, cast(Any, m).predictor.norm if hasattr(m, "predictor") else None),
         reset_state_fn=None,
     )
 
