@@ -17,8 +17,14 @@ from typing import Any, Literal, cast
 from lighttrain.observability.lineage.dag import apply_cycle_policy, cycle_check
 from lighttrain.observability.lineage.store import LineageStore
 from lighttrain.registry import register
+from lighttrain.utils.log import warn_once
 
 _log = logging.getLogger(__name__)
+
+# Per-metric-name coercion warnings already emitted — _safe_metrics runs every
+# time metrics are recorded (per step), so a non-coercible metric warns once per
+# name instead of flooding.
+_WARNED_METRICS: set[str] = set()
 
 
 @register("callback", "lineage_recorder")
@@ -214,7 +220,10 @@ def _safe_metrics(metrics: Any) -> dict[str, Any]:
         try:
             out[str(k)] = float(v)
         except Exception:  # noqa: BLE001
-            _log.warning(
+            warn_once(
+                _WARNED_METRICS,
+                f"float_{k}",
+                _log,
                 "lineage_recorder: metric %r not float-coercible; falling back to str()",
                 k,
                 exc_info=True,
@@ -222,7 +231,10 @@ def _safe_metrics(metrics: Any) -> dict[str, Any]:
             try:
                 out[str(k)] = str(v)
             except Exception:  # noqa: BLE001
-                _log.warning(
+                warn_once(
+                    _WARNED_METRICS,
+                    f"str_{k}",
+                    _log,
                     "lineage_recorder: metric %r not str-coercible; dropping it from final_metrics",
                     k,
                     exc_info=True,

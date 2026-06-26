@@ -29,6 +29,7 @@ from typing import Any
 
 from lighttrain.callbacks.base import Signal
 from lighttrain.registry import register
+from lighttrain.utils.log import warn_once
 
 _log = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ class FileSignalsCallback:
         self.allow_inject = bool(allow_inject)
         self._trainer: Any = None
         self._ctx: Any = None
+        # Per-poll failure warnings fire once per run, not on every poll (hot loop).
+        self._warned: set[str] = set()
 
     def on_train_start(self, *, trainer: Any = None, ctx: Any = None, **_: Any) -> None:
         self._trainer = trainer
@@ -89,7 +92,8 @@ class FileSignalsCallback:
                     {"event": "lr_scale", "scale": scale, "step": int(step), "ts": time.time()}
                 )
             except Exception:  # noqa: BLE001
-                _log.warning("file_signals: lr.json apply failed; lr scale skipped", exc_info=True)
+                warn_once(self._warned, "lr_apply_failed", _log,
+                          "file_signals: lr.json apply failed; lr scale skipped", exc_info=True)
             try:
                 lr_path.unlink()
             except FileNotFoundError:
@@ -133,7 +137,8 @@ class FileSignalsCallback:
                     {"event": "inject", "step": int(step), "ts": time.time()}
                 )
             except Exception as exc:  # noqa: BLE001 — never kill on inject error
-                _log.warning("file_signals: inject.py exec failed; recording inject_error", exc_info=True)
+                warn_once(self._warned, "inject_exec_failed", _log,
+                          "file_signals: inject.py exec failed; recording inject_error", exc_info=True)
                 events.append(
                     {
                         "event": "inject_error",
@@ -156,7 +161,8 @@ class FileSignalsCallback:
                 try:
                     store.update_node_payload(int(run_node), {"realtime_events": log})
                 except Exception:  # noqa: BLE001
-                    _log.warning("file_signals: lineage update_node_payload failed; realtime events not persisted", exc_info=True)
+                    warn_once(self._warned, "lineage_payload_failed", _log,
+                              "file_signals: lineage update_node_payload failed; realtime events not persisted", exc_info=True)
 
         return signal
 

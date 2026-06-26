@@ -33,7 +33,7 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -153,7 +153,7 @@ def _compute_sensitivity(
     ok = [t for t in trials if t.metric is not None]
     if len(ok) < 2:
         return {}
-    metrics = [t.metric for t in ok]  # type: ignore[misc]
+    metrics: list[float] = [t.metric for t in ok if t.metric is not None]
     mean_m = sum(metrics) / len(metrics)
     var_m = sum((m - mean_m) ** 2 for m in metrics) / len(metrics)
     if var_m < 1e-14:
@@ -344,7 +344,7 @@ class SweepRunner:
         ok = [t for t in trials if t.status == "ok" and t.metric is not None]
         if len(ok) < grace:
             return
-        median_val = statistics.median(t.metric for t in ok)  # type: ignore[misc]
+        median_val = statistics.median(t.metric for t in ok if t.metric is not None)
         threshold = 1.2 if self.direction == "minimize" else 0.8
         for t in ok:
             assert t.metric is not None
@@ -368,9 +368,9 @@ class SweepRunner:
         ok = [t for t in trials if t.status == "ok" and t.metric is not None]
         if ok:
             best = (
-                min(ok, key=lambda t: t.metric)  # type: ignore[arg-type]
+                min(ok, key=lambda t: cast(float, t.metric))
                 if self.direction == "minimize"
-                else max(ok, key=lambda t: t.metric)  # type: ignore[arg-type]
+                else max(ok, key=lambda t: cast(float, t.metric))
             )
             best_config = best.config_overrides
             best_metric: float | None = best.metric

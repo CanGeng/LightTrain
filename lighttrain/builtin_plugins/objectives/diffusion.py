@@ -118,6 +118,7 @@ class DiffusionObjective:
             * ``batch["t"]``        — integer timesteps (B,)
         """
         self._ensure_schedule(device)
+        assert self._sqrt_acp is not None and self._sqrt_one_minus_acp is not None
         x0 = batch["x"]
         B = x0.shape[0]
         t = torch.randint(0, self.timesteps, (B,), device=x0.device)
@@ -150,6 +151,7 @@ class DiffusionObjective:
         noise = batch["noise"]
         t = batch["t"]
         self._ensure_schedule(x0.device)
+        assert self._sqrt_acp is not None and self._sqrt_one_minus_acp is not None
 
         if self.target == "eps":
             gt = noise

@@ -154,11 +154,15 @@ def _grpo_batch_no_labels(V: int = 16, T: int = 4, B: int = 4) -> dict:
 # ===========================================================================
 
 
-def test_invariant_fit_raises_when_lora_base_as_ref_and_beta_kl_positive():
-    """beta_kl>0 + lora_base_as_ref=True must raise RuntimeError at fit() time (line 188)."""
+def test_invariant_fit_lora_base_as_ref_with_beta_kl_builds_ref():
+    """A2: beta_kl>0 + lora_base_as_ref=True no longer raises at fit() time — the
+    per-token LoRA-base reference path is now wired. fit() builds a lora-base
+    reference policy (model=None, toggles adapters on the live model per step)."""
     trainer = _make_grpo(beta_kl=0.5, lora_base_as_ref=True)
-    with pytest.raises(RuntimeError, match="lora_base_as_ref=True"):
-        trainer.fit()
+    _stub_rollout(trainer, rewards=torch.tensor([1.0, 0.5]))
+    trainer.fit()
+    assert trainer._ref_policy is not None
+    assert trainer._ref_policy.lora_base_as_ref is True
 
 
 # ===========================================================================

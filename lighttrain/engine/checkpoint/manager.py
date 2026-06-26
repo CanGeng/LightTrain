@@ -77,6 +77,30 @@ def _save_safetensors(state_dict: Mapping[str, torch.Tensor], path: Path) -> Non
         _torch_save_atomic(dict(state_dict), path.with_suffix(".pt"))
 
 
+def _commit_dir(staging: Path, target: Path) -> None:
+    """Atomically install ``staging`` as ``target`` (a directory swap).
+
+    If ``target`` does not exist, this is a single ``os.replace`` (atomic). If
+    it does (a same-step overwrite), the previously-committed copy is first
+    renamed aside, the staging dir is swapped in, and only then is the old copy
+    removed — so a crash between the two renames still leaves a complete copy on
+    disk (the old one under a ``.old.*`` name, swept on next construction). If
+    the swap-in itself fails, the previous good copy is restored before raising,
+    so an existing checkpoint is never lost.
+    """
+    if not target.exists():
+        os.replace(staging, target)
+        return
+    backup = target.with_suffix(target.suffix + f".old.{secrets.token_hex(4)}")
+    os.replace(target, backup)
+    try:
+        os.replace(staging, target)
+    except BaseException:
+        os.replace(backup, target)  # restore the previous good copy
+        raise
+    shutil.rmtree(backup, ignore_errors=True)
+
+
 def _load_safetensors(path: Path) -> dict[str, torch.Tensor]:
     if path.exists():
         from safetensors.torch import load_file
@@ -120,18 +144,26 @@ class CheckpointManager:
         In distributed runs, pass ``parallel_ctx`` so that only rank-0
         writes to disk.  Non-rank-0 processes return ``None`` immediately.
 
-        Note: re-saving an existing step directory is not crash-atomic.
-        ``save()`` overwrites fixed filenames in place, so a crash mid-write
-        on a same-step overwrite can leave a mixed file set behind a stale
-        manifest. Completed (non-crashed) re-saves are consistent. Callers
-        needing crash atomicity across same-step overwrites would require a
-        generation-specific on-disk layout (future work).
+        Crash-atomic, including same-step overwrite: the step is built in full
+        in a staging directory ``step_<n>.tmp.<pid>.<token>/`` (manifest last)
+        and then committed by an atomic directory swap. A crash at any point
+        leaves the previously-committed ``step_<n>/`` intact — ``step_<n>/`` is
+        only ever a complete committed directory or absent, never a half-
+        overwritten mixed file set. A crash may leave an inert ``*.tmp.*`` /
+        ``*.old.*`` dir behind; ``_STEP_RE`` does not match them, so
+        listing/loading/pruning ignore them.
         """
         if parallel_ctx is not None and not parallel_ctx.is_main_process:
             return None
 
         target = self.ckpt_dir / f"step_{int(step)}"
-        target.mkdir(parents=True, exist_ok=True)
+        # Build the whole step in a staging dir, then atomically swap it in. This
+        # keeps a same-step overwrite crash-atomic (never corrupts the previously
+        # committed step_<n>/). _tmp_path adds a .tmp.<pid>.<token> suffix that
+        # _STEP_RE does not match, so a half-written staging dir is invisible to
+        # list_steps()/load()/_prune().
+        staging = _tmp_path(target)
+        staging.mkdir(parents=True, exist_ok=False)
 
         manifest: dict[str, Any] = {
             "step": int(step),
@@ -141,7 +173,7 @@ class CheckpointManager:
         }
 
         if "model" in state and state["model"] is not None:
-            path = target / "model.safetensors"
+            path = staging / "model.safetensors"
             _save_safetensors(state["model"], path)
             manifest["files"]["model"] = path.name
 
@@ -155,11 +187,14 @@ class CheckpointManager:
             ("data_module", "data_module.pt"),
         ):
             if key in state and state[key] is not None:
-                path = target / name
+                path = staging / name
                 _torch_save_atomic(state[key], path)
                 manifest["files"][key] = name
 
-        _atomic_write_text(target / "manifest.json", json.dumps(manifest, indent=2))
+        _atomic_write_text(staging / "manifest.json", json.dumps(manifest, indent=2))
+
+        # Atomic swap: staging -> step_<n>/ (replacing any prior committed copy).
+        _commit_dir(staging, target)
 
         # Rotate / pointers.
         if kind == "step":

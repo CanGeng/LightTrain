@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.4.5"
+version = "0.5.0"
 description = "PyTorch training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -132,6 +132,7 @@ module = [
     "matplotlib.*",
     "optuna.*",
     "peft.*",
+    "PIL.*",
     "pyarrow.*",
     "transformers.*",
     "vllm.*",
@@ -154,17 +155,11 @@ module = [
     "lighttrain.builtin_plugins.optim.architectures.rwkv",
     "lighttrain.builtin_plugins.data.artifacts.joined_dataset",
     "lighttrain.builtin_plugins.data.artifacts.producer",
-    "lighttrain.builtin_plugins.data.processors.image",
-    "lighttrain.builtin_plugins.distributed.model_parallel.ep",
     "lighttrain.builtin_plugins.distributed.strategies.ddp",
     "lighttrain.builtin_plugins.distributed.strategies.fsdp",
     "lighttrain.builtin_plugins.distributed.strategies.zero",
-    "lighttrain.builtin_plugins.layer_offload._engine",
-    "lighttrain.builtin_plugins.objectives.diffusion",
     "lighttrain.builtin_plugins.trainers._preference_base",
     "lighttrain.builtin_plugins.trainers.grpo",
     "lighttrain.builtin_plugins.trainers.ppo",
-    "lighttrain.builtin_plugins.trainers.rm",
-    "lighttrain.lab.sweep",
 ]
 ignore_errors = true

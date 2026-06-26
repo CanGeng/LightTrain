@@ -43,6 +43,20 @@ from lighttrain.trainers.base import Trainer
 _log = logging.getLogger(__name__)
 
 
+def _effective_beta_kl(objective: Any) -> float:
+    """Read the KL coefficient from the *actually effective* PPO loss.
+
+    Honors the ``loss:`` seam: unwrap a ``LossOnlyObjective`` to its ``loss_fn``
+    and read ``beta_kl``. Returns ``0.0`` when the bound loss exposes no such
+    knob (e.g. a custom non-PPO loss) so we never build a reference policy the
+    effective loss can't consume.
+    """
+    from lighttrain.optim.architectures.profile import LossOnlyObjective
+
+    loss_fn = objective.loss_fn if isinstance(objective, LossOnlyObjective) else objective
+    return float(getattr(loss_fn, "beta_kl", 0.0))
+
+
 @register("trainer", "ppo")
 class PPOTrainer(Trainer):
     """Single-GPU PPO trainer with adaptive KL penalty.
@@ -102,6 +116,7 @@ class PPOTrainer(Trainer):
         clip_eps: float = 0.2,
         vf_coef: float = 0.5,
         ent_coef: float = 0.01,
+        beta_kl: float = 0.0,
         target_kl: float | None = 0.02,
         lora_base_as_ref: bool = False,
         max_new_tokens: int = 128,
@@ -153,7 +168,7 @@ class PPOTrainer(Trainer):
         # Default RL loss (fallback when the recipe omits a `loss:` block). The
         # `loss:` seam wins: see Trainer._recipe_loss_or in _ppo_step.
         self._default_loss = PPOSurrogateLoss(
-            clip_eps=clip_eps, vf_coef=vf_coef, ent_coef=ent_coef
+            clip_eps=clip_eps, vf_coef=vf_coef, ent_coef=ent_coef, beta_kl=beta_kl
         )
         self._rl_rule = RLUpdateRule(grad_clip=grad_clip)
         # F1: resolve the rollout backend via the rl_backend registry and forward
@@ -191,10 +206,20 @@ class PPOTrainer(Trainer):
         if self.reward_fn is None:
             raise RuntimeError("PPOTrainer.fit: reward_fn is not set.")
 
-        # Freeze reference policy once before training.
-        self._ref_policy = freeze_as_ref(
-            self.model, lora_base_as_ref=self.lora_base_as_ref
+        # Reference policy for the KL penalty. Reset first so re-running a trainer
+        # with a different objective/beta can't leave a stale ref behind; build it
+        # only when the *effective* loss actually uses KL (beta_kl > 0), so the
+        # default beta_kl=0 path pays no deep-copy cost.
+        self._ref_policy = None
+        eff_beta = (
+            _effective_beta_kl(self.objective)
+            if self.objective is not None
+            else self._default_loss.beta_kl
         )
+        if eff_beta > 0:
+            self._ref_policy = freeze_as_ref(
+                self.model, lora_base_as_ref=self.lora_base_as_ref
+            )
 
         target = int(steps) if steps is not None else self.max_steps
         loader = self.data_module.train_loader()
@@ -379,6 +404,10 @@ class PPOTrainer(Trainer):
             logits = out["logits"]
             hidden = None
 
+        # Clear any reference log-probs left in ctx.extras by a prior step before
+        # deciding whether to re-inject this step (PPOSurrogateLoss only checks presence).
+        self.ctx.extras.pop("log_probs_ref", None)
+
         # Per-token log-probs
         if labels is not None:
             # NOTE: `labels` is used as a None-sentinel only; the actual next-token
@@ -391,7 +420,21 @@ class PPOTrainer(Trainer):
             log_probs_new = torch.cat(
                 [torch.zeros_like(log_probs_new[:, :1]), log_probs_new], dim=1
             )
+            # KL reference log-probs (per-token, aligned with log_probs_new).
+            # Only when fit() built a reference policy (effective beta_kl > 0).
+            if self._ref_policy is not None:
+                self.ctx.extras["log_probs_ref"] = self._ref_policy.log_probs(
+                    input_ids, attention_mask, labels,
+                    live_model=self.model, per_token=True,
+                )
         else:
+            if self._ref_policy is not None:
+                raise RuntimeError(
+                    "PPOTrainer: KL penalty is enabled (beta_kl > 0) but this "
+                    "batch has no 'labels', so per-token log-probs are all zero and "
+                    "no meaningful KL can be formed. Provide labels in KL-enabled "
+                    "rollouts (the rollout buffer always collates them)."
+                )
             log_probs_new = torch.zeros_like(log_probs_old)
 
         # value head — compute V(s) from hidden states if available

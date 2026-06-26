@@ -69,7 +69,10 @@ class PPOSurrogateLoss:
     Entropy bonus:
         L_H = -mean(entropy)
 
-    Total = L_π + vf_coef * L_V - ent_coef * H
+    KL penalty (optional if ``beta_kl > 0``):
+        L_KL = β_kl * KL(π_θ || π_ref)   via the k3 estimator (needs log_probs_ref)
+
+    Total = L_π + vf_coef * L_V - ent_coef * H + L_KL
     """
 
     def __init__(
@@ -78,11 +81,13 @@ class PPOSurrogateLoss:
         clip_eps: float = 0.2,
         vf_coef: float = 0.5,
         ent_coef: float = 0.01,
+        beta_kl: float = 0.0,
         vf_clip_range: float | None = None,
     ) -> None:
         self.clip_eps = float(clip_eps)
         self.vf_coef = float(vf_coef)
         self.ent_coef = float(ent_coef)
+        self.beta_kl = float(beta_kl)
         self.vf_clip_range = float(vf_clip_range) if vf_clip_range is not None else None
 
     def __call__(
@@ -135,7 +140,34 @@ class PPOSurrogateLoss:
         if self.ent_coef > 0:
             entropy_loss = _masked_mean(-log_probs_new, mask)
 
-        total = policy_loss + self.vf_coef * value_loss - self.ent_coef * entropy_loss
+        # Reference-KL penalty (optional). Mirrors GRPOLoss: fail loud rather than
+        # silently dropping the KL term when log_probs_ref is missing — that means
+        # the trainer never injected reference-policy log-probs (ref not built, or a
+        # loss-wrapping config the gate didn't recognize). This guard backstops every
+        # mis-wiring path.
+        kl_loss = torch.tensor(0.0, device=policy_loss.device)
+        if self.beta_kl > 0:
+            if "log_probs_ref" not in ctx.extras:
+                raise RuntimeError(
+                    "PPOSurrogateLoss has beta_kl > 0 but ctx.extras is missing "
+                    "'log_probs_ref' — the trainer did not inject reference-policy "
+                    "log-probs. The PPO trainer builds a reference policy in fit() "
+                    "when the effective loss has beta_kl > 0; ensure beta_kl is set "
+                    "on the effective (loss-seam) PPOSurrogateLoss and that fit() ran."
+                )
+            log_probs_ref = ctx.extras["log_probs_ref"]
+            # k3 estimator (Schulman): KL(π_θ || π_ref) ≈ E[exp(Δ) - Δ - 1], Δ = log_ref - log_new
+            log_diff = log_probs_ref - log_probs_new
+            kl_per_token = log_diff.exp() - log_diff - 1.0
+            kl = _masked_mean(kl_per_token, mask)
+            kl_loss = self.beta_kl * kl
+
+        total = (
+            policy_loss
+            + self.vf_coef * value_loss
+            - self.ent_coef * entropy_loss
+            + kl_loss
+        )
         return {
             "loss": total,
             "policy_loss": float(policy_loss.detach()),
@@ -143,6 +175,7 @@ class PPOSurrogateLoss:
             "entropy": float(entropy_loss.detach()),
             "approx_kl": float(approx_kl.detach()),
             "clip_frac": float(clip_frac.detach()),
+            "kl": float(kl_loss.detach()),
         }
 
 

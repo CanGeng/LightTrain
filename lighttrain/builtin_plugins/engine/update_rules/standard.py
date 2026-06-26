@@ -39,6 +39,7 @@ from lighttrain.engine.update_rules._primitives import (  # noqa: F401  (_regist
 )
 from lighttrain.protocols import LossContext, ModelOutput
 from lighttrain.registry import register
+from lighttrain.utils.log import warn_once
 from lighttrain.utils.seed import restore_rng_state, rng_state
 
 _log = logging.getLogger(__name__)
@@ -68,6 +69,9 @@ class StandardUpdateRule:
         # Gradient-accumulation cursor lives in a caller-shareable holder so the
         # backward half can be the stateless ``apply_update`` primitive.
         self._micro = MicroState()
+        # Keys of per-step failure warnings already emitted, so a persistently
+        # failing hot-loop site (RNG snapshot/restore) warns once, not per step.
+        self._warned: set[str] = set()
 
     @property
     def _micro_step(self) -> int:
@@ -125,7 +129,10 @@ class StandardUpdateRule:
         try:
             rng_snap = rng_state()
         except Exception:  # noqa: BLE001
-            _log.warning(
+            warn_once(
+                self._warned,
+                "rng_snapshot_failed",
+                _log,
                 "update_rule.step: RNG snapshot failed; RETRY_STEP replay will skip RNG restore",
                 exc_info=True,
             )
@@ -201,7 +208,10 @@ class StandardUpdateRule:
                     try:
                         writer.restore_snapshot(model=model, optimizer=optimizer)
                     except Exception:  # noqa: BLE001
-                        _log.warning(
+                        warn_once(
+                            self._warned,
+                            "retry_snapshot_restore_failed",
+                            _log,
                             "update_rule.step: RETRY_STEP snapshot restore failed; replaying on unrestored params",
                             exc_info=True,
                         )
@@ -209,7 +219,10 @@ class StandardUpdateRule:
                     try:
                         restore_rng_state(rng_snap)
                     except Exception:  # noqa: BLE001
-                        _log.warning(
+                        warn_once(
+                            self._warned,
+                            "retry_rng_restore_failed",
+                            _log,
                             "update_rule.step: RETRY_STEP RNG restore failed; replaying with current RNG state",
                             exc_info=True,
                         )

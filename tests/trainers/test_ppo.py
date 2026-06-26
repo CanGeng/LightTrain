@@ -621,3 +621,122 @@ def test_ppo_clip_eps_propagated_to_default_loss():
     block (the loss: seam wins when present — keystone step 3)."""
     trainer = _make_ppo(clip_eps=0.3)
     assert trainer._default_loss.clip_eps == 0.3
+
+
+# ===========================================================================
+# KL reference-policy wiring (A1) — PPO must inject per-token log_probs_ref so a
+# configured beta_kl actually applies the KL penalty (parity with GRPO). The k3
+# KL math is covered in tests/losses/test_rl.py; here we pin the *wiring* (gate,
+# shape, stale-clearing, fail-loud paths).
+# ===========================================================================
+
+
+def test_ppo_effective_beta_kl_unwraps_objective_and_defaults_to_zero():
+    """_effective_beta_kl honors the loss-seam: unwrap LossOnlyObjective.loss_fn,
+    read beta_kl; a loss without the knob → 0.0 (never builds an unusable ref)."""
+    from lighttrain.builtin_plugins.losses.rl import PPOSurrogateLoss
+    from lighttrain.builtin_plugins.trainers.ppo import _effective_beta_kl
+    from lighttrain.optim.architectures.profile import LossOnlyObjective
+
+    assert _effective_beta_kl(PPOSurrogateLoss(beta_kl=0.3)) == pytest.approx(0.3)
+    assert _effective_beta_kl(
+        LossOnlyObjective(PPOSurrogateLoss(beta_kl=0.3), loss_family="rl")
+    ) == pytest.approx(0.3)
+
+    def _custom_loss(model_output, batch, ctx):  # no beta_kl attribute
+        return {"loss": torch.tensor(0.0)}
+
+    assert _effective_beta_kl(LossOnlyObjective(_custom_loss)) == 0.0
+
+
+def test_ppo_step_injects_per_token_log_probs_ref_shape():
+    """beta_kl>0 + ref built → ctx.extras['log_probs_ref'] is (B, T) (== log_probs_new),
+    first column 0, and the kl metric is finite."""
+    import math
+
+    from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
+
+    trainer = _make_ppo(beta_kl=1.0)
+    trainer._ref_policy = freeze_as_ref(trainer.model)
+
+    raw = trainer._ppo_step(_ppo_batch())  # B=2, T=4
+
+    ref = trainer.ctx.extras["log_probs_ref"]
+    assert ref.shape == (2, 4)
+    assert torch.all(ref[:, 0] == 0.0)
+    assert math.isfinite(raw["kl"])
+
+
+def test_ppo_step_kl_positive_with_distinct_ref():
+    """A reference that differs from the current policy yields kl_loss > 0.
+
+    (A just-frozen ref equals the policy → KL=0 by construction, so we inject a
+    separately-initialized model as the reference to exercise a real penalty.)"""
+    from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
+
+    trainer = _make_ppo(beta_kl=1.0)
+    trainer._ref_policy = freeze_as_ref(_TinyLM())  # independent init → differs
+
+    raw = trainer._ppo_step(_ppo_batch())
+
+    assert raw["kl"] > 0.0
+
+
+def test_ppo_step_fail_loud_when_beta_kl_but_no_ref():
+    """Direct _ppo_step (no fit()) with beta_kl>0 and no ref → PPOSurrogateLoss
+    raises instead of silently dropping the KL term."""
+    trainer = _make_ppo(beta_kl=0.1)
+    assert trainer._ref_policy is None
+    with pytest.raises(RuntimeError, match="log_probs_ref"):
+        trainer._ppo_step(_ppo_batch())
+
+
+def test_ppo_step_clears_stale_log_probs_ref():
+    """Once a step injects log_probs_ref, a later step without a ref must not
+    leave the stale value in ctx.extras (PPOSurrogateLoss only checks presence)."""
+    from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
+
+    trainer = _make_ppo()  # beta_kl=0 → loss won't require the key
+    trainer._ref_policy = freeze_as_ref(trainer.model)
+    trainer._ppo_step(_ppo_batch())
+    assert "log_probs_ref" in trainer.ctx.extras
+
+    trainer._ref_policy = None
+    trainer._ppo_step(_ppo_batch())
+    assert "log_probs_ref" not in trainer.ctx.extras
+
+
+def test_ppo_step_fail_loud_when_kl_enabled_but_no_labels():
+    """KL enabled (ref built) but a batch without labels → fail loud rather than
+    forming a meaningless 'ref vs zeros' KL."""
+    from lighttrain.builtin_plugins.rl.ref_policy import freeze_as_ref
+
+    trainer = _make_ppo(beta_kl=1.0)
+    trainer._ref_policy = freeze_as_ref(trainer.model)
+    batch = _ppo_batch()
+    del batch["labels"]
+    with pytest.raises(RuntimeError, match="labels"):
+        trainer._ppo_step(batch)
+
+
+def test_ppo_fit_builds_ref_only_when_beta_kl_positive():
+    """The fit() gate builds the reference policy iff effective beta_kl>0."""
+    t_kl = _make_ppo(beta_kl=0.5, max_steps=1)
+    _stub_rollout_phase(t_kl, rewards=torch.tensor([1.0, 0.5]))
+    t_kl.fit()
+    assert t_kl._ref_policy is not None
+
+    t_no = _make_ppo(beta_kl=0.0, max_steps=1)
+    _stub_rollout_phase(t_no, rewards=torch.tensor([1.0, 0.5]))
+    t_no.fit()
+    assert t_no._ref_policy is None
+
+
+def test_ppo_step_beta_kl_zero_does_not_inject_ref():
+    """Behavior-neutral baseline: default beta_kl=0 builds no ref, injects no
+    log_probs_ref, and computes a zero KL term (unchanged from pre-fix)."""
+    trainer = _make_ppo()  # beta_kl=0
+    raw = trainer._ppo_step(_ppo_batch())
+    assert trainer._ref_policy is None
+    assert "log_probs_ref" not in trainer.ctx.extras
+    assert raw["kl"] == 0.0

@@ -313,6 +313,45 @@ class TestLoraAdapterToggle:
 
         torch.testing.assert_close(out_lora, out_copy, atol=1e-5, rtol=1e-4)
 
+    def test_invariant_lora_base_per_token_matches_frozen_copy(self):
+        """(A2) per_token=True on the LoRA-base path: adapters toggle once each and
+        the (B, T) result equals the frozen-copy per-token log-probs."""
+        torch.manual_seed(33)
+        base = _TinyLM(vocab=8, hidden=4)
+        lora = _LoRAWrapper(base)
+        ref_lora = ReferencePolicy(model=None, lora_base_as_ref=True)
+        ref_copy = freeze_as_ref(base)
+
+        input_ids = torch.randint(0, 8, (2, 5))
+        labels = input_ids.clone()
+
+        out_lora = ref_lora.log_probs(
+            input_ids, None, labels, live_model=lora, per_token=True
+        )
+        out_copy = ref_copy.log_probs(input_ids, None, labels, per_token=True)
+
+        assert out_lora.shape == (2, 5)
+        assert lora.disable_calls == 1
+        assert lora.enable_calls == 1
+        assert lora._adapters_enabled is True
+        torch.testing.assert_close(out_lora, out_copy, atol=1e-5, rtol=1e-4)
+
+    def test_invariant_lora_base_per_token_reenabled_when_forward_raises(self):
+        """(A2) finally guard also holds on the per-token path: adapters re-enabled
+        even if the forward raises."""
+        base = _TinyLM(vocab=8, hidden=4)
+        lora = _ExplodingLoRA(base)
+        ref = ReferencePolicy(model=None, lora_base_as_ref=True)
+        input_ids = torch.randint(0, 8, (2, 4))
+
+        with pytest.raises(RuntimeError, match="exploded"):
+            ref.log_probs(input_ids, None, input_ids.clone(),
+                          live_model=lora, per_token=True)
+
+        assert lora.disable_calls == 1
+        assert lora.enable_calls == 1
+        assert lora._adapters_enabled is True
+
     def test_invariant_lora_base_with_attention_mask(self):
         """(Line 105 via _lora_base_log_probs) Attention mask forwarded correctly."""
         torch.manual_seed(32)

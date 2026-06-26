@@ -424,6 +424,59 @@ def test_grpo_step_beta_kl_zero_does_not_inject_ref():
 
 
 # ===========================================================================
+# A2 — lora_base_as_ref per-token KL (the LoRA-base reference path is now wired).
+# ===========================================================================
+
+
+class _LoRALikeLM(_TinyLM):
+    """_TinyLM + PEFT-style adapter toggles (no-ops here) so the LoRA-base
+    reference path can disable/enable adapters around the base forward."""
+
+    def __init__(self, V: int = 16, D: int = 8) -> None:
+        super().__init__(V, D)
+        self.disable_calls = 0
+        self.enable_calls = 0
+
+    def disable_adapter_layers(self) -> None:
+        self.disable_calls += 1
+
+    def enable_adapter_layers(self) -> None:
+        self.enable_calls += 1
+
+
+def test_grpo_step_lora_base_per_token_kl_runs():
+    """A2 e2e: lora_base_as_ref ref injects a (B, T) per-token log_probs_ref via
+    adapter toggling; KL metric is finite and the adapters are restored."""
+    model = _LoRALikeLM()
+    trainer = _make_grpo(model=model, beta_kl=1.0, lora_base_as_ref=True)
+    trainer._ref_policy = freeze_as_ref(model, lora_base_as_ref=True)
+
+    raw = trainer._grpo_step(_grpo_batch())  # B=4, T=4
+
+    ref = trainer.ctx.extras["log_probs_ref"]
+    assert ref.shape == (4, 4)
+    assert torch.all(ref[:, 0] == 0.0)
+    assert math.isfinite(raw["kl"])
+    # adapters toggled once each and left enabled
+    assert model.disable_calls == 1
+    assert model.enable_calls == 1
+
+
+def test_grpo_fit_lora_base_as_ref_with_kl_builds_ref():
+    """A2: fit() with beta_kl>0 + lora_base_as_ref=True no longer raises (the
+    guard is removed); it builds a lora-base reference policy."""
+    model = _LoRALikeLM()
+    batch = _grpo_batch()
+    t = _make_grpo(model=model, beta_kl=0.5, lora_base_as_ref=True, max_steps=1)
+    _stub_rollout_with_batch(t, rewards=batch["rewards"], batch=batch)
+
+    t.fit()  # must NOT raise
+
+    assert t._ref_policy is not None
+    assert t._ref_policy.lora_base_as_ref is True
+
+
+# ===========================================================================
 # Registry + constructor-config invariants (merged from
 # tests/test_trainer_grpo.py)
 # ===========================================================================

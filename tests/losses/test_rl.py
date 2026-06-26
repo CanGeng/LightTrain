@@ -304,6 +304,38 @@ def test_ppo_reports_loss_and_policy_loss_keys():
     assert "loss" in out and "policy_loss" in out
 
 
+def test_ppo_kl_zero_when_new_equals_ref():
+    """Goal (A1): log_probs_new == log_probs_ref → k3 KL = exp(0) - 0 - 1 = 0."""
+    ctx = _ppo_ctx_simple(B=2, T=3, lp_new=-0.5)
+    ctx.extras["log_probs_ref"] = ctx.extras["log_probs_new"].clone()
+    out = PPOSurrogateLoss(beta_kl=1.0, vf_coef=0.0, ent_coef=0.0)(_DUMMY, {}, ctx)
+    assert abs(out["kl"]) < 1e-6
+
+
+@pytest.mark.parametrize("delta", [-1.0, -0.3, 0.3, 1.0])
+def test_ppo_kl_nonneg_invariant_random_deltas(delta):
+    """Goal (A1): the k3 estimator is non-negative for any ref≠new offset."""
+    ctx = _ppo_ctx_simple(B=2, T=3, lp_new=0.0)
+    ctx.extras["log_probs_ref"] = ctx.extras["log_probs_new"] + delta
+    out = PPOSurrogateLoss(beta_kl=1.0, vf_coef=0.0, ent_coef=0.0)(_DUMMY, {}, ctx)
+    assert out["kl"] >= -1e-6
+
+
+def test_ppo_kl_fail_loud_when_beta_kl_but_no_ref():
+    """Goal (A1): beta_kl>0 with no log_probs_ref in ctx → raise, not silent drop."""
+    ctx = _ppo_ctx_simple(adv=1.0)
+    with pytest.raises(RuntimeError, match="log_probs_ref"):
+        PPOSurrogateLoss(beta_kl=1.0)(_DUMMY, {}, ctx)
+
+
+def test_ppo_beta_kl_zero_no_kl_term_added():
+    """Behavior-neutral baseline: default beta_kl=0 → kl metric 0, ref not required."""
+    ctx = _ppo_ctx_simple(adv=1.0)
+    ctx.extras["log_probs_ref"] = ctx.extras["log_probs_new"] + 1.0  # present but ignored
+    out = PPOSurrogateLoss(beta_kl=0.0)(_DUMMY, {}, ctx)
+    assert out["kl"] == 0.0
+
+
 # ---------------------------------------------------------------------------
 # GRPOLoss
 # ---------------------------------------------------------------------------
