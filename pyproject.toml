@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.5.0"
+version = "0.5.1"
 description = "PyTorch training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -111,13 +111,17 @@ python_version = "3.12"
 # errors), NOT one-shot strict. strict is intentionally off; ratchet later.
 # Scope = package + test tree (`mypy lighttrain tests`, since v0.4.4). Tests
 # carry targeted `# type: ignore[...]` for intentional duck-typed / wrong-type
-# seams; ~108 `annotation-unchecked` notes remain (untyped test bodies) —
-# non-blocking, a marker for the future `check_untyped_defs` ratchet.
+# seams.
 # warn_unused_ignores is on: stale `# type: ignore` comments are flagged so they
 # don't accumulate. Optional/untyped third-party imports are handled by the
 # per-module ignore_missing_imports overrides below (NOT inline ignores), so the
 # CI types env — which installs only `.[dev]`, not optional extras — stays green.
 warn_unused_ignores = true
+# check_untyped_defs: the whole `lighttrain/` package passes with untyped function
+# bodies checked (since v0.5.1). Test bodies still carry ~358 untyped-body errors;
+# they opt out via the `tests.*` override below, which is the next ratchet target
+# (burn down per test module, then delete the opt-out).
+check_untyped_defs = true
 
 # Third-party without stubs → Any. PER-MODULE only (never global
 # ignore_missing_imports) so first-party import breakage still surfaces.
@@ -140,26 +144,9 @@ module = [
 ]
 ignore_missing_imports = true
 
-# --- P0.4 ratchet quarantine -------------------------------------------------
-# These modules carry pre-existing type debt (181 errors at the P0 baseline).
-# The gate is green by quarantining them; this is NOT permanent — each entry is
-# a cleanup item (see docs/changelog Known limitations). Burn down per module
-# and delete from this list. `cli._app` / `cli._runtime` are cleaned as the
-# hard DoD of P1 / P2 respectively (do not let them sit here).
-# TODO(lighttrain): ratchet down to empty.
+# check_untyped_defs ratchet opt-out: test bodies are largely unannotated, so
+# checking them surfaces ~358 errors that are not yet burned down. Production
+# code (`lighttrain/`) is fully checked; this opt-out shrinks over time.
 [[tool.mypy.overrides]]
-module = [
-    "lighttrain.builtin_plugins.optim.architectures.diffusion_unet",
-    "lighttrain.builtin_plugins.optim.architectures.jepa",
-    "lighttrain.builtin_plugins.optim.architectures.mamba",
-    "lighttrain.builtin_plugins.optim.architectures.rwkv",
-    "lighttrain.builtin_plugins.data.artifacts.joined_dataset",
-    "lighttrain.builtin_plugins.data.artifacts.producer",
-    "lighttrain.builtin_plugins.distributed.strategies.ddp",
-    "lighttrain.builtin_plugins.distributed.strategies.fsdp",
-    "lighttrain.builtin_plugins.distributed.strategies.zero",
-    "lighttrain.builtin_plugins.trainers._preference_base",
-    "lighttrain.builtin_plugins.trainers.grpo",
-    "lighttrain.builtin_plugins.trainers.ppo",
-]
-ignore_errors = true
+module = ["tests.*"]
+check_untyped_defs = false

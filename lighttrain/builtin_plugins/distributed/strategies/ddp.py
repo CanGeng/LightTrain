@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
 import torch.nn as nn
@@ -62,7 +62,7 @@ class DDPStrategy:
         return wrapped, optimizer, loader
 
     def accumulate(self, model: nn.Module) -> Any:
-        return model.no_sync()
+        return cast(Any, model).no_sync()  # DDP-only method, not on base nn.Module
 
     def backward(self, loss: torch.Tensor, model: nn.Module) -> None:
         loss.backward()
@@ -86,7 +86,7 @@ class DDPStrategy:
         inner.zero_grad(set_to_none=True)
 
     def unwrap_model(self, model: nn.Module) -> nn.Module:
-        return model.module  # type: ignore[attr-defined]
+        return cast(nn.Module, cast(Any, model).module)  # DDP wraps the real module
 
     def save_checkpoint(
         self,

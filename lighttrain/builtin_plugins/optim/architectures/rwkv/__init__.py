@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import torch
 import torch.nn as nn
@@ -190,8 +190,10 @@ class TinyRWKVModel(nn.Module):
             self._state = prev_state
 
         # Ensure state batch size matches current input
+        assert self._state is not None
         if self._state[0][0].shape[0] != B:
             self.reset_state(B, device)
+            assert self._state is not None
 
         x = self.embed(input_ids)   # (B, T, C)
 
@@ -217,7 +219,7 @@ class TinyRWKVModel(nn.Module):
 # ---------------------------------------------------------------------------
 
 def _rwkv_blocks(model: nn.Module) -> Iterator[nn.Module]:
-    yield from model.blocks
+    yield from cast(Any, model).blocks
 
 
 @register("architecture", "rwkv")
@@ -227,9 +229,9 @@ def rwkv_profile() -> ArchitectureProfile:
         loss_family="next_token",
         state_mode="stateful",
         block_iterator_fn=_rwkv_blocks,
-        embedding_layer_fn=lambda m: m.embed,
-        head_layer_fn=lambda m: m.head,
-        reset_state_fn=lambda m: m.reset_state(1),
+        embedding_layer_fn=lambda m: cast(Any, m).embed,
+        head_layer_fn=lambda m: cast(Any, m).head,
+        reset_state_fn=lambda m: cast(Any, m).reset_state(1),
     )
 
 

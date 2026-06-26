@@ -24,12 +24,13 @@ import ast
 import logging
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
 
 from lighttrain.data.artifacts import (
     ArtifactHeader,
+    ArtifactStoreBase,
     ArtifactStoreProtocol,
     StaleArtifactError,
 )
@@ -118,7 +119,7 @@ class ArtifactJoinedDataset:
 
     def __len__(self) -> int:
         if hasattr(self.base, "__len__"):
-            return len(self.base)  # type: ignore[arg-type]
+            return len(self.base)
         raise TypeError("base dataset has no __len__")
 
     def __getitem__(self, idx: int) -> dict[str, Any] | None:
@@ -132,16 +133,18 @@ class ArtifactJoinedDataset:
             namespace = cfg["namespace"]
             missing_policy = cfg["missing"]
             if not store.contains(sid):
+                # header/root live on the concrete base, not the read protocol
+                store_base = cast(ArtifactStoreBase, store)
                 if missing_policy == _MISSING_DROP:
                     return None
                 if missing_policy == _MISSING_FILL:
-                    for k, shape_str in store.header.field_schema.items():
+                    for k, shape_str in store_base.header.field_schema.items():
                         shape = _parse_shape(shape_str)
                         merged[f"aux.{namespace}.{k}"] = torch.zeros(shape)
                     continue
                 raise KeyError(
                     f"artifact_joined: sample {sid!r} not present in store at "
-                    f"{store.root}. Set missing='drop' to skip or 'fill_zero' "
+                    f"{store_base.root}. Set missing='drop' to skip or 'fill_zero' "
                     f"to substitute zeros."
                 )
             tensors = store.get(sid)

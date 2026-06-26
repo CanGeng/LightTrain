@@ -198,7 +198,7 @@ class PPOTrainer(Trainer):
 
     # ------------------------------------------------------------------ fit
 
-    def fit(self, *, steps: int | None = None) -> dict[str, Any]:  # type: ignore[override]
+    def fit(self, *, steps: int | None = None) -> dict[str, Any]:
         if self.model is None:
             raise RuntimeError("PPOTrainer.fit: model is not set.")
         if self.optimizer is None:
@@ -337,6 +337,7 @@ class PPOTrainer(Trainer):
         prompt_mask = batch.get("attention_mask", batch.get("prompt_attention_mask"))
 
         self._buffer.clear()
+        assert prompt_ids is not None and self.reward_fn is not None
         episodes = self._rollout_engine.rollout(
             self.model,
             prompt_ids,
@@ -382,6 +383,7 @@ class PPOTrainer(Trainer):
         validate_batch(batch, [
             "input_ids", "log_probs_old", "advantages_buf",
         ], "PPOTrainer")
+        assert self.model is not None
         self.model.train()
 
         input_ids = batch["input_ids"]
@@ -499,6 +501,7 @@ class PPOTrainer(Trainer):
         input_ids = torch.stack(ids_list).to(self.device)
         attn_mask = torch.stack(mask_list).to(self.device)
 
+        assert self.model is not None
         self.model.eval()
         with torch.no_grad():
             try:
@@ -530,7 +533,7 @@ class PPOTrainer(Trainer):
                 ep.values = ((vals * resp_mask).sum() / denom).unsqueeze(0).cpu()
         self.model.train()
 
-    def _step(self, batch: dict[str, Any]) -> StepOutput:  # type: ignore[override]
+    def _step(self, batch: dict[str, Any]) -> StepOutput:
         """Bridge to _ppo_step() for the unified train_step() protocol.
 
         For PPOTrainer, train_step() / _step() corresponds to **one inner-epoch
@@ -541,10 +544,10 @@ class PPOTrainer(Trainer):
         raw = self._ppo_step(batch)
         return StepOutput(loss=raw.get("loss"), metrics=dict(raw))
 
-    def eval(self, *args: Any, **kwargs: Any) -> dict[str, float]:  # type: ignore[override]
+    def eval(self, *args: Any, **kwargs: Any) -> dict[str, float]:
         return {}
 
-    def predict(self, *args: Any, **kwargs: Any) -> list[Any]:  # type: ignore[override]
+    def predict(self, *args: Any, **kwargs: Any) -> list[Any]:
         return []
 
 
