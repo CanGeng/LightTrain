@@ -13,6 +13,9 @@
 #   学习率    : optim.lr=3e-4
 #   数据路径  : data.dataset.data_path=your/data.jsonl
 
+defaults:
+  - _model     # 模型架构（修改 _model.yaml 统一改动所有阶段）
+
 user_modules:
   - examples/MiniMind/model/model_adapter.py
   - examples/MiniMind/dataset/lm_dataset.py
@@ -21,31 +24,6 @@ mode: prod
 seed: 42
 exp: minimind_pretrain
 run_root: runs
-
-model: default
-model_profiles:
-  default:
-    name: minimind
-    # --- 核心架构 ---
-    hidden_size: 512
-    num_hidden_layers: 8
-    num_attention_heads: 8       # Q heads
-    num_key_value_heads: 4       # KV heads (GQA; 等于 num_attention_heads 则退化为 MHA)
-    # intermediate_size: null    # FFN 隐层, 默认 ceil(hidden*π/64)*64；覆盖时填具体整数
-    # --- 上下文 / RoPE ---
-    max_position_embeddings: 32768
-    rope_theta: 1.0e+6
-    # --- 词表 / 嵌入 ---
-    vocab_size: 6400
-    tie_word_embeddings: true
-    # --- 训练稳定性 ---
-    dropout: 0.0
-    rms_norm_eps: 1.0e-6
-    flash_attn: true
-    # --- MoE (use_moe=true 时生效) ---
-    use_moe: false
-    num_experts: 4
-    num_experts_per_tok: 1
 
 data:
   name: simple

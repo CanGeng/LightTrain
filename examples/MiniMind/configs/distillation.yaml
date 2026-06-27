@@ -16,13 +16,14 @@ exp: minimind_distillation
 run_root: runs
 
 models:
+  # ↓ multi-model schema，无法直接继承 _model.yaml；student 架构应与 _model.yaml 一致
   student:
     name: minimind
     hidden_size: 512
     num_hidden_layers: 8
   teacher:
     name: minimind
-    hidden_size: 768
+    hidden_size: 768          # 有意更大；与 student 独立
     num_hidden_layers: 16
     trainable: false
     checkpoint: runs/minimind_pretrain/checkpoints/best

@@ -5,6 +5,9 @@
 # 训练：
 #   lighttrain train -c examples/MiniMind/configs/sft.yaml
 
+defaults:
+  - _model
+
 user_modules:
   - examples/MiniMind/model/model_adapter.py
   - examples/MiniMind/dataset/lm_dataset.py
@@ -13,14 +16,6 @@ mode: prod
 seed: 42
 exp: minimind_sft
 run_root: runs
-
-model: default
-model_profiles:
-  default:
-    name: minimind
-    hidden_size: 512
-    num_hidden_layers: 8
-    use_moe: false
 
 data:
   name: simple

@@ -20,6 +20,7 @@ model_profiles:
   default:
     name: lora            # lighttrain 内置 LoRA 封装
     base:
+      # ↓ 架构参数 — 与 _model.yaml 中的 minimind 保持一致
       name: minimind
       hidden_size: 512
       num_hidden_layers: 8
