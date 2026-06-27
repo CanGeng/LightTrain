@@ -8,7 +8,13 @@
 
 ## 开放（Open）
 
-_（空）—— 截至 v0.5.2,历次 changelog 审计的所有开放问题均已解决或勾销。新发现的问题登记于此。_
+### E3 — 无内置 `hf_auto` tokenizer；HF 分词器需由用户在 `user_modules` 中自注册
+
+**发现版本**：v0.5.4（nanoGPT/MiniMind 移植审计）
+
+lighttrain 内置 tokenizer 仅有 `byte`；任何需要 `AutoTokenizer.from_pretrained` 的 HF 模型（包括 MiniMind 自定义分词器、`hf_causal` 用户侧自定义词表等）必须在 `user_modules` 里手工注册一个 `@register("tokenizer", "...")` 封装。这是相当常见的需求，应内置一个 `hf_auto` tokenizer（接受 `path:` 参数）。
+
+**当前绕过**：`examples/MiniMind/model/model_adapter.py` 中注册了 `hf_auto` tokenizer，可复用于其他 HF 模型场景。
 
 ## 已解决 / 已勾销（Resolved / Dismissed）
 
