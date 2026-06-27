@@ -1,0 +1,89 @@
+# Train nanoGPT character-level model on Tiny Shakespeare.
+#
+# Equivalent to nanoGPT's config/train_shakespeare_char.py
+# Architecture: 6-layer, 6-head, 384-dim (10.65M params)
+#
+# First prepare the data:
+#   python examples/nanoGPT/data/shakespeare_char/prepare.py
+#
+# Then train:
+#   lighttrain train -c examples/nanoGPT/configs/train_shakespeare_char.yaml
+#
+# Expected val loss: ~1.47 after 5000 steps (matches original nanoGPT).
+
+user_modules:
+  - examples/nanoGPT/model.py
+  - examples/nanoGPT/components.py
+
+mode: lab
+seed: 1337
+exp: nanogpt_shakespeare_char
+run_root: runs
+
+model: default
+model_profiles:
+  default:
+    name: nano_gpt
+    block_size: 256
+    vocab_size: 65       # shakespeare_char vocab
+    n_layer: 6
+    n_head: 6
+    n_embd: 384
+    dropout: 0.2
+    bias: false
+
+data:
+  name: simple
+  dataset:
+    name: memmap_bin
+    path: examples/nanoGPT/data/shakespeare_char/train.bin
+    block_size: 256
+  val_dataset:
+    name: memmap_bin
+    path: examples/nanoGPT/data/shakespeare_char/val.bin
+    block_size: 256
+  tokenizer:
+    name: byte           # injected but unused — data is pre-tokenized
+  collator:
+    name: stack_xy
+  sampler:
+    name: shuffle
+    seed: ${seed}
+  batch_size: 64
+  num_workers: 4
+
+loss:
+  name: cross_entropy
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  betas: [0.9, 0.99]
+  weight_decay: 0.1
+
+scheduler:
+  name: warmup_cosine
+  warmup_steps: 100
+  total_steps: ${trainer.max_steps}
+  min_lr_ratio: 0.1     # min_lr = 1e-4
+
+engine:
+  name: standard
+  mixed_precision: bf16
+
+trainer:
+  name: pretrain
+  max_steps: 5000
+  val_every: 250
+  ckpt_every: 500
+  log_every: 10
+  grad_clip: 1.0
+  accumulate: 1
+
+callbacks:
+  - { name: throughput, window: 50 }
+  - { name: best_ckpt, monitor: val/loss, mode: min }
+
+logger:
+  - { name: console, log_every: 10 }
+  - { name: jsonl }
