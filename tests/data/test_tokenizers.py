@@ -244,3 +244,74 @@ def test_byte_tokenizer_registered_under_byte():
     from lighttrain.registry import get
     cls = get("tokenizer", "byte")
     assert cls is ByteTokenizer
+
+
+# ---------------------------------------------------------------------------
+# HFAutoTokenizer (built-in ``hf_auto`` short name)
+# ---------------------------------------------------------------------------
+
+_HF_AUTO_TESTED = False
+
+
+def test_hf_auto_protocol_and_roundtrip() -> None:
+    """``HFAutoTokenizer`` structurally satisfies ``TokenizerProtocol`` and
+    round-trips a sample string against the vendored Qwen3-0.6B tokenizer.
+
+    Covers PLAN_v0.5.5 Block B / T1:
+      * ``isinstance(tok, TokenizerProtocol)`` is True (structural check,
+        not ``__getattr__`` magic).
+      * ``vocab_size > 0`` (cached scalar property hit).
+      * ``encode(...)`` returns ``list[int]``; ``decode(encode(...))`` round-trips.
+      * ``pad_id >= 0`` (defaults to 0 when ``pad_token_id`` is None).
+    """
+    from lighttrain.builtin_plugins.data.core.tokenizers import (
+        QWEN3_BASELINE_DIR,
+        HFAutoTokenizer,
+    )
+    from lighttrain.protocols import TokenizerProtocol
+
+    assert QWEN3_BASELINE_DIR.exists(), (
+        f"vendored Qwen3 tokenizer missing at {QWEN3_BASELINE_DIR}; "
+        "run Block B download step"
+    )
+    tok = HFAutoTokenizer(str(QWEN3_BASELINE_DIR))
+
+    assert isinstance(tok, TokenizerProtocol)
+    assert tok.vocab_size > 0
+    assert tok.pad_id >= 0
+
+    ids = tok.encode("hello, world")
+    assert isinstance(ids, list)
+    assert all(isinstance(i, int) for i in ids)
+    assert tok.decode(ids) == "hello, world"
+
+
+def test_hf_auto_registered_under_hf_auto_name() -> None:
+    """``HFAutoTokenizer`` is registered as ``('tokenizer', 'hf_auto')`` by
+    importing its module — pin the registry short name (recipes depend on it).
+    """
+    from lighttrain.builtin_plugins.data.core.tokenizers import HFAutoTokenizer
+    from lighttrain.registry import get
+
+    cls = get("tokenizer", "hf_auto")
+    assert cls is HFAutoTokenizer
+
+
+def test_no_examples_hf_auto_dup() -> None:
+    """``examples/MiniMind/model/model_adapter.py`` must no longer contain a
+    ``@register("tokenizer", ...)`` block — the duplicate registration was
+    moved to ``lighttrain/builtin_plugins/data/core/tokenizers.py``.
+
+    Covers PLAN_v0.5.5 Block B / T2. The registry's ``_same_source`` check
+    raises ``RegistryConflictError`` on conflicting (category, name) sources,
+    so a duplicate must not exist.
+    """
+    from pathlib import Path
+
+    src = Path("examples/MiniMind/model/model_adapter.py").read_text(encoding="utf-8")
+    assert '@register("tokenizer"' not in src, (
+        "examples/MiniMind/model/model_adapter.py still registers a tokenizer — "
+        "Block B requires deleting the duplicate (registry conflict guard)"
+    )
+    # Sanity: the model registration is preserved.
+    assert '@register("model", "minimind")' in src

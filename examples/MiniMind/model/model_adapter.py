@@ -84,25 +84,4 @@ class MiniMindLightTrain(nn.Module):
         return self.model.config
 
 
-@register("tokenizer", "hf_auto")
-class HFAutoTokenizer:
-    """HuggingFace AutoTokenizer wrapper registered for lighttrain.
-
-    Usage in recipe::
-        tokenizer:
-          name: hf_auto
-          path: examples/MiniMind/model
-    """
-
-    def __init__(self, path: str) -> None:
-        from transformers import AutoTokenizer  # type: ignore[import-untyped]
-        self._tok = AutoTokenizer.from_pretrained(path)
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._tok, name)
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self._tok(*args, **kwargs)
-
-
-__all__ = ["MiniMindLightTrain", "HFAutoTokenizer"]
+__all__ = ["MiniMindLightTrain"]

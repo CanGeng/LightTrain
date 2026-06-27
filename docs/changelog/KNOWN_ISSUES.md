@@ -8,15 +8,19 @@
 
 ## 开放（Open）
 
-### E3 — 无内置 `hf_auto` tokenizer；HF 分词器需由用户在 `user_modules` 中自注册
+*当前无开放项。*
 
-**发现版本**：v0.5.4（nanoGPT/MiniMind 移植审计）
-
-lighttrain 内置 tokenizer 仅有 `byte`；任何需要 `AutoTokenizer.from_pretrained` 的 HF 模型（包括 MiniMind 自定义分词器、`hf_causal` 用户侧自定义词表等）必须在 `user_modules` 里手工注册一个 `@register("tokenizer", "...")` 封装。这是相当常见的需求，应内置一个 `hf_auto` tokenizer（接受 `path:` 参数）。
-
-**当前绕过**：`examples/MiniMind/model/model_adapter.py` 中注册了 `hf_auto` tokenizer，可复用于其他 HF 模型场景。
+---
 
 ## 已解决 / 已勾销（Resolved / Dismissed）
+
+### E3 — 无内置 `hf_auto` tokenizer；HF 分词器需由用户在 `user_modules` 中自注册
+✅ 已解决 → v0.5.5（见 [v0.5.5](v0/v0.5/v0.5.5.md)）：在
+`lighttrain/builtin_plugins/data/core/tokenizers.py` 内置显式满足
+`TokenizerProtocol` 的 `HFAutoTokenizer`（接受 `path:` 参数），删除
+`examples/MiniMind/model/model_adapter.py` 中的 `hf_auto` 重复注册；
+vendored Qwen3-0.6B tokenizer 文件组入
+`lighttrain/builtin_plugins/data/_q3_tok_baseline/`。
 
 ### B2 — `check_untyped_defs` 未启用 / tests/ 余量未清
 ✅ 已解决 → v0.5.1（生产）+ v0.5.2（tests/）（见 [v0.5.2](v0/v0.5/v0.5.2.md)）：v0.5.1 启用 `check_untyped_defs=true` 覆盖 `lighttrain/`;v0.5.2 注解优先清空 `tests/` 的 358 个未注解 body 错并删除 `tests.*` opt-out,check_untyped_defs 现覆盖整个仓库。

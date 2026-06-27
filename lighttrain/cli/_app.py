@@ -30,6 +30,7 @@ from .commands import (
 from .commands import eval as eval_commands
 from .commands import lineage as lineage_commands
 from .commands import migrate as migrate_commands
+from .commands import tokenizer as tokenizer_commands
 
 __all__ = ["_flatten_patch_to_overrides", "app"]
 
@@ -102,6 +103,8 @@ app.command("resume-verify")(run.resume_verify_cmd)
 app.command("convert-checkpoint")(artifacts.convert_checkpoint_cmd)
 app.command("export")(artifacts.export_cmd)
 app.command("init")(scaffold.init_cmd)
+app.command("prune-tokenizer")(tokenizer_commands.prune_tokenizer_cmd)
+app.command("check-tokenizer")(tokenizer_commands.check_tokenizer_cmd)
 
 lineage_app.command("tag")(lineage_commands.lineage_tag_cmd)
 lineage_app.command("untag")(lineage_commands.lineage_untag_cmd)

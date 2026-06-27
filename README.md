@@ -11,12 +11,12 @@ architectures, sweeps, distributed) are opt-in.
 Design goals: **registry-first**, **failure-first**, **plugin-clean**,
 **lab-friendly**, **audit-ready**.
 
-> Status: Development pauses. Distributed is **data-parallel only** (DDP / FSDP /
-> DeepSpeed ZeRO); DDP, FSDP, and DeepSpeed ZeRO-2 are validated on a real
-> single-node multi-GPU box (NCCL), but **not** on multi-node GPU clusters — use
-> at your own risk for production. (Tensor / pipeline / expert / sequence
-> parallelism were removed.) The test suite is ~82K lines /
-> 4,400+ tests with adversarial regression tests verified by mutation testing.
+> Status: Development pauses. Distributed is data-parallel only (DDP / FSDP /
+> DeepSpeed ZeRO), validated on a single-node multi-GPU box (NCCL). Multi-node
+> is not supported — `ParallelContext.from_env` raises on `NNODES>1`. (Tensor /
+> pipeline / expert / sequence parallelism were removed.) The test suite is
+> ~82K lines / 4,400+ tests with adversarial regression tests verified by
+> mutation testing.
 
 ## Install
 
