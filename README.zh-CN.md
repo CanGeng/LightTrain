@@ -9,7 +9,7 @@
 设计目标：**registry-first**、**failure-first**、**plugin-clean**、
 **lab-friendly**、**audit-ready**。
 
-> 状态：测试阶段。分布式**仅支持数据并行**（DDP / FSDP / DeepSpeed ZeRO）；
+> 状态：暂停开发。分布式**仅支持数据并行**（DDP / FSDP / DeepSpeed ZeRO）；
 > DDP、FSDP、DeepSpeed ZeRO-2 已在真实单机多卡（NCCL）验证，但**未**在多机 GPU
 > 集群验证——生产环境自行评估风险。（张量 / 流水线 / 专家 / 序列并行已移除。）
 > 测试套件约 82K 行 / 4400+ 测试，含经变异测试验证的对抗性回归测试。

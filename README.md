@@ -11,7 +11,7 @@ architectures, sweeps, distributed) are opt-in.
 Design goals: **registry-first**, **failure-first**, **plugin-clean**,
 **lab-friendly**, **audit-ready**.
 
-> Status: testing phase. Distributed is **data-parallel only** (DDP / FSDP /
+> Status: Development pauses. Distributed is **data-parallel only** (DDP / FSDP /
 > DeepSpeed ZeRO); DDP, FSDP, and DeepSpeed ZeRO-2 are validated on a real
 > single-node multi-GPU box (NCCL), but **not** on multi-node GPU clusters — use
 > at your own risk for production. (Tensor / pipeline / expert / sequence
