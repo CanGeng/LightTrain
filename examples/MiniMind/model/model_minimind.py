@@ -1,3 +1,6 @@
+# Copyright (c) jingyaogong (https://github.com/jingyaogong/minimind)
+# SPDX-License-Identifier: Apache-2.0
+# Verbatim copy from MiniMind; see LICENSE in this directory.
 # ruff: noqa
 import math
 
