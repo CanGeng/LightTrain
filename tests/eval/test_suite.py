@@ -87,6 +87,7 @@ def test_invariant_single_task_run_uses_bare_metric_keys():
     t = _Task("t1", {"acc": 0.9, "loss": 0.1})
     e = Evaluator(tasks=[t], eval_every_n_steps=10)
     rep = e.run(model=None, step=10, force=True)
+    assert rep is not None
     assert set(rep.metrics) == {"acc", "loss"}
     assert rep.metrics["acc"] == pytest.approx(0.9)
 
@@ -97,6 +98,7 @@ def test_invariant_multi_task_run_uses_prefixed_metric_keys():
     b = _Task("b", {"acc": 0.5})
     e = Evaluator(tasks=[a, b], eval_every_n_steps=10)
     rep = e.run(model=None, step=10, force=True)
+    assert rep is not None
     assert set(rep.metrics) == {"a/acc", "b/acc"}
     assert rep.metrics["a/acc"] == pytest.approx(0.9)
     assert rep.metrics["b/acc"] == pytest.approx(0.5)
@@ -137,6 +139,7 @@ def test_invariant_non_numeric_metric_values_dropped():
     t = _Task("t", {"acc": 0.9, "label": "good", "task_name": "t"})
     e = Evaluator(tasks=[t], eval_every_n_steps=10)
     rep = e.run(model=None, step=10, force=True)
+    assert rep is not None
     assert "acc" in rep.metrics
     assert "label" not in rep.metrics
     assert "task_name" not in rep.metrics

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import pytest
 import torch
 
@@ -10,7 +13,7 @@ from lighttrain.builtin_plugins.data.collators.image import ImageClassificationC
 
 def test_stacks_pixels_and_labels():
     coll = ImageClassificationCollator()
-    samples = [{"pixel_values": torch.randn(3, 8, 8), "label": i % 3} for i in range(5)]
+    samples: list[Mapping[str, Any]] = [{"pixel_values": torch.randn(3, 8, 8), "label": i % 3} for i in range(5)]
     batch = coll(samples)
     assert batch["pixel_values"].shape == (5, 3, 8, 8)
     assert batch["pixel_values"].dtype == torch.float32

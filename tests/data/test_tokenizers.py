@@ -81,7 +81,7 @@ def test_invariant_encode_decode_round_trip_all_bytes():
     """
     tk = ByteTokenizer(add_bos=False, add_eos=False)
     text = bytes(range(256))
-    ids = tk.encode(text)
+    ids = tk.encode(text)  # type: ignore[arg-type]
     # Encoding bytes directly: every byte preserved literally.
     assert ids == list(range(256))
     # Decode reproduces the original byte sequence.
@@ -123,7 +123,7 @@ def test_encode_bytes_input_uses_bytes_fast_path():
     """
     tk = ByteTokenizer(add_bos=False, add_eos=False)
     raw = b"\xff\xfe\x00\x01"
-    ids = tk.encode(raw)
+    ids = tk.encode(raw)  # type: ignore[arg-type]
     assert ids == [255, 254, 0, 1]
 
 

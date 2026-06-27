@@ -9,6 +9,9 @@ Heavy tests are gated; default ``pytest`` skips them.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any, cast
+
 import pytest
 import torch
 
@@ -99,7 +102,7 @@ def test_r3_end_to_end_loss_decreases(tmp_path):
 
     losses: list[float] = []
     for step in range(50):
-        batch = collator([joined[i % len(joined)] for i in range(step, step + 4)])
+        batch = collator(cast(list[Mapping[str, Any]], [joined[i % len(joined)] for i in range(step, step + 4)]))
         ctx.step = step
         out = engine.step(batch, ctx)
         losses.append(float(out["loss"]))

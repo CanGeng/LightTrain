@@ -48,6 +48,7 @@ def test_diffusion_v_target_closed_form():
     obj._ensure_schedule("cpu")  # ensure schedule arrays exist
     B = batch["x"].shape[0]
     t = batch["t"]
+    assert obj._sqrt_acp is not None and obj._sqrt_one_minus_acp is not None
     sqrt_acp = obj._sqrt_acp[t].view(B, 1)
     sqrt_omacp = obj._sqrt_one_minus_acp[t].view(B, 1)
     v_target = sqrt_acp * batch["noise"] - sqrt_omacp * batch["x"]
@@ -65,6 +66,7 @@ def test_diffusion_linear_vs_cosine_schedule_alphas_differ_at_midstep():
     obj_cos = DiffusionObjective(noise_schedule="cosine", timesteps=10)
     obj_lin._ensure_schedule("cpu")
     obj_cos._ensure_schedule("cpu")
+    assert obj_lin._sqrt_acp is not None and obj_cos._sqrt_acp is not None
     diff = (obj_lin._sqrt_acp[5] - obj_cos._sqrt_acp[5]).abs().item()
     assert diff > 1e-3, f"linear and cosine schedules should differ at t=5; got {diff}"
 
@@ -80,6 +82,7 @@ def test_diffusion_noisy_x_equals_alpha_x0_plus_sigma_noise():
     batch = obj.prepare_batch(batch, step=0, device="cpu")
     obj._ensure_schedule("cpu")
     t = batch["t"]
+    assert obj._sqrt_acp is not None and obj._sqrt_one_minus_acp is not None
     sqrt_acp = obj._sqrt_acp[t].view(3, 1)
     sqrt_omacp = obj._sqrt_one_minus_acp[t].view(3, 1)
     expected = sqrt_acp * batch["x"] + sqrt_omacp * batch["noise"]

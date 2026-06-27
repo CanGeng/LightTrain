@@ -281,7 +281,7 @@ def test_pin_current_behavior_on_train_end_dispatch_exception_suppressed():
             raise RuntimeError("on_train_end bus exploded")
         return original_dispatch(event, **kw)
 
-    trainer.bus.dispatch = boom_dispatch
+    trainer.bus.dispatch = boom_dispatch  # type: ignore[method-assign]
     result = trainer.fit()
     assert isinstance(result, dict)
 
@@ -323,8 +323,8 @@ def test_invariant_produce_batch_adds_episodes_to_buffer():
     ep1 = _make_episode(T=4, n_resp=2)
     ep2 = _make_episode(T=4, n_resp=2)
     trainer = _make_ppo()
-    trainer._rollout_engine.rollout = MagicMock(return_value=[ep1, ep2])
-    trainer._buffer.add = MagicMock()
+    trainer._rollout_engine.rollout = MagicMock(return_value=[ep1, ep2])  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
 
     trainer._ref_policy = MagicMock()
     prompt = {
@@ -343,7 +343,7 @@ def test_invariant_produce_batch_returns_tensor_of_rewards():
     ep2 = _make_episode(T=4, n_resp=2)
     ep2.reward = 0.5
     trainer = _make_ppo()
-    trainer._rollout_engine.rollout = MagicMock(return_value=[ep1, ep2])
+    trainer._rollout_engine.rollout = MagicMock(return_value=[ep1, ep2])  # type: ignore[method-assign]
     trainer._ref_policy = MagicMock()
     prompt = {
         "input_ids": torch.randint(0, 16, (2, 4)),
@@ -367,8 +367,8 @@ def test_invariant_compute_advantages_uses_values_when_available():
     torch.manual_seed(0)
     trainer = _make_ppo(use_value_head=True)
     trainer._value_head = LinearValueHead(hidden_size=8)
-    trainer._buffer.all_values = MagicMock(return_value=torch.tensor([[0.5], [0.3]]))
-    trainer._compute_buffer_values = lambda: None
+    trainer._buffer.all_values = MagicMock(return_value=torch.tensor([[0.5], [0.3]]))  # type: ignore[method-assign]
+    trainer._compute_buffer_values = lambda: None  # type: ignore[method-assign]
 
     rewards = torch.tensor([1.0, 0.5])
     advantages, returns = trainer._compute_advantages(rewards)
@@ -383,8 +383,8 @@ def test_invariant_compute_advantages_falls_back_to_zeros_when_values_none():
     torch.manual_seed(0)
     trainer = _make_ppo(use_value_head=True)
     trainer._value_head = LinearValueHead(hidden_size=8)
-    trainer._buffer.all_values = MagicMock(return_value=None)
-    trainer._compute_buffer_values = lambda: None
+    trainer._buffer.all_values = MagicMock(return_value=None)  # type: ignore[method-assign]
+    trainer._compute_buffer_values = lambda: None  # type: ignore[method-assign]
 
     rewards = torch.tensor([1.0, 0.5])
     advantages, _ = trainer._compute_advantages(rewards)
@@ -395,7 +395,7 @@ def test_invariant_compute_advantages_zeros_when_no_value_head():
     """When use_value_head=False, zero baseline is always used (line 343)."""
     torch.manual_seed(0)
     trainer = _make_ppo(use_value_head=False)
-    trainer._compute_buffer_values = lambda: None
+    trainer._compute_buffer_values = lambda: None  # type: ignore[method-assign]
 
     rewards = torch.tensor([1.0, 0.5])
     advantages, _ = trainer._compute_advantages(rewards)
@@ -441,6 +441,7 @@ def test_invariant_ppo_step_no_labels_uses_zero_log_probs():
     class _SpyObjective:
         def __call__(self, out, batch, ctx):
             captured["log_probs_new"] = ctx.extras.get("log_probs_new")
+            assert trainer.model is not None
             params = list(trainer.model.parameters())
             return {"loss": sum(p.sum() for p in params) * 0.0}
 
@@ -480,6 +481,7 @@ def test_invariant_value_head_spec_zero_init_propagated():
     model = _TinyLM(with_hidden=True)
     trainer = _make_ppo(model=model, use_value_head=True, value_head={"zero_init": True})
     trainer._ppo_step(_ppo_batch())
+    assert trainer._value_head is not None
     w = trainer._value_head.linear.weight
     assert (w == 0).all(), "zero_init=True must zero out linear weight"
 
@@ -537,11 +539,13 @@ def test_invariant_compute_buffer_values_sets_model_to_train_after_inference():
     trainer._buffer.add(_make_episode())
 
     # Confirm model is in train mode initially
+    assert trainer.model is not None
     trainer.model.train()
     assert trainer.model.training
 
     trainer._compute_buffer_values()
 
+    assert trainer.model is not None
     assert trainer.model.training, "model must be back in train mode after _compute_buffer_values"
 
 
@@ -576,6 +580,7 @@ def test_invariant_compute_buffer_values_model_back_to_train_when_no_hidden():
         warnings.simplefilter("always")
         trainer._compute_buffer_values()
 
+    assert trainer.model is not None
     assert trainer.model.training
 
 
@@ -639,6 +644,7 @@ def test_invariant_compute_buffer_values_cpu_outputs():
     trainer._buffer.add(ep)
 
     trainer._compute_buffer_values()
+    assert ep.values is not None
     assert ep.values.device.type == "cpu"
 
 
@@ -708,13 +714,13 @@ def test_invariant_fit_returns_mean_reward_in_metrics():
     """The returned dict from fit() must include 'mean_reward' (line 254)."""
     trainer = _make_ppo(max_steps=1, ppo_epochs=1)
     # Provide one real minibatch so inner_metrics is populated
-    trainer._rollout_engine.rollout = MagicMock(return_value=[])
-    trainer._buffer.clear = MagicMock()
-    trainer._buffer.add = MagicMock()
-    trainer._buffer.all_rewards = MagicMock(return_value=torch.tensor([1.0, 0.5]))
-    trainer._buffer.all_values = MagicMock(return_value=None)
-    trainer._buffer.batches = MagicMock(return_value=iter([_ppo_batch()]))
-    trainer._compute_buffer_values = lambda: None
+    trainer._rollout_engine.rollout = MagicMock(return_value=[])  # type: ignore[method-assign]
+    trainer._buffer.clear = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.all_rewards = MagicMock(return_value=torch.tensor([1.0, 0.5]))  # type: ignore[method-assign]
+    trainer._buffer.all_values = MagicMock(return_value=None)  # type: ignore[method-assign]
+    trainer._buffer.batches = MagicMock(return_value=iter([_ppo_batch()]))  # type: ignore[method-assign]
+    trainer._compute_buffer_values = lambda: None  # type: ignore[method-assign]
 
     result = trainer.fit()
     assert "mean_reward" in result

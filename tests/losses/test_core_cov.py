@@ -102,7 +102,7 @@ class TestLogitsHelper:
     def test_invariant_non_mapping_non_model_output_raises_type_error(self):
         """Passing a non-Mapping, non-ModelOutput object raises TypeError (line 29)."""
         with pytest.raises(TypeError, match="logits"):
-            CrossEntropyLoss()(_NotAMapping(), {"labels": torch.tensor([0])}, _ctx())
+            CrossEntropyLoss()(_NotAMapping(), {"labels": torch.tensor([0])}, _ctx())  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

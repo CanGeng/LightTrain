@@ -268,6 +268,7 @@ def test_invariant_init_mounts_val_terminal(rows_nodes, tmp_path):
         store_root=tmp_path / "store",
     )
     assert dm.val_terminal == "val"
+    assert dm.val_dataset is not None
     assert len(dm.val_dataset) == 6
 
 
@@ -277,10 +278,10 @@ def test_invariant_init_scalar_kwargs_are_coerced(rows_nodes, tmp_path):
         prep_graph=_rows_spec("train"),
         train="train",
         store_root=tmp_path / "store",
-        batch_size="4",
-        num_workers="0",
-        pin_memory=1,
-        drop_last=0,
+        batch_size="4",  # type: ignore[arg-type]
+        num_workers="0",  # type: ignore[arg-type]
+        pin_memory=1,  # type: ignore[arg-type]
+        drop_last=0,  # type: ignore[arg-type]
     )
     assert dm.batch_size == 4 and isinstance(dm.batch_size, int)
     assert dm.num_workers == 0

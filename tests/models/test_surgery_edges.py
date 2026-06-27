@@ -88,7 +88,7 @@ def test_init_rows_mean_mode_is_guarded():
 def test_init_rows_unknown_mode_raises():
     """``_init_rows`` rejects an unknown mode."""
     with pytest.raises(ValueError, match="Unknown init mode"):
-        _init_rows(torch.zeros(2, 4), mode="bogus")
+        _init_rows(torch.zeros(2, 4), mode="bogus")  # type: ignore[arg-type]
 
 
 def test_resize_embedding_tied_head_with_bias_copies_and_zeros():
@@ -226,7 +226,7 @@ def test_replace_module_rejects_missing_intermediate():
 
 def test_replace_module_rejects_non_module_factory_result():
     with pytest.raises(TypeError, match="must yield nn.Module"):
-        replace_module(_make_tiny(), "lm_head", lambda old: 123)
+        replace_module(_make_tiny(), "lm_head", lambda old: 123)  # type: ignore[arg-type, return-value]
 
 
 def test_get_submodule_empty_path_returns_model():

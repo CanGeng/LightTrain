@@ -111,12 +111,12 @@ def test_mezo_never_calls_backward():
         backward_calls[0] += 1
         return original_backward(self, *args, **kwargs)
 
-    torch.Tensor.backward = _recording_backward
+    torch.Tensor.backward = _recording_backward  # type: ignore[method-assign]
     try:
         ctx, model, _ = _build_ctx()
         MeZOUpdateRule(eps=1e-3).step(model, _batch(), ctx)
     finally:
-        torch.Tensor.backward = original_backward
+        torch.Tensor.backward = original_backward  # type: ignore[method-assign]
 
     assert backward_calls[0] == 0
 

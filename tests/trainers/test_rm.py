@@ -30,7 +30,7 @@ class _TinyBackbone(nn.Module):
 
     def forward(self, input_ids, attention_mask=None, **_):
         h = self.emb(input_ids)
-        return ModelOutput(outputs={"logits": self.proj(h)}, hidden_states=[h])
+        return ModelOutput(outputs={"logits": self.proj(h)}, hidden_states=(h,))
 
 
 class _FakeEngine:

@@ -120,7 +120,7 @@ def test_invariant_coerce_raises_for_non_mapping_non_componentspec():
     This guards against accidental pass of plain strings/ints as specs.
     """
     with pytest.raises(ConfigResolveError, match="Spec must be a mapping"):
-        _coerce("just_a_string")
+        _coerce("just_a_string")  # type: ignore[arg-type]
 
 
 def test_invariant_coerce_raises_for_integer_input():
@@ -128,13 +128,13 @@ def test_invariant_coerce_raises_for_integer_input():
     type name in the error message.
     """
     with pytest.raises(ConfigResolveError, match="int"):
-        _coerce(42)
+        _coerce(42)  # type: ignore[arg-type]
 
 
 def test_invariant_coerce_raises_for_list_input():
     """List input to ``_coerce`` raises ``ConfigResolveError``."""
     with pytest.raises(ConfigResolveError, match="list"):
-        _coerce([{"name": "x"}])
+        _coerce([{"name": "x"}])  # type: ignore[arg-type]
 
 
 def test_invariant_coerce_raises_for_none_input():
@@ -142,13 +142,13 @@ def test_invariant_coerce_raises_for_none_input():
     is not a Mapping).
     """
     with pytest.raises(ConfigResolveError, match="NoneType"):
-        _coerce(None)
+        _coerce(None)  # type: ignore[arg-type]
 
 
 def test_invariant_resolve_raises_for_non_mapping_spec():
     """``resolve()`` surfaces the ConfigResolveError when spec is not a mapping."""
     with pytest.raises(ConfigResolveError, match="Spec must be a mapping"):
-        resolve(123)
+        resolve(123)  # type: ignore[arg-type]
 
 
 # ===========================================================================

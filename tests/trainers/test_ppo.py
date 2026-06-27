@@ -410,17 +410,17 @@ def test_ppo_target_kl_early_stops_inner_loop():
 
     trainer = _make_ppo(target_kl=0.01, max_steps=1, ppo_epochs=2)
     # 4 minibatches per epoch — but early stop should kick in after 2 steps.
-    trainer._rollout_engine.rollout = MagicMock(return_value=[])
-    trainer._buffer.clear = MagicMock()
-    trainer._buffer.add = MagicMock()
-    trainer._buffer.all_rewards = MagicMock(return_value=torch.tensor([1.0, 0.5]))
-    trainer._buffer.all_values = MagicMock(return_value=None)
+    trainer._rollout_engine.rollout = MagicMock(return_value=[])  # type: ignore[method-assign]
+    trainer._buffer.clear = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.all_rewards = MagicMock(return_value=torch.tensor([1.0, 0.5]))  # type: ignore[method-assign]
+    trainer._buffer.all_values = MagicMock(return_value=None)  # type: ignore[method-assign]
     # Provide many minibatches across two epochs
-    trainer._buffer.batches = MagicMock(
+    trainer._buffer.batches = MagicMock(  # type: ignore[method-assign]
         side_effect=[iter([_ppo_batch() for _ in range(4)]), iter([_ppo_batch() for _ in range(4)])]
     )
-    trainer._compute_buffer_values = lambda: None
-    trainer.train_step = _fake_train_step
+    trainer._compute_buffer_values = lambda: None  # type: ignore[method-assign]
+    trainer.train_step = _fake_train_step  # type: ignore[method-assign]
 
     trainer.fit()
 

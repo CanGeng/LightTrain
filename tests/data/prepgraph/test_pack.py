@@ -25,7 +25,7 @@ def _run_pack(rows, *, seq_len=16, eos_id=99, pad_id=0, strategy=None):
         cfg["strategy"] = strategy
     node = PackNode(name="p", inputs=["u"], config=cfg)
     ctx = RunContext(
-        store_root=None, workers=1, upstream={"u": _FakeUpstream(rows)}, log=None
+        store_root=None, workers=1, upstream={"u": _FakeUpstream(rows)}, log=None  # type: ignore[arg-type, dict-item]
     )
     return node.run(ctx)
 

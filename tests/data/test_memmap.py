@@ -78,7 +78,7 @@ def test_getitem_builds_default_attention_mask_and_labels(tmp_path):
 def test_getitem_coerces_float_index(tmp_path):
     """``__getitem__`` coerces its index to int."""
     write_memmap(tmp_path, [{"input_ids": [1, 1]}, {"input_ids": [2, 2]}], seq_len=2)
-    assert MemmapDataset(tmp_path)[1.0]["input_ids"] == [2, 2]
+    assert MemmapDataset(tmp_path)[1.0]["input_ids"] == [2, 2]  # type: ignore[index]
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,9 @@ def test_write_respects_custom_dtypes(tmp_path):
     dtypes = {f: "int32" for f in _FIELDS}
     write_memmap(tmp_path, [{"input_ids": [1, 2], "position_ids": [0, 1], "document_ids": [0, 0]}],
                  seq_len=2, dtypes=dtypes)
-    assert read_header(tmp_path).dtypes == dtypes
+    hdr = read_header(tmp_path)
+    assert hdr is not None
+    assert hdr.dtypes == dtypes
     assert MemmapDataset(tmp_path)[0]["input_ids"] == [1, 2]
 
 

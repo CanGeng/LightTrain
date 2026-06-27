@@ -199,6 +199,7 @@ def test_dpo_gradient_pulls_chosen_up_relative_to_ref(dummy_ctx, dummy_model_out
     }
     out = DPOLoss(beta=0.1)(dummy_model_output, batch, dummy_ctx)
     out["loss"].backward()
+    assert chosen.grad is not None and rejected.grad is not None
     assert (chosen.grad < 0).all()
     assert (rejected.grad > 0).all()
 

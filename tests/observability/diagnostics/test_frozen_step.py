@@ -172,6 +172,7 @@ def test_invariant_snapshot_optimizer_copy_failure_is_swallowed(tmp_path, caplog
             step=1, ctx=_Ctx(), batch=_ids_batch(),
             model=_tiny(), optimizer=_BadOptimizer(),
         )
+    assert writer._snapshot is not None
     assert writer._snapshot["optimizer_state"] is None
     recs = [
         r for r in caplog.records
@@ -195,6 +196,7 @@ def test_invariant_snapshot_rng_capture_failure_is_swallowed(
             step=1, ctx=_Ctx(), batch=_ids_batch(),
             model=_tiny(), optimizer=None,
         )
+    assert writer._snapshot is not None
     assert writer._snapshot["rng_state"] is None
     recs = [r for r in caplog.records if "RNG state capture failed" in r.getMessage()]
     assert recs, caplog.text
@@ -208,6 +210,7 @@ def test_invariant_snapshot_optimizer_without_state_dict_is_none(tmp_path):
         step=1, ctx=_Ctx(), batch=_ids_batch(),
         model=_tiny(), optimizer=object(),
     )
+    assert writer._snapshot is not None
     assert writer._snapshot["optimizer_state"] is None
 
 
@@ -271,6 +274,7 @@ def test_invariant_restore_optimizer_load_failure_is_swallowed(tmp_path, caplog)
     writer.snapshot(
         step=1, ctx=_Ctx(), batch=_ids_batch(), model=model, optimizer=opt
     )
+    assert writer._snapshot is not None
     assert writer._snapshot["optimizer_state"] is not None
     with caplog.at_level(logging.WARNING, logger=_FS_LOGGER):
         writer.restore_snapshot(model=None, optimizer=_RaisingLoadOptimizer())
@@ -288,6 +292,7 @@ def test_invariant_restore_rng_failure_is_swallowed(tmp_path, monkeypatch, caplo
     writer.snapshot(
         step=1, ctx=_Ctx(), batch=_ids_batch(), model=_tiny(), optimizer=None
     )
+    assert writer._snapshot is not None
     assert writer._snapshot["rng_state"] is not None
 
     def _boom(_state):
@@ -358,6 +363,7 @@ def test_invariant_commit_uses_code_snapshot_dir_when_present(tmp_path):
     (tmp_path / "code.snapshot").mkdir()
     writer = _snapshotted_writer(tmp_path)
     out = writer.commit(reason="scheduled")
+    assert out is not None
     with zipfile.ZipFile(out) as zf:
         pointer = zf.read("code_snapshot_pointer.txt").decode("utf-8").strip()
     assert pointer.endswith("code.snapshot")

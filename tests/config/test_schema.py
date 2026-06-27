@@ -123,7 +123,7 @@ def test_componentspec_target_via_canonical_field_name():
     Input: ComponentSpec via ``target=`` (no underscores).
     Expected: ``cs.target == 'pkg.Cls'``.
     """
-    cs = ComponentSpec(target="pkg.Cls")
+    cs = ComponentSpec(target="pkg.Cls")  # type: ignore[call-arg]
     assert cs.target == "pkg.Cls"
 
 
@@ -139,7 +139,7 @@ def test_pin_root_config_extra_allow(tmp_yaml):
     """
     p = tmp_yaml("mode: lab\nmy_experimental_field: 42\n")
     cfg = load_config(p)
-    assert cfg.my_experimental_field == 42
+    assert cfg.my_experimental_field == 42  # type: ignore[union-attr]
 
 
 def test_root_config_invalid_mode_raises_at_load(tmp_yaml):

@@ -21,6 +21,8 @@ ratio, shape, allclose round-trip). This file adds:
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -36,7 +38,7 @@ from lighttrain.builtin_plugins.models.text.tiny_lm import (  # noqa: E402 — a
 )
 
 # Tiny base parameters chosen for fast tests AND deterministic shape math.
-_BASE_KW = {"vocab_size": 64, "d_model": 16, "n_layers": 2, "n_heads": 4, "max_seq_len": 32}
+_BASE_KW: dict[str, Any] = {"vocab_size": 64, "d_model": 16, "n_layers": 2, "n_heads": 4, "max_seq_len": 32}
 _BASE_SPEC = {"name": "tiny_lm", **_BASE_KW}
 
 

@@ -60,6 +60,7 @@ def test_join_require_emits_aux_fields(tmp_path):
         },
     )
     res = node.run(_make_ctx(upstream_rows, tmp_path))
+    assert res.rows is not None
     rows = list(res.rows)
     assert len(rows) == 2
     for row in rows:
@@ -83,6 +84,7 @@ def test_join_drop_filters_missing(tmp_path):
         },
     )
     res = node.run(_make_ctx(upstream_rows, tmp_path))
+    assert res.rows is not None
     rows = list(res.rows)
     assert [r["id"] for r in rows] == ["a0"]
 

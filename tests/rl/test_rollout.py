@@ -27,6 +27,7 @@ All stubs are deterministic (no sampling RNG is exercised — the stub
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import pytest
 import torch
@@ -48,7 +49,7 @@ class _RecordingGenModel:
 
     def __init__(self, sequences: torch.Tensor) -> None:
         self._sequences = sequences
-        self.last_kwargs: dict | None = None
+        self.last_kwargs: dict[str, Any] = {}
         self.last_input_ids: torch.Tensor | None = None
         self.no_grad_seen: bool | None = None
 
@@ -135,11 +136,11 @@ def _expected_token_logprob(vocab_size: int, token_id: int) -> float:
 def test_invariant_init_coerces_field_types():
     """Constructor casts numeric/bool args to their declared types."""
     be = HFGenerateBackend(
-        max_new_tokens="8",
-        do_sample=1,
-        temperature="0.5",
-        top_p="0.9",
-        num_return_sequences="3",
+        max_new_tokens="8",  # type: ignore[arg-type]
+        do_sample=1,  # type: ignore[arg-type]
+        temperature="0.5",  # type: ignore[arg-type]
+        top_p="0.9",  # type: ignore[arg-type]
+        num_return_sequences="3",  # type: ignore[arg-type]
     )
     assert be.max_new_tokens == 8 and isinstance(be.max_new_tokens, int)
     assert be.do_sample is True

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lighttrain"
-version = "0.5.1"
+version = "0.5.2"
 description = "PyTorch training framework for research labs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -117,10 +117,8 @@ python_version = "3.12"
 # per-module ignore_missing_imports overrides below (NOT inline ignores), so the
 # CI types env — which installs only `.[dev]`, not optional extras — stays green.
 warn_unused_ignores = true
-# check_untyped_defs: the whole `lighttrain/` package passes with untyped function
-# bodies checked (since v0.5.1). Test bodies still carry ~358 untyped-body errors;
-# they opt out via the `tests.*` override below, which is the next ratchet target
-# (burn down per test module, then delete the opt-out).
+# check_untyped_defs: untyped function bodies are checked across the whole scope
+# — both `lighttrain/` (since v0.5.1) and `tests/` (since v0.5.2, opt-out removed).
 check_untyped_defs = true
 
 # Third-party without stubs → Any. PER-MODULE only (never global
@@ -143,10 +141,3 @@ module = [
     "yaml",
 ]
 ignore_missing_imports = true
-
-# check_untyped_defs ratchet opt-out: test bodies are largely unannotated, so
-# checking them surfaces ~358 errors that are not yet burned down. Production
-# code (`lighttrain/`) is fully checked; this opt-out shrinks over time.
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-check_untyped_defs = false

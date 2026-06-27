@@ -139,7 +139,7 @@ def test_current_lr_missing_lr_key_returns_zero():
     """_current_lr returns 0.0 when param_groups[0] has no 'lr' key."""
 
     class _NoLRGroups:
-        param_groups = [{}]
+        param_groups: list[dict] = [{}]
 
     assert _current_lr(_NoLRGroups()) == 0.0
 
@@ -172,7 +172,7 @@ def test_init_stores_hyperparams():
 
 def test_init_n_infer_accepts_float_string_coercion():
     """n_infer is int-cast from its argument (type coercion guard)."""
-    rule = PCNUpdateRule(n_infer=3.9)
+    rule = PCNUpdateRule(n_infer=3.9)  # type: ignore[arg-type]
     assert rule.n_infer == 3
 
 
@@ -184,7 +184,7 @@ def test_init_n_infer_accepts_float_string_coercion():
 def test_setup_returns_none():
     """setup() is a no-op that explicitly returns None (line 81)."""
     rule = PCNUpdateRule()
-    result = rule.setup(model=MagicMock(), sample=MagicMock())
+    result = rule.setup(model=MagicMock(), sample=MagicMock())  # type: ignore[func-returns-value]
     assert result is None
 
 

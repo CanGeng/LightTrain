@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -89,14 +90,14 @@ def test_diff_configs_uses_repr_for_comparison():
     Setup: cfg1 has ``flag: 1``, cfg2 has ``flag: True``.
     Expected: both appear in the diff.
     """
-    cfgs = [{"flag": 1}, {"flag": True}]
+    cfgs: list[dict[str, Any]] = [{"flag": 1}, {"flag": True}]
     diff = _diff_configs(cfgs)
     assert "flag" in diff
 
 
 def test_diff_configs_missing_key_in_one_run_appears_as_none():
     """Run A has key X, run B does not → X appears with [val, None]."""
-    cfgs = [{"a": 1, "extra": "x"}, {"a": 1}]
+    cfgs: list[dict[str, Any]] = [{"a": 1, "extra": "x"}, {"a": 1}]
     diff = _diff_configs(cfgs)
     assert diff["extra"] == ["x", None]
 

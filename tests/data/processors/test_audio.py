@@ -303,6 +303,7 @@ def test_invariant_hf_call_passes_sampling_rate_and_return_tensors(monkeypatch):
     proc = HFAudioProcessor(model_name_or_path="m", sample_rate=8_000)
     proc(np.zeros(10, dtype=np.float32))
     ex = proc._extractor
+    assert ex is not None
     assert ex.seen_sampling_rate == 8_000
     assert ex.seen_return_tensors == "np"
 

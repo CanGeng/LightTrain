@@ -219,8 +219,8 @@ def test_invariant_ia3_tuple_target_modules_coerced_to_list():
     converted to lists before being stored in ``_ia3_kwargs``."""
     adapter = IA3Adapter(
         base=_spec(),
-        target_modules=("qkv", "fc2"),
-        feedforward_modules=("fc2",),
+        target_modules=["qkv", "fc2"],
+        feedforward_modules=["fc2"],
     )
     assert isinstance(adapter._ia3_kwargs["target_modules"], list)
     assert adapter._ia3_kwargs["target_modules"] == ["qkv", "fc2"]

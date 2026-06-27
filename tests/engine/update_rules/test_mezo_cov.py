@@ -227,7 +227,7 @@ def test_current_lr_reads_group_zero_lr():
 def test_setup_returns_none():
     """setup() is a no-op that returns None (line 76)."""
     rule = MeZOUpdateRule()
-    result = rule.setup(model=MagicMock(), sample=MagicMock())
+    result = rule.setup(model=MagicMock(), sample=MagicMock())  # type: ignore[func-returns-value]
     assert result is None
 
 
@@ -235,7 +235,7 @@ def test_setup_accepts_arbitrary_args():
     """setup() ignores both args (ARG002 noqa); calling with complex objects is safe."""
     rule = MeZOUpdateRule()
     # Neither model nor sample should cause any error
-    result = rule.setup(model=None, sample={"input_ids": torch.zeros(1)})
+    result = rule.setup(model=None, sample={"input_ids": torch.zeros(1)})  # type: ignore[func-returns-value]
     assert result is None
 
 

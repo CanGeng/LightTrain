@@ -31,6 +31,7 @@ def test_update_node_payload_merges_existing(tmp_path):
     ls.update_node_payload(node, {"ended_ts": 2.0, "final_metrics": {"loss": 0.5}})
 
     got = ls.get_node(node)
+    assert got is not None
     assert got["payload"]["started_ts"] == 1.0
     assert got["payload"]["ended_ts"] == 2.0
     assert got["payload"]["final_metrics"]["loss"] == 0.5

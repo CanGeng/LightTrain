@@ -92,6 +92,7 @@ def test_portable_state_round_trips_through_checkpoint_manager(tmp_path):
         "param_groups": [{"lr": 1e-3}],
     }
     target = mgr.save(step=1, state={"optimizer": _portable_state_dict(raw)}, kind="step")
+    assert target is not None
 
     loaded = _rebuild(mgr.load(target)["optimizer"])
     proj = loaded["state"][0]["projector"]

@@ -286,10 +286,10 @@ def test_pin_current_behavior_on_exception_dispatched_on_primary_crash():
 
     trainer = _make_grpo(callbacks=[_OnException()], max_steps=1)
     # Make produce_batch raise via buffer.all_rewards after rollout
-    trainer._rollout_engine.rollout = MagicMock(return_value=[])
-    trainer._buffer.clear = MagicMock()
-    trainer._buffer.add = MagicMock()
-    trainer._buffer.all_rewards = MagicMock(side_effect=ValueError("buffer exploded"))
+    trainer._rollout_engine.rollout = MagicMock(return_value=[])  # type: ignore[method-assign]
+    trainer._buffer.clear = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.all_rewards = MagicMock(side_effect=ValueError("buffer exploded"))  # type: ignore[method-assign]
 
     with pytest.raises(ValueError, match="buffer exploded"):
         trainer.fit()
@@ -318,7 +318,7 @@ def test_pin_current_behavior_on_train_end_exception_suppressed():
             raise RuntimeError("on_train_end exploded")
         return original_dispatch(event, **kw)
 
-    trainer.bus.dispatch = boom_dispatch
+    trainer.bus.dispatch = boom_dispatch  # type: ignore[method-assign]
     result = trainer.fit()
     assert isinstance(result, dict)  # fit returned normally
 
@@ -371,8 +371,8 @@ def test_invariant_produce_batch_adds_episodes_to_buffer():
     ep1 = _make_episode()
     ep2 = _make_episode()
     trainer = _make_grpo()
-    trainer._rollout_engine.rollout = MagicMock(return_value=[ep1, ep2])
-    trainer._buffer.add = MagicMock()
+    trainer._rollout_engine.rollout = MagicMock(return_value=[ep1, ep2])  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
 
     prompt = {
         "input_ids": torch.randint(0, 16, (2, 4)),
@@ -385,9 +385,9 @@ def test_invariant_produce_batch_adds_episodes_to_buffer():
 def test_invariant_produce_batch_uses_prompt_attention_mask_key():
     """produce_batch falls back to 'prompt_attention_mask' when 'attention_mask' absent (line 290)."""
     trainer = _make_grpo()
-    trainer._rollout_engine.rollout = MagicMock(return_value=[])
-    trainer._buffer.clear = MagicMock()
-    trainer._buffer.add = MagicMock()
+    trainer._rollout_engine.rollout = MagicMock(return_value=[])  # type: ignore[method-assign]
+    trainer._buffer.clear = MagicMock()  # type: ignore[method-assign]
+    trainer._buffer.add = MagicMock()  # type: ignore[method-assign]
 
     captured: dict = {}
 
@@ -395,7 +395,7 @@ def test_invariant_produce_batch_uses_prompt_attention_mask_key():
         captured["mask"] = prompt_mask
         return []
 
-    trainer._rollout_engine.rollout = _spy_rollout
+    trainer._rollout_engine.rollout = _spy_rollout  # type: ignore[method-assign, assignment]
 
     expected_mask = torch.ones(2, 4, dtype=torch.long)
     prompt = {
@@ -428,7 +428,7 @@ def test_invariant_grpo_step_no_labels_produces_zero_log_probs_new():
         captured_lp_new.append(ctx.extras["log_probs_new"].clone())
         return {"loss": torch.tensor(0.0), "kl": 0.0}
 
-    trainer._rl_rule.step = _spy_step
+    trainer._rl_rule.step = _spy_step  # type: ignore[method-assign]
 
     batch = _grpo_batch_no_labels()
     trainer._grpo_step(batch)

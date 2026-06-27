@@ -11,7 +11,7 @@ State is resumable via ``state_dict``: epoch + within-block offset.
 from __future__ import annotations
 
 import random
-from collections.abc import Iterable, Sized
+from collections.abc import Iterator, Sized
 from typing import Any
 
 
@@ -60,7 +60,7 @@ class LengthGroupedSampler:
     def __len__(self) -> int:
         return self._n
 
-    def __iter__(self) -> Iterable[int]:
+    def __iter__(self) -> Iterator[int]:
         rng = random.Random(self.seed + self._epoch)
         indices = list(range(self._n))
         rng.shuffle(indices)

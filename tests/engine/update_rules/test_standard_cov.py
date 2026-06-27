@@ -93,7 +93,7 @@ def _batch():
 def test_invariant_setup_returns_none():
     """setup() is a no-op that returns None; callers may check the return value."""
     rule = StandardUpdateRule()
-    result = rule.setup(model=MagicMock(), sample={"x": torch.zeros(1)})
+    result = rule.setup(model=MagicMock(), sample={"x": torch.zeros(1)})  # type: ignore[func-returns-value]
     assert result is None
 
 
@@ -101,8 +101,8 @@ def test_invariant_setup_accepts_arbitrary_args():
     """setup() accepts any model and sample without raising."""
     rule = StandardUpdateRule()
     # Should not raise for any combination of types.
-    assert rule.setup(model=None, sample=None) is None
-    assert rule.setup(model=MagicMock(), sample=42) is None
+    assert rule.setup(model=None, sample=None) is None  # type: ignore[func-returns-value]
+    assert rule.setup(model=MagicMock(), sample=42) is None  # type: ignore[func-returns-value]
 
 
 # ===========================================================================
@@ -171,7 +171,7 @@ def test_invariant_model_returning_mapping_is_wrapped_in_model_output():
         loss = (pred - 1.0).pow(2).mean()
         return {"loss": loss}
 
-    model = _LinearModel(return_type="mapping")
+    model: nn.Module = _LinearModel(return_type="mapping")
     ctx, model, _ = _build_ctx(model=model)
     ctx.loss_fn = _recording_loss
 
@@ -198,7 +198,7 @@ def test_invariant_model_returning_bare_tensor_is_wrapped_in_model_output():
         loss = (pred - 1.0).pow(2).mean()
         return {"loss": loss}
 
-    model = _LinearModel(return_type="bare_tensor")
+    model: nn.Module = _LinearModel(return_type="bare_tensor")
     ctx, model, _ = _build_ctx(model=model)
     ctx.loss_fn = _recording_loss
 

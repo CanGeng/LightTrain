@@ -8,6 +8,7 @@ resize / replace / add / reinit / tie behaviors are preserved.
 from __future__ import annotations
 
 import re
+from typing import Any, cast
 
 import pytest
 import torch
@@ -146,7 +147,7 @@ def test_replace_module_with_module_verbatim():
     model = _make_tiny()
     replacement = nn.Linear(model.d_model, model.d_model)
     new = replace_module(model, "blocks.0.attn.proj", replacement)
-    assert model.blocks[0].attn.proj is new
+    assert cast(Any, model).blocks[0].attn.proj is new
 
 
 def test_replace_module_raises_on_missing_path():
@@ -182,7 +183,7 @@ def test_add_named_module_param_followed_by_state_dict_and_to_device():
 def test_add_named_module_rejects_non_module_intermediate():
     model = _make_tiny()
     # Inject a non-Module attr in the way and verify we refuse to overwrite.
-    model.bad = 42
+    cast(Any, model).bad = 42
     with pytest.raises(TypeError):
         add_named_module(model, "bad.child", nn.Linear(2, 2))
 
@@ -192,14 +193,15 @@ def test_add_named_module_rejects_non_module_intermediate():
 
 def test_reinit_module_changes_weights_and_zeros_bias():
     model = _make_tiny()
-    before = model.blocks[0].mlp.fc1.weight.detach().clone()
-    before_bias = model.blocks[0].mlp.fc1.bias.detach().clone()
+    m = cast(Any, model)
+    before = m.blocks[0].mlp.fc1.weight.detach().clone()
+    before_bias = m.blocks[0].mlp.fc1.bias.detach().clone()
     # Use a non-default std so the change is unambiguous.
     n = reinit_module(model, r"blocks\.0\.mlp\.fc1$", dist={"kind": "normal", "std": 5.0})
     assert n == 1
-    after = model.blocks[0].mlp.fc1.weight
+    after = m.blocks[0].mlp.fc1.weight
     assert not torch.allclose(after, before)
-    assert torch.all(model.blocks[0].mlp.fc1.bias == 0.0)
+    assert torch.all(m.blocks[0].mlp.fc1.bias == 0.0)
     _ = before_bias
 
 

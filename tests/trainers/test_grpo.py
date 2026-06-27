@@ -293,6 +293,7 @@ def test_grpo_stop_requested_breaks_outer_loop():
         def __init__(self):
             self.trainer = None
         def on_reward_computed(self, **_):
+            assert self.trainer is not None
             self.trainer._stop_requested = True
 
     stopper = _Stopper()

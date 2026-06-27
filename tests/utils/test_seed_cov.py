@@ -385,7 +385,7 @@ class TestEdgeCases:
     def test_invariant_seed_float_truncated_to_int(self):
         """seed_everything(3.9) applies int() before masking — returns 3."""
         from lighttrain.utils.seed import seed_everything
-        assert seed_everything(3.9) == 3
+        assert seed_everything(3.9) == 3  # type: ignore[arg-type]
 
     def test_invariant_rng_state_returns_dict(self):
         """rng_state() always returns a dict."""

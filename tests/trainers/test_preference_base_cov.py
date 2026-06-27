@@ -362,7 +362,7 @@ def test_invariant_maybe_log_returns_early_for_non_main_rank():
     """Non-main rank: _maybe_log returns before touching the logger."""
     logger = MagicMock()
     trainer = _make_trainer(logger=logger, log_every=1)
-    trainer.ctx.parallel_ctx = _NonMainPctx()
+    trainer.ctx.parallel_ctx = _NonMainPctx()  # type: ignore[assignment]
     trainer.ctx.step = 1
     trainer._maybe_log({"loss": 0.1})
     logger.log_dict.assert_not_called()
@@ -420,7 +420,7 @@ def test_invariant_maybe_log_skips_when_all_scalars_filtered():
 def test_invariant_maybe_eval_skips_when_val_every_nonpositive():
     """val_every <= 0 disables eval entirely."""
     trainer = _make_trainer(val_every=0)
-    trainer.eval = MagicMock()
+    trainer.eval = MagicMock()  # type: ignore[method-assign]
     trainer._maybe_eval()
     trainer.eval.assert_not_called()
 
@@ -428,7 +428,7 @@ def test_invariant_maybe_eval_skips_when_val_every_nonpositive():
 def test_invariant_maybe_eval_skips_off_schedule():
     """Off the val_every cadence, eval is not invoked."""
     trainer = _make_trainer(val_every=3)
-    trainer.eval = MagicMock()
+    trainer.eval = MagicMock()  # type: ignore[method-assign]
     trainer.ctx.step = 2  # 2 % 3 != 0
     trainer._maybe_eval()
     trainer.eval.assert_not_called()
@@ -437,7 +437,7 @@ def test_invariant_maybe_eval_skips_off_schedule():
 def test_invariant_maybe_eval_runs_on_schedule():
     """On the val_every cadence, eval is invoked once."""
     trainer = _make_trainer(val_every=2)
-    trainer.eval = MagicMock()
+    trainer.eval = MagicMock()  # type: ignore[method-assign]
     trainer.ctx.step = 4
     trainer._maybe_eval()
     trainer.eval.assert_called_once()

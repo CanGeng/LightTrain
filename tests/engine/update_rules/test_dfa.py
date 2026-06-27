@@ -208,7 +208,7 @@ def test_act_deriv_none_returns_ones(
 def test_setup_returns_none():
     """setup() is a no-op and explicitly returns None (line 91)."""
     rule = DFAUpdateRule()
-    result = rule.setup(model=MagicMock(), sample=MagicMock())
+    result = rule.setup(model=MagicMock(), sample=MagicMock())  # type: ignore[func-returns-value]
     assert result is None
 
 

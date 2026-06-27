@@ -61,7 +61,7 @@ class _TinyBackbone(nn.Module):
 
     def forward(self, input_ids, attention_mask=None, **_):
         h = self.emb(input_ids)
-        return ModelOutput(outputs={"logits": self.proj(h)}, hidden_states=[h])
+        return ModelOutput(outputs={"logits": self.proj(h)}, hidden_states=(h,))
 
 
 class _ListDM:
@@ -110,7 +110,7 @@ def _run_pref(loss_fn, n=5):
     t = PreferenceTrainer(engine=None, data_module=_ListDM(batches), optimizer=opt,
                           model=model, max_steps=n)
     t.ctx.loss_fn = loss_fn
-    return [round(float(t.train_step(b).loss), 8) for b in batches]
+    return [round(float(t.train_step(b).loss), 8) for b in batches]  # type: ignore[arg-type]
 
 
 import pytest  # noqa: E402 — placed after the helper above by design

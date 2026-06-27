@@ -20,6 +20,7 @@ Coverage targets (previously uncovered lines):
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import pytest
 
@@ -221,7 +222,7 @@ def test_invariant_answer_pattern_skipped_when_reference_key_missing():
     """
     j = VerifierJudge()  # reference_key="answer"
     # extras has no "answer" key → should fall to pure-regex mode
-    items = [("q", "text #### 42", {})]
+    items: list[tuple[str, str, dict[str, Any]]] = [("q", "text #### 42", {})]
     scores = j.score(items)
     # pure-regex mode: pattern matches → 1.0
     assert scores == [1.0]
@@ -230,7 +231,7 @@ def test_invariant_answer_pattern_skipped_when_reference_key_missing():
 def test_invariant_pure_regex_mode_no_match_scores_0():
     """Pure-regex mode (no reference): pattern doesn't match → 0.0 (line 90)."""
     j = VerifierJudge()
-    items = [("q", "no hash here", {})]
+    items: list[tuple[str, str, dict[str, Any]]] = [("q", "no hash here", {})]
     scores = j.score(items)
     assert scores == [0.0]
 
