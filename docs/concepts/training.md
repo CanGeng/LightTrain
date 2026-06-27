@@ -83,7 +83,7 @@ A custom trainer reaches them as `self.models["teacher"]` /
 
 Runnable end-to-end example: a student rolling out on-policy against a frozen
 teacher — [examples/online_distill.py](../../examples/online_distill.py)
-(`lighttrain train -c recipes/online_distill_demo.yaml`).
+(`lighttrain train -c examples/references/recipes/online_distill_demo.yaml`).
 
 ## PEFT & memory efficiency
 

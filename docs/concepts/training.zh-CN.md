@@ -76,7 +76,7 @@ optimizers:
 
 可跑的端到端示例：student 在线 rollout 对抗冻结 teacher——
 [examples/online_distill.py](../../examples/online_distill.py)
-（`lighttrain train -c recipes/online_distill_demo.yaml`）。
+（`lighttrain train -c examples/references/recipes/online_distill_demo.yaml`）。
 
 ## PEFT 与显存效率
 

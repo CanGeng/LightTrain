@@ -211,7 +211,7 @@ def test_auto_attach_noncritical_failure_warns(tmp_path: Path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 _REPO = Path(__file__).resolve().parent.parent.parent
-_RECIPE = _REPO / "recipes" / "pretrain_causal.yaml"
+_RECIPE = _REPO / "examples" / "references" / "recipes" / "pretrain_causal.yaml"
 
 _BUNDLE_KEYS = {
     "cfg", "resolved_yaml", "run_dir", "model", "data", "optimizer", "scheduler",

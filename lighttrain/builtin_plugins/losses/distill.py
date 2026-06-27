@@ -6,7 +6,7 @@ The losses never call the teacher model directly — that's the producer's job.
 
 Tensor naming convention
 ------------------------
-Producer side (see ``recipes/produce_teacher.yaml``) writes:
+Producer side (see ``examples/references/recipes/produce_teacher.yaml``) writes:
 
   * ``logits_topk_64.values``   (B, T, K)
   * ``logits_topk_64.indices``  (B, T, K)  (int32)

@@ -3,8 +3,8 @@
 > [中文版](recipes.zh-CN.md) · [Docs index](../README.md)
 
 The fastest way to start: copy a bundled recipe from
-[`recipes/`](../../recipes/) and edit it. Most run with
-`lighttrain train -c recipes/<name>.yaml`; the distributed overlays (below) are
+[`examples/references/recipes/`](../../examples/references/recipes/) and edit it. Most run with
+`lighttrain train -c examples/references/recipes/<name>.yaml`; the distributed overlays (below) are
 the exception — they layer onto a full recipe and need a multi-process launcher.
 
 ## Pretraining & SFT

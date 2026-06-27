@@ -129,7 +129,7 @@ logger:
 # =============================================================================
 
 # --- A. SFT over chat data (PrepGraph) ---------------------------------------
-# Replace data: with a prep_graph data module; see recipes/sft_chat.yaml.
+# Replace data: with a prep_graph data module; see examples/references/recipes/sft_chat.yaml.
 
 # --- B. Model variants (model_profiles) --------------------------------------
 # Swap on the CLI with `model=big`; tweak with `model_profiles.base.d_model=384`.
@@ -140,7 +140,7 @@ logger:
 
 # --- C. Multi-model: frozen teacher + trainable student ----------------------
 # A custom trainer reads self.models["teacher"] / self.optimizers["student"].
-# See examples/online_distill.py and recipes/online_distill_demo.yaml.
+# See examples/references/online_distill.py and examples/references/recipes/online_distill_demo.yaml.
 # models:
 #   student: { spec: { name: tiny_lm, d_model: 128, n_layers: 4, n_heads: 4 }, trainable: true,  optimizer: main }
 #   teacher: { spec: { name: tiny_lm, d_model: 128, n_layers: 4, n_heads: 4 }, trainable: false, checkpoint: path/to/teacher }

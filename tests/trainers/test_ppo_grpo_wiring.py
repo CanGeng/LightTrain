@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-_RECIPES = Path(__file__).resolve().parents[2] / "recipes"
+_RECIPES = Path(__file__).resolve().parents[2] / "examples" / "references" / "recipes"
 _FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
 

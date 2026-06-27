@@ -15,7 +15,7 @@ import pytest
 
 from lighttrain.cli._runtime import setup_run_from_config
 
-RECIPE = Path("recipes/image_cls.yaml")
+RECIPE = Path("examples/references/recipes/image_cls.yaml")
 
 
 @pytest.mark.skipif(not RECIPE.exists(), reason="image_cls recipe missing")

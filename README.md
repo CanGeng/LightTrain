@@ -60,8 +60,8 @@ and is heavily commented as a living tutorial — uncomment the optional blocks
 ## Example: train, then branch & resume
 
 ```bash
-lighttrain train -c recipes/pretrain_causal.yaml
-lighttrain fork  --from runs/<...>/checkpoints/step_500 -c recipes/finetune.yaml
+lighttrain train -c examples/references/recipes/pretrain_causal.yaml
+lighttrain fork  --from runs/<...>/checkpoints/step_500 -c examples/references/recipes/finetune.yaml
 lighttrain resume --run runs/<...>
 ```
 
@@ -78,7 +78,7 @@ judge:   { name: verifier, verify_pattern: "\\d+" }   # → reward_fn
 Multi-model (a frozen teacher + a trainable student) is a named model set; a
 custom trainer reads `self.models["teacher"]`. A runnable end-to-end template:
 [examples/online_distill.py](examples/online_distill.py)
-(`lighttrain train -c recipes/online_distill_demo.yaml`).
+(`lighttrain train -c examples/references/recipes/online_distill_demo.yaml`).
 → [Training paradigms](docs/concepts/training.md)
 
 ## What you get

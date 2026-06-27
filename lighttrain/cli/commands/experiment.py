@@ -26,7 +26,7 @@ def sweep_cmd(
 
     \\b
     Example:
-      lighttrain sweep -c recipes/sweep_demo.yaml -s recipes/sweep_r15.yaml
+      lighttrain sweep -c examples/references/recipes/sweep_demo.yaml -s examples/references/recipes/sweep_r15.yaml
     """
     from lighttrain.lab.auto_report import write_sweep_report
     from lighttrain.lab.sweep import SweepRunner
@@ -150,7 +150,7 @@ def fork_cmd(
     \\b
     Example:
       lighttrain fork --from runs/exp/run_001/checkpoints/step_500 \\
-                      -c recipes/pretrain_causal.yaml ++optim.lr=1e-4
+                      -c examples/references/recipes/pretrain_causal.yaml ++optim.lr=1e-4
     """
     from lighttrain.lab.fork import fork
 

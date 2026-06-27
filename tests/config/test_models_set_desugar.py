@@ -15,7 +15,7 @@ import pytest
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent.parent
-RECIPE = REPO / "recipes" / "pretrain_causal.yaml"
+RECIPE = REPO / "examples" / "references" / "recipes" / "pretrain_causal.yaml"
 
 
 def _losses_for(recipe_path: Path, run_root: Path) -> list[float]:

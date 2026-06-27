@@ -1,0 +1,93 @@
+# R3 — Stage 2: student distillation training (DESIGN §12.9).
+#
+# Joins the teacher artifact produced by `examples/references/recipes/produce_teacher.yaml` and
+# trains a smaller TinyLM with the CE + KL_topk + hidden_mse composite loss.
+# Run with:
+#   lighttrain train -c examples/references/recipes/student_kd.yaml
+
+mode: lab
+seed: 17
+exp: r3_student
+run_root: runs
+
+# Smaller student. Note: hidden_dim matches teacher (192) so hidden_mse can
+# operate without a projection layer (M3 limitation; see M3 docs §11).
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 260
+    d_model: 192
+    n_layers: 4
+    n_heads: 6
+    max_seq_len: 128
+    output_hidden_states: true
+
+data:
+  name: simple
+  dataset:
+    name: artifact_joined
+    base:
+      name: line_file_text
+      path: tests/fixtures/tiny_corpus.txt
+      max_len: 128
+    join:
+      - store: artifacts/teacher_tiny_v1
+        namespace: teacher
+        missing: require
+  tokenizer:
+    name: byte
+  collator:
+    name: causal_lm
+    max_len: 128
+  batch_size: 4
+
+loss:
+  name: composite
+  children:
+    - { name: cross_entropy, weight: 0.5 }
+    - name: kl_topk
+      weight: 0.4
+      temperature: 2.0
+      top_k: 64
+      teacher_namespace: teacher
+      teacher_key: logits_topk_64
+    - name: hidden_mse
+      weight: 0.1
+      mapping: { 1: 2, 2: 4, 3: 6 }
+      teacher_namespace: teacher
+      teacher_key: hidden_states_layers
+
+optim:
+  name: adamw
+  lr: 5.0e-4
+  betas: [0.9, 0.95]
+  weight_decay: 0.01
+
+scheduler:
+  name: warmup_cosine
+  warmup_steps: 50
+  total_steps: ${trainer.max_steps}
+  min_lr_ratio: 0.1
+
+engine:
+  name: standard
+  mixed_precision: "no"
+
+trainer:
+  name: pretrain
+  max_steps: 400
+  val_every: 0
+  ckpt_every: 0
+  log_every: 25
+  grad_clip: 1.0
+  accumulate: 1
+
+callbacks:
+  - { name: throughput, window: 25 }
+  - { name: nan_skip, max_skips: 10 }
+  - { name: lineage_recorder, cycle_policy: warn }
+
+logger:
+  - { name: console, log_every: 25 }
+  - { name: jsonl }

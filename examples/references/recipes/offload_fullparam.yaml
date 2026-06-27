@@ -1,0 +1,98 @@
+# R12 — Full-parameter training with LayerOffloadEngine (DESIGN §14 / §26.7).
+#
+# Drop-in replacement for examples/references/recipes/pretrain_causal.yaml that:
+#   * swaps engine.name = "standard" → "layer_offload"
+#   * uses optim.name = "cpu_offload" so optimizer state lives on host
+#   * keeps resident_layers=2 + prefetch=1 (DESIGN §14.1 defaults)
+#
+# Numerically equivalent to the standard recipe on the same seed; on a CUDA
+# box the difference is ~constant device memory usage independent of n_layers.
+#
+# WSL acceptance (docs/M5_INTERFACES.md):
+#   pip install -e ".[peft,quant,dev]"
+#   pytest -m heavy -k r12
+#   lighttrain estimate -c examples/references/recipes/offload_fullparam.yaml --json r12.json
+#   lighttrain train    -c examples/references/recipes/offload_fullparam.yaml
+
+mode: lab
+seed: 1337
+exp: r12_offload
+run_root: runs
+
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 260
+    d_model: 256
+    n_layers: 8
+    n_heads: 8
+    max_seq_len: 128
+    dropout: 0.0
+
+data:
+  name: simple
+  dataset:
+    name: line_file_text
+    path: tests/fixtures/tiny_corpus.txt
+    max_len: 128
+  tokenizer:
+    name: byte
+  collator:
+    name: causal_lm
+    max_len: 128
+  sampler:
+    name: shuffle
+    seed: ${seed}
+  batch_size: 4
+  num_workers: 0
+
+loss: { name: cross_entropy }
+
+optim:
+  name: cpu_offload
+  base:
+    name: adamw
+    lr: 1.0e-4
+    betas: [0.9, 0.95]
+    weight_decay: 0.1
+
+scheduler:
+  name: warmup_cosine
+  warmup_steps: 50
+  total_steps: ${trainer.max_steps}
+  min_lr_ratio: 0.1
+
+engine:
+  name: layer_offload
+  mixed_precision: bf16
+  resident_layers: 2
+  prefetch: 1
+  storage:
+    weights:    { device: cpu_pinned }
+    grads:      { device: cpu_pinned }
+    optim:      { device: cpu_pinned }
+    activations:
+      mode: recompute_or_offload
+      device: cpu_pinned
+  io_streams: 2
+  pin_memory: true
+
+trainer:
+  name: pretrain
+  max_steps: 200
+  val_every: 0
+  ckpt_every: 100
+  log_every: 20
+  grad_clip: 1.0
+  accumulate: 1
+
+callbacks:
+  - { name: throughput }
+  - { name: nan_skip }
+  - { name: invariants }
+  - { name: best_ckpt, monitor: loss, mode: min }
+
+logger:
+  - { name: console, log_every: 20 }
+  - { name: jsonl }

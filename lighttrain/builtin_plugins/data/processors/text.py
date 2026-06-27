@@ -8,7 +8,7 @@ Two flavours:
 * ``ChatTemplateProcessor`` — hermetic byte-tokenizer-friendly chat templater
   that needs no model files. Uses Python f-strings as the template language
   (``{system}{user}{assistant}``), so it's enough for tests and the default
-  ``recipes/sft_chat.yaml``.
+  ``examples/references/recipes/sft_chat.yaml``.
 """
 
 from __future__ import annotations

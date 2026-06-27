@@ -1,0 +1,83 @@
+# R9 — JEPA masked patch prediction (DESIGN §13.2-13.3 / §26.9).
+#
+# Trains a JEPAModel on synthetic patch sequences.  The predictor is
+# trained to predict the EMA target encoder's embeddings for masked patches,
+# given only the context patches.
+#
+# Run with:
+#   lighttrain train -c examples/references/recipes/jepa.yaml
+
+mode: lab
+seed: 13
+exp: r9_jepa
+run_root: runs
+
+# Demo-only toy dataset/collator (synthetic_patches / patches); not a core component.
+user_modules: [examples/references/lab_components.py]
+
+model: default
+model_profiles:
+  default:
+    name: jepa
+    patch_dim: 16
+    embed_dim: 64
+    num_heads: 4
+    depth: 2
+    predictor_depth: 1
+    dropout: 0.0
+
+data:
+  name: simple
+  dataset:
+    name: synthetic_patches
+    num_patches: 16
+    patch_dim: 16
+    num_samples: 256
+    seed: ${seed}
+  collator:
+    name: patches
+    num_patches: 16
+    patch_dim: 16
+  batch_size: 4
+  num_workers: 0
+
+objective:
+  name: jepa
+  num_context_patches: 10
+  num_target_patches: 6
+  ema_momentum: 0.996
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  betas: [0.9, 0.999]
+  weight_decay: 0.05
+
+scheduler:
+  name: warmup_cosine
+  warmup_steps: 20
+  total_steps: ${trainer.max_steps}
+  min_lr_ratio: 0.0
+
+engine:
+  name: standard
+  mixed_precision: "no"
+  update_rule:
+    name: standard   # grad_clip/accumulate are controlled by trainer:
+
+trainer:
+  name: pretrain
+  max_steps: 200
+  val_every: 0
+  ckpt_every: 200
+  log_every: 20
+
+callbacks:
+  - { name: throughput, window: 20 }
+  # Advance JEPAModel's internal EMA target encoder each optimizer step
+  # (distinct from `ema`, which is a Polyak parameter shadow for eval).
+  - { name: target_ema }
+
+logger:
+  - { name: console, log_every: 20 }
+  - { name: jsonl }

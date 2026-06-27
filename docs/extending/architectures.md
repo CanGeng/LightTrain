@@ -6,12 +6,12 @@ Stateful (RWKV, Mamba) and non-Transformer objectives ship as plugins, selected
 like any other model/objective:
 
 ```bash
-lighttrain train -c recipes/pretrain_rwkv.yaml   # RWKV stateful pretraining
-lighttrain train -c recipes/diffusion_eps.yaml   # diffusion eps-prediction
-lighttrain train -c recipes/jepa.yaml            # JEPA masked-patch prediction
-lighttrain train -c recipes/pcn_demo.yaml        # Predictive Coding Networks
-lighttrain train -c recipes/ff_demo.yaml         # Forward-Forward
-lighttrain train -c recipes/mezo_sft.yaml        # MeZO zero-order SFT
+lighttrain train -c examples/references/recipes/pretrain_rwkv.yaml   # RWKV stateful pretraining
+lighttrain train -c examples/references/recipes/diffusion_eps.yaml   # diffusion eps-prediction
+lighttrain train -c examples/references/recipes/jepa.yaml            # JEPA masked-patch prediction
+lighttrain train -c examples/references/recipes/pcn_demo.yaml        # Predictive Coding Networks
+lighttrain train -c examples/references/recipes/ff_demo.yaml         # Forward-Forward
+lighttrain train -c examples/references/recipes/mezo_sft.yaml        # MeZO zero-order SFT
 ```
 
 Built-in objectives carry a `loss_family`: `next_token`, `masked_denoising`,

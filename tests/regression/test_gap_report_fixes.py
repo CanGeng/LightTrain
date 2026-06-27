@@ -342,7 +342,7 @@ def test_demo_recipe_runs(recipe, tmp_path):
     from lighttrain.cli._runtime import setup_run_from_config
 
     cfg = load_config(
-        f"recipes/{recipe}.yaml",
+        f"examples/references/recipes/{recipe}.yaml",
         overrides=[
             f"run_root={tmp_path}",
             "trainer.max_steps=2",
@@ -364,7 +364,7 @@ def test_jepa_recipe_advances_target_encoder(tmp_path):
     from lighttrain.cli._runtime import setup_run_from_config
 
     cfg = load_config(
-        "recipes/jepa.yaml",
+        "examples/references/recipes/jepa.yaml",
         overrides=[f"run_root={tmp_path}", "trainer.max_steps=3",
                    "trainer.ckpt_every=0", "trainer.log_every=1"],
     )
@@ -383,7 +383,7 @@ def test_rwkv_recipe_wires_arch_profile_object(tmp_path):
     from lighttrain.cli._runtime import setup_run_from_config
 
     cfg = load_config(
-        "recipes/pretrain_rwkv.yaml",
+        "examples/references/recipes/pretrain_rwkv.yaml",
         overrides=[f"run_root={tmp_path}", "trainer.max_steps=3",
                    "trainer.ckpt_every=0", "trainer.log_every=1"],
     )
@@ -401,7 +401,7 @@ def test_rwkv_recipe_wires_arch_profile_object(tmp_path):
 def test_x_labels_one_hot_matches_mlp_toy_top_for_pcn_clamp():
     """M4: x_labels emits (B, output_dim) one-hot so the PCN supervised clamp
     (labels.shape == top_activation.shape) actually fires."""
-    from examples.lab_components import MLPToy, XLabelsCollator
+    from examples.references.lab_components import MLPToy, XLabelsCollator
 
     coll = XLabelsCollator(num_classes=2)
     batch = coll([{"x": torch.randn(16), "label": 1}, {"x": torch.randn(16), "label": 0}])

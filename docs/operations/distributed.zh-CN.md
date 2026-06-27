@@ -57,7 +57,7 @@ engine:   { mixed_precision: "no" }
 ```
 
 完整 recipe 示例见
-[`recipes/`](../../recipes)。
+[`examples/references/recipes/`](../../recipes)。
 
 ## 相关
 

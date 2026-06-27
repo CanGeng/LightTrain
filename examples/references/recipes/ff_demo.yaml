@@ -1,0 +1,70 @@
+# R10b — Forward-Forward algorithm demo (DESIGN §13.4 / §26.9).
+#
+# Demonstrates ForwardForwardUpdateRule on a toy binary classification task.
+# Positive data = real batch; negative data = shuffled batch.
+# Goodness-based layer-local training, no backward through entire network.
+#
+# Run with:
+#   python -c "from lighttrain.builtin_plugins.update_rules.forward_forward import ForwardForwardUpdateRule"
+#   lighttrain train -c examples/references/recipes/ff_demo.yaml
+
+mode: lab
+seed: 77
+exp: r10_ff
+run_root: runs
+
+# Demo-only toy model/dataset/collator (mlp_toy / synthetic_binary / x_labels); not core.
+user_modules: [examples/references/lab_components.py]
+
+model: default
+model_profiles:
+  default:
+    name: mlp_toy
+    input_dim: 16
+    hidden_dim: 32
+    output_dim: 2
+    num_layers: 3
+
+data:
+  name: simple
+  dataset:
+    name: synthetic_binary
+    input_dim: 16
+    num_samples: 256
+    seed: ${seed}
+  collator:
+    name: x_labels
+    input_dim: 16
+  batch_size: 8
+  num_workers: 0
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  betas: [0.9, 0.99]
+  weight_decay: 0.0
+
+scheduler:
+  name: constant
+
+engine:
+  name: standard
+  mixed_precision: "no"
+  update_rule:
+    name: forward_forward
+    threshold: 2.0
+    grad_clip: 1.0
+
+trainer:
+  name: pretrain
+  max_steps: 100
+  val_every: 0
+  ckpt_every: 100
+  log_every: 10
+
+callbacks:
+  - { name: throughput, window: 10 }
+
+logger:
+  - { name: console, log_every: 10 }
+  - { name: jsonl }

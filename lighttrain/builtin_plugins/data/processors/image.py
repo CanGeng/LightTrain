@@ -3,7 +3,7 @@
 Two flavours:
 
 * ``SimpleImageProcessor`` — Pillow-only, hermetic. Resize + CHW float32
-  normalize. Default for tests and ``recipes/vlm_sft.yaml`` when no HF model
+  normalize. Default for tests and ``examples/references/recipes/vlm_sft.yaml`` when no HF model
   is available.
 
 * ``HFImageProcessor`` — wraps ``transformers.AutoImageProcessor``; lazy

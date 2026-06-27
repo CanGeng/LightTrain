@@ -20,8 +20,8 @@ from lighttrain.config import ConfigError, load_config
 from lighttrain.config._models import build_primary_model, normalize_model_set
 
 REPO = Path(__file__).resolve().parents[2]
-PROFILES = REPO / "recipes" / "pretrain_causal.yaml"          # model: + model_profiles:
-MODELS_SET = REPO / "recipes" / "online_distill_demo.yaml"    # explicit models: set
+PROFILES = REPO / "examples" / "references" / "recipes" / "pretrain_causal.yaml"          # model: + model_profiles:
+MODELS_SET = REPO / "examples" / "references" / "recipes" / "online_distill_demo.yaml"    # explicit models: set
 
 pytestmark = pytest.mark.skipif(
     not (PROFILES.exists() and MODELS_SET.exists()),
