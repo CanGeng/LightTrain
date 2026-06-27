@@ -69,3 +69,4 @@ trainer:
 logger:
   - { name: console, log_every: 10 }
   - { name: jsonl }
+  - { name: tensorboard }

@@ -79,6 +79,7 @@ class MicroState:
     """
 
     micro_step: int = 0
+    last_grad_norm: float = 0.0
 
 
 def apply_update(
@@ -145,7 +146,7 @@ def apply_update(
     if bus is not None:
         bus.dispatch("on_backward_post", step=ctx.step, loss=loss)
 
-    grad_norm = 0.0
+    grad_norm = micro_state.last_grad_norm
     if not accumulating:
         if grad_clip and grad_clip > 0:
             if grad_sync is not None:
@@ -158,6 +159,7 @@ def apply_update(
                     else:
                         gn = torch.nn.utils.clip_grad_norm_(params, max_norm=grad_clip)
                     grad_norm = float(gn)
+        micro_state.last_grad_norm = grad_norm
         if bus is not None:
             bus.dispatch("on_clip_grad", step=ctx.step, grad_norm=grad_norm)
             bus.dispatch("on_optimizer_step_pre", step=ctx.step)
