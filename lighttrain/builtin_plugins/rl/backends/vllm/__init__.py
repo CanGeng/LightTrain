@@ -1,4 +1,4 @@
-"""VLLMBackend — vLLM rollout backend stub.
+"""VLLMBackend — vLLM rollout backend (available when ``vllm`` is installed).
 
 Registers ``@register("rl_backend", "vllm")`` as an opt-in generation backend.
 Importing this module without vLLM installed will raise ``ImportError`` at
@@ -39,7 +39,8 @@ from lighttrain.registry import register
 class VLLMBackend:
     """vLLM generation backend for high-throughput PPO/GRPO rollouts.
 
-    This is a stub that raises ``ImportError`` unless ``vllm`` is installed.
+    Constructing this backend without ``vllm`` installed raises
+    ``ImportError``.
     """
 
     def __init__(

@@ -39,13 +39,11 @@ dev = [
     "mypy>=2.0",
 ]
 peft = ["peft>=0.7"]
+prune = ["langdetect>=1.0"]
 quant = ["bitsandbytes>=0.43; platform_system == 'Linux'"]
-# Reserved extras (no hard dep today): the CPU/layer-offload path is pure-torch,
-# and the vLLM rl_backend lazy-imports ``vllm`` only at use time. Kept for API
-# symmetry — ``pip install '.[offload]'`` / ``'.[vllm]'`` are accepted no-ops;
-# populate when a backend grows a required dependency.
-offload = []
-vllm = []
+# Optional rl_backend (lazy-imported at runtime). Install ``vllm`` to enable
+# high-throughput PPO/GRPO rollouts with the vLLM backend.
+vllm = ["vllm>=0.6"]
 sweep = ["optuna>=3.0"]
 
 [project.scripts]
@@ -130,6 +128,7 @@ module = [
     "accelerate.*",
     "bitsandbytes.*",
     "deepspeed.*",
+    "langdetect.*",
     "lm_eval.*",
     "matplotlib.*",
     "optuna.*",

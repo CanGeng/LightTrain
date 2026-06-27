@@ -57,7 +57,26 @@ class ParallelContext:
         Expects LOCAL_RANK / RANK / WORLD_SIZE to be set by the launcher.
         Builds a single-dimension (dp,) DeviceMesh; all ranks form one
         data-parallel group.
+
+        Raises ``RuntimeError`` when ``NNODES>1`` or when
+        ``LOCAL_WORLD_SIZE < WORLD_SIZE`` (multi-node placement) — multi-node
+        is not supported. The NNODES check runs before
+        ``dist.init_process_group`` so multi-node launches fail fast instead
+        of hanging on rendezvous.
         """
+        # Multi-node fail-loud: lighttrain validates only single-node
+        # multi-GPU (DDP / FSDP / ZeRO). Detect NNODES *before*
+        # dist.init_process_group — otherwise multi-node init hangs on
+        # rendezvous and obscures the cause.
+        _nnodes = int(os.environ.get("NNODES", "1"))
+        if _nnodes > 1:
+            raise RuntimeError(
+                f"Multi-node training is not supported (NNODES={_nnodes}). "
+                "lighttrain validates only single-node multi-GPU "
+                "(DDP / FSDP / ZeRO). Run torchrun with --nnodes=1 or use "
+                "ParallelContext.single_gpu()."
+            )
+
         import torch.distributed as dist
 
         backend = str(getattr(cfg, "backend", "nccl"))
@@ -67,6 +86,16 @@ class ParallelContext:
         rank = dist.get_rank()
         local_rank = int(os.environ.get("LOCAL_RANK", "0"))
         world_size = dist.get_world_size()
+
+        # Double-signal defense: torchrun splits the world across nodes by
+        # setting LOCAL_WORLD_SIZE < WORLD_SIZE even when NNODES is unset
+        # (e.g. via --nnodes inferred from --nproc-per-node placement).
+        _local_world_size = int(os.environ.get("LOCAL_WORLD_SIZE", str(world_size)))
+        if _local_world_size < world_size:
+            raise RuntimeError(
+                f"Multi-node detected (LOCAL_WORLD_SIZE={_local_world_size} < "
+                f"WORLD_SIZE={world_size}); multi-node is not supported."
+            )
 
         dp = int(getattr(cfg, "dp", 1))
         force_cpu = bool(getattr(cfg, "force_cpu", False))

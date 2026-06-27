@@ -9,7 +9,7 @@ using lighttrain as the training framework.
 examples/MiniMind/
   model/
     model_minimind.py     # 原始模型定义（verbatim copy）
-    model_adapter.py      # @register("model", "minimind") + @register("tokenizer", "hf_auto")
+    model_adapter.py      # @register("model", "minimind")
     model_lora.py         # LoRA 工具（verbatim copy）
     tokenizer.json / tokenizer_config.json   # vocab_size=6400 自定义分词器
   dataset/
