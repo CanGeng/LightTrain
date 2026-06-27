@@ -399,7 +399,7 @@ def test_skip_step_aborts_backward_and_optimizer():
     ctx.loss_fn = _trap_loss
 
     optim_step_spy = MagicMock(wraps=optim.step)
-    optim.step = optim_step_spy
+    optim.step = optim_step_spy  # type: ignore[method-assign]
 
     metrics = StandardUpdateRule().step(model, _batch(), ctx)
 

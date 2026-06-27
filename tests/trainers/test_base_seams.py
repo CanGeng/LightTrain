@@ -101,6 +101,7 @@ def test_custom_forward_loss_routes_through_apply_update():
 
     class _Custom(Trainer):
         def forward_loss(self, batch):
+            assert self.model is not None
             return self.model(batch["x"]).sum()
 
     trainer = _Custom(**_kwargs(model=model, optimizer=opt))
@@ -112,7 +113,7 @@ def test_custom_forward_loss_routes_through_apply_update():
 def test_before_step_default_is_noop():
     """The base ``before_step`` hook is a no-op returning None."""
     trainer = Trainer(**_kwargs())
-    assert trainer.before_step({}) is None
+    assert trainer.before_step({}) is None  # type: ignore[func-returns-value]
 
 
 def test_constructor_empty_models_and_optimizers_when_none():
@@ -191,9 +192,10 @@ def test_predict_full_path_wraps_and_returns_cpu_outputs():
 
 def test_maybe_log_returns_early_for_non_main_rank():
     trainer = Trainer(**_kwargs(logger=MagicMock()))
-    trainer.ctx.parallel_ctx = _NonMainPctx()
+    trainer.ctx.parallel_ctx = _NonMainPctx()  # type: ignore[assignment]
     trainer.ctx.step = trainer.log_every  # would log if main
     trainer._maybe_log({"loss": 0.1})
+    assert trainer.logger is not None
     trainer.logger.log_dict.assert_not_called()
 
 
@@ -208,14 +210,14 @@ def test_maybe_log_filters_to_finite_scalars():
 
 def test_maybe_eval_skips_when_val_every_nonpositive():
     trainer = Trainer(**_kwargs(model=_DictModel(), val_every=0))
-    trainer.eval = MagicMock()
+    trainer.eval = MagicMock()  # type: ignore[method-assign]
     trainer._maybe_eval()
     trainer.eval.assert_not_called()
 
 
 def test_maybe_eval_runs_on_schedule():
     trainer = Trainer(**_kwargs(model=_DictModel(), val_every=2))
-    trainer.eval = MagicMock()
+    trainer.eval = MagicMock()  # type: ignore[method-assign]
     trainer.ctx.step = 4
     trainer._maybe_eval()
     trainer.eval.assert_called_once()
@@ -353,8 +355,8 @@ def test_load_checkpoint_swallows_data_module_and_seek_and_rng_failures(tmp_path
 
 def test_write_crash_bundle_returns_early_for_non_main_rank():
     trainer = Trainer(**_kwargs(model=_DictModel()))
-    trainer.ctx.parallel_ctx = _NonMainPctx()
-    trainer._run_dir = "/nonexistent"  # would be used if main
+    trainer.ctx.parallel_ctx = _NonMainPctx()  # type: ignore[assignment]
+    trainer._run_dir = "/nonexistent"  # type: ignore[attr-defined]  # would be used if main
     # Non-main → returns before touching run_dir; no raise.
     trainer._write_crash_bundle(RuntimeError("x"), {"a": 1}, {"loss": 0.1})
 
@@ -369,7 +371,7 @@ def test_write_crash_bundle_writes_bundle_and_oom_report(tmp_path):
     """With a run_dir on the main rank, a crash bundle is written; an
     OOM-looking exception also triggers the OOM report path."""
     trainer = Trainer(**_kwargs(model=_DictModel()))
-    trainer._run_dir = tmp_path
+    trainer._run_dir = tmp_path  # type: ignore[attr-defined]
     exc = RuntimeError("CUDA out of memory. Tried to allocate ...")
     trainer._write_crash_bundle(exc, {"input_ids": torch.zeros(1, 2, dtype=torch.long)}, {"loss": 0.1})
     # A diagnostics dir should now exist under the run dir.
@@ -387,7 +389,7 @@ def test_write_crash_bundle_swallows_inner_write_failures(tmp_path, monkeypatch)
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("oom boom")),
     )
     trainer = Trainer(**_kwargs(model=_DictModel()))
-    trainer._run_dir = tmp_path
+    trainer._run_dir = tmp_path  # type: ignore[attr-defined]
     exc = RuntimeError("CUDA out of memory")  # is_oom_exception → True
     trainer._write_crash_bundle(exc, {"a": 1}, {"loss": 0.1})  # must not raise
 
@@ -406,7 +408,7 @@ def test_maybe_log_skips_off_schedule():
 
 def test_maybe_eval_skips_off_schedule():
     trainer = Trainer(**_kwargs(model=_DictModel(), val_every=3))
-    trainer.eval = MagicMock()
+    trainer.eval = MagicMock()  # type: ignore[method-assign]
     trainer.ctx.step = 2  # 2 % 3 != 0
     trainer._maybe_eval()
     trainer.eval.assert_not_called()

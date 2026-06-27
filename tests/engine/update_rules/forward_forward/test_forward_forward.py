@@ -149,10 +149,10 @@ def test_invariant_current_lr_no_param_groups_attr_returns_zero():
 def test_invariant_setup_returns_none():
     """setup() always returns None regardless of arguments (line 63)."""
     rule = ForwardForwardUpdateRule()
-    result = rule.setup(model=None, sample=None)
+    result = rule.setup(model=None, sample=None)  # type: ignore[func-returns-value]
     assert result is None
     # also with non-None args
-    result2 = rule.setup(model=MagicMock(), sample={"x": torch.zeros(2, 4)})
+    result2 = rule.setup(model=MagicMock(), sample={"x": torch.zeros(2, 4)})  # type: ignore[func-returns-value]
     assert result2 is None
 
 

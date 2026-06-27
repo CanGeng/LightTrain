@@ -44,7 +44,7 @@ def _make_ctx(epoch=0):
         pass
 
     c = _Ctx()
-    c.epoch = epoch
+    c.epoch = epoch  # type: ignore[attr-defined]
     return c
 
 
@@ -61,6 +61,7 @@ def test_frozen_step_writes_lora_model_spec(tmp_path):
     out = writer.commit(reason="scheduled")
     expect_exists(out, tmp_path, what="frozen-step zip")
     # Read back the metadata.
+    assert out is not None
     with zipfile.ZipFile(out) as zf:
         meta = json.loads(zf.read("step_metadata.json"))
     spec = meta["model_spec"]
@@ -82,6 +83,7 @@ def test_frozen_step_bundle_reconstructs_lora_via_minimal(tmp_path):
     writer = FrozenStepWriter(run_dir=tmp_path)
     writer.snapshot(step=7, ctx=_make_ctx(), model=a, batch={"input_ids": ids}, optimizer=opt)
     bundle_path = writer.commit(reason="cli")
+    assert bundle_path is not None
     bundle = read_frozen_step_bundle(bundle_path)
     spec = bundle.metadata["model_spec"]
     # Rebuild via the minimal-model path. Same shape contract as M4.

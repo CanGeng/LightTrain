@@ -30,6 +30,7 @@ def test_writer_commit_creates_zip(tmp_path):
         config_resolved_yaml="mode: lab\n",
     )
     path = writer.commit(reason="scheduled")
+    assert path is not None
     expect_exists(path, tmp_path, what="frozen-step zip")
     bundle = read_frozen_step_bundle(path)
     assert bundle.step == 7

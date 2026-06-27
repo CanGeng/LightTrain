@@ -446,7 +446,7 @@ def test_pin_current_behavior_hidden_mse_ctx_without_extras_warns_degraded():
         warnings.simplefilter("always")
         out = HiddenStatesMSELoss(
             mapping={0: 0}, project=True, project_init="zeros"
-        )(mo, batch, _Ctx())
+        )(mo, batch, _Ctx())  # type: ignore[arg-type]
     degraded = [w for w in caught if "won't be auto-registered" in str(w.message)]
     assert len(degraded) == 1
     torch.testing.assert_close(out["loss"], torch.tensor(1.0), atol=1e-5, rtol=1e-4)

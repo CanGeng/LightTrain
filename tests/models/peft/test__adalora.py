@@ -28,6 +28,7 @@ is path-dependent, hence the import forcing.
 from __future__ import annotations
 
 import sys
+from typing import Any, cast
 
 import pytest
 import torch
@@ -174,7 +175,7 @@ def test_invariant_build_manual_resolves_nested_parent(no_peft):
         base=_NestedLinear(), r=4, target_modules=["block"], total_step=10
     )
     assert list(adapter._adalora_layers) == ["block.0"]
-    assert isinstance(adapter.model.block[0], AdaLoRALinear)
+    assert isinstance(cast(Any, adapter.model).block[0], AdaLoRALinear)
 
 
 def test_invariant_build_manual_skips_non_linear_and_unmatched(no_peft):

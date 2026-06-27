@@ -42,7 +42,7 @@ def test_invariant_post_init_rejects_nonpositive_seq_len(bad):
 
 def test_invariant_eos_and_pad_coerced_to_int():
     """Float ``eos_id`` / ``pad_id`` are coerced to int in __post_init__."""
-    p = SequencePacker(seq_len=4, eos_id=2.0, pad_id=1.0)
+    p = SequencePacker(seq_len=4, eos_id=2.0, pad_id=1.0)  # type: ignore[arg-type]
     assert p.eos_id == 2 and isinstance(p.eos_id, int)
     assert p.pad_id == 1 and isinstance(p.pad_id, int)
 

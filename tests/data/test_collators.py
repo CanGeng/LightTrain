@@ -27,6 +27,9 @@ Coverage:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import pytest
 import torch
 
@@ -47,7 +50,7 @@ def test_invariant_collator_right_pads_to_max_length():
     Setup: two samples of length 3 and 5.
     Expected: input_ids[0] == [t0, t1, t2, pad, pad] (closed form).
     """
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2, 3]},
         {"input_ids": [4, 5, 6, 7, 8]},
     ]
@@ -63,7 +66,7 @@ def test_invariant_attention_mask_is_one_for_real_zero_for_pad():
 
     Closed form: row 0 of length 3 in a batch padded to 5 → mask=[1,1,1,0,0].
     """
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2, 3]},
         {"input_ids": [4, 5, 6, 7, 8]},
     ]
@@ -80,7 +83,7 @@ def test_invariant_attention_mask_dtype_is_long():
     If you intentionally switch to torch.bool or torch.float, update this
     test AND verify every downstream consumer handles the new dtype.
     """
-    samples = [{"input_ids": [1, 2, 3]}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1, 2, 3]}]
     coll = CausalLMCollator(pad_id=PAD_ID, max_len=64)
     batch = coll(samples)
     assert batch["attention_mask"].dtype == torch.long
@@ -92,7 +95,7 @@ def test_invariant_input_ids_and_labels_dtype_are_long():
     Loss CE expects long-dtype labels; if dtype regresses, CE silently
     casts or raises.
     """
-    samples = [{"input_ids": [1, 2, 3]}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1, 2, 3]}]
     coll = CausalLMCollator(pad_id=PAD_ID, max_len=64)
     batch = coll(samples)
     assert batch["input_ids"].dtype == torch.long
@@ -106,7 +109,7 @@ def test_invariant_labels_minus_100_on_pad_positions_exact():
     Setup: row 0 ids=[10, 20]; max in batch 4; row 0 labels expected =
     ``[10, 20, -100, -100]``.
     """
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [10, 20]},
         {"input_ids": [30, 40, 50, 60]},
     ]
@@ -122,7 +125,7 @@ def test_collator_caps_at_max_len_truncating_long_samples():
     Setup: 1 sample of length 10, ``max_len=4``.
     Expected: ``input_ids.shape[1] == 4`` AND values are the first 4 tokens.
     """
-    samples = [{"input_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}]
     coll = CausalLMCollator(pad_id=PAD_ID, max_len=4)
     batch = coll(samples)
     assert batch["input_ids"].shape == (1, 4)
@@ -151,7 +154,7 @@ def test_collator_uses_input_ids_as_labels_when_labels_key_absent():
     Setup: sample with only ``input_ids``; verify labels equals input_ids
     on real positions.
     """
-    samples = [{"input_ids": [11, 22, 33]}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [11, 22, 33]}]
     coll = CausalLMCollator(pad_id=PAD_ID, max_len=64)
     batch = coll(samples)
     # row 0: labels[:3] == input_ids[:3] (the explicit fallback path)
@@ -167,7 +170,7 @@ def test_collator_label_ignore_value_configurable():
     Setup: ``label_ignore=-1``; sample shorter than batch max.
     Expected: pad positions in labels are -1 (not -100).
     """
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2]},
         {"input_ids": [3, 4, 5, 6]},
     ]
@@ -193,7 +196,7 @@ def test_invariant_aux_hidden_states_layers_transposed_to_L_B_T_H():
     L, T, H = 3, 2, 4
     s0 = torch.randn(L, T, H)
     s1 = torch.randn(L, T, H)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2], "aux.foo.hidden_states_layers": s0},
         {"input_ids": [3, 4], "aux.foo.hidden_states_layers": s1},
     ]
@@ -219,7 +222,7 @@ def test_invariant_aux_attentions_layers_transposed_to_L_B_H_T_T():
     L, H, T = 2, 3, 4
     s0 = torch.randn(L, H, T, T)
     s1 = torch.randn(L, H, T, T)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2], "aux.bar.attentions_layers": s0},
         {"input_ids": [3, 4], "aux.bar.attentions_layers": s1},
     ]
@@ -241,7 +244,7 @@ def test_invariant_generic_aux_2d_stacks_along_batch_dim_zero():
     """
     t0 = torch.tensor([1.0, 2.0, 3.0])
     t1 = torch.tensor([4.0, 5.0, 6.0])
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2, 3], "aux.misc.logprobs": t0},
         {"input_ids": [4, 5, 6], "aux.misc.logprobs": t1},
     ]
@@ -264,7 +267,7 @@ def test_collator_aux_with_variable_shape_silently_dropped():
     """
     s0 = torch.randn(3, 4)
     s1 = torch.randn(3, 5)  # mismatched last dim
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1], "aux.varshape": s0},
         {"input_ids": [2], "aux.varshape": s1},
     ]
@@ -281,7 +284,7 @@ def test_collator_aux_none_values_silently_skipped():
     Setup: both samples have None for the aux key.
     Expected: the key is absent from the batch.
     """
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2], "aux.maybe": None},
         {"input_ids": [3, 4], "aux.maybe": None},
     ]
@@ -296,7 +299,7 @@ def test_collator_aux_keys_sorted_in_output():
     Goal: pin determinism — downstream code can't rely on insertion order.
     """
     t = torch.tensor([1.0])
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1], "aux.zebra": t, "aux.alpha": t, "aux.middle": t},
     ]
     coll = CausalLMCollator(pad_id=PAD_ID, max_len=64)
@@ -318,7 +321,7 @@ def test_preference_collator_pads_chosen_and_rejected_independently():
     Expected: chosen.shape[1] == 5, rejected.shape[1] == 4. Each side has
     correct attention_mask + label padding.
     """
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {
             "chosen_input_ids": [1, 2, 3], "chosen_labels": [1, 2, 3],
             "rejected_input_ids": [10, 20, 30, 40],
@@ -359,7 +362,7 @@ def test_preference_collator_aux_keys_preserved():
     ``aux.ref.chosen_logprobs``.
     Expected: aux key appears in the output dict with shape (B, *).
     """
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {
             "chosen_input_ids": [1, 2], "chosen_labels": [1, 2],
             "rejected_input_ids": [3, 4], "rejected_labels": [3, 4],
@@ -433,7 +436,7 @@ def test_preference_collator_configurable_pad_id_and_ignore_index():
     ``ignore_index=-100`` → mask=[1,1,1,0,0]; input_ids[3]==99; labels[3]==-100.
     """
     coll = PreferenceCollator(pad_id=99, max_len=16, ignore_index=-100)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {
             "chosen_input_ids": [1, 2, 3], "chosen_labels": [1, 2, 3],
             "rejected_input_ids": [1, 2, 3], "rejected_labels": [1, 2, 3],
@@ -457,7 +460,7 @@ def test_preference_collator_scalar_aux_logprobs_passthrough():
     along the batch dim, not dropped. Distinct from the (B, T) token-level
     aux case already pinned in ``test_preference_collator_aux_keys_preserved``.
     """
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {
             "chosen_input_ids": [1, 2, 3], "chosen_labels": [1, 2, 3],
             "rejected_input_ids": [4, 5], "rejected_labels": [4, 5],

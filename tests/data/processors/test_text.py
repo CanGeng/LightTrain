@@ -56,7 +56,7 @@ class _FakeTokenizer:
     """
 
     def __init__(self, *, with_attention: bool = True) -> None:
-        self.chat_template = None
+        self.chat_template: str | None = None
         self.with_attention = with_attention
         self.apply_calls: list[tuple[tuple[str, ...], bool]] = []
         self.encode_calls = 0
@@ -221,8 +221,8 @@ def test_invariant_hf_init_coerces_and_stores_fields():
         model_name_or_path="org/model",
         chat_template="TMPL",
         max_len=8,
-        add_generation_prompt=1,  # truthy -> coerced to bool True
-        response_only_mask=0,  # falsy -> coerced to bool False
+        add_generation_prompt=1,  # type: ignore[arg-type]  # truthy -> coerced to bool True
+        response_only_mask=0,  # type: ignore[arg-type]  # falsy -> coerced to bool False
         label_ignore=-7,
         from_pretrained_kwargs={"revision": "main"},
     )

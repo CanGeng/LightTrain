@@ -472,7 +472,7 @@ def test_invariant_exception_inner_store_failure_logged(caplog):
     exception is caught and a warning is emitted (never re-raised) so the
     original crash can propagate normally."""
     cb = LineageRecorderCallback()
-    cb._store = _BrokenStore()
+    cb._store = _BrokenStore()  # type: ignore[assignment]
     cb._run_id = "r"
     cb._run_node_id = 1  # pretend there is a run node
 

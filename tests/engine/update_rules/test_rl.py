@@ -256,7 +256,7 @@ def test_rl_skip_path_no_backward_no_optimizer_step():
     ctx.extras["model"] = model
 
     step_spy = MagicMock(wraps=optim.step)
-    optim.step = step_spy
+    optim.step = step_spy  # type: ignore[method-assign]
 
     metrics = RLUpdateRule().step(model, {}, ctx)
 

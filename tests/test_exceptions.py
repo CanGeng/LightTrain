@@ -94,7 +94,7 @@ def test_batch_validation_error_non_string_keys_coerced_to_string():
     e = BatchValidationError(
         trainer_name="t",
         missing_keys=["m"],
-        present_keys=[123, ("a", "b")],
+        present_keys=[123, ("a", "b")],  # type: ignore[list-item]
     )
     msg = str(e)
     assert "123" in msg

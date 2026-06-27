@@ -128,6 +128,7 @@ def test_frozen_step_pointer_uses_code_snapshot_when_present(tmp_path, monkeypat
     writer = FrozenStepWriter(run_dir=tmp_path)
     writer.snapshot(step=1, ctx=_Ctx(), model=model, batch=batch, optimizer=None)
     p = writer.commit(reason="scheduled")
+    assert p is not None
     with zipfile.ZipFile(p) as zf:
         ptr = zf.read("code_snapshot_pointer.txt").decode("utf-8").strip()
     assert ptr == str(tmp_path.resolve())
@@ -136,6 +137,7 @@ def test_frozen_step_pointer_uses_code_snapshot_when_present(tmp_path, monkeypat
     capture_code_snapshot(tmp_path)
     writer.snapshot(step=2, ctx=_Ctx(), model=model, batch=batch, optimizer=None)
     p2 = writer.commit(reason="scheduled")
+    assert p2 is not None
     with zipfile.ZipFile(p2) as zf:
         ptr2 = zf.read("code_snapshot_pointer.txt").decode("utf-8").strip()
     assert ptr2 == str((tmp_path / "code.snapshot").resolve())

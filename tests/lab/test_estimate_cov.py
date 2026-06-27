@@ -19,6 +19,7 @@ Pins and exercises every reachable uncovered branch at the time of creation:
 from __future__ import annotations
 
 import warnings
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -336,7 +337,7 @@ def test_invariant_activation_estimate_d_model_fallback_256():
             return x
 
     model = _NoLinearModel()
-    cfg = {}  # minimal, no data section
+    cfg: dict[str, Any] = {}  # minimal, no data section
     tokens, act_bytes = _activation_estimate(cfg, model)
     # d_model=256, n_layers=4, batch_size=8, seq_len=128
     # act = 8 * 128 * 256 * 4 * 4 * 2 = 8*128*256*4*4*2
@@ -356,7 +357,7 @@ def test_invariant_activation_estimate_n_layers_fallback_4():
     model = _TinyLinear(in_f=8, out_f=4)
     # _TinyLinear has a Linear(8, 4) → d_model=4 (from max out_features=4)
     # No n_layers attr, no LayerNorms → n_layers=4
-    cfg = {}
+    cfg: dict[str, Any] = {}
     tokens, act_bytes = _activation_estimate(cfg, model)
     # d_model=4, n_layers=4
     expected_act = 8 * 128 * 4 * 4 * 4 * 2
@@ -369,7 +370,7 @@ def test_invariant_activation_estimate_n_layers_from_layernorm_count():
     model = _ModelWithLayerNorms()
     # Has 2 LayerNorms → n_layers=2
     # Linear(16, 4) → d_model = max(out_features) = 4
-    cfg = {}
+    cfg: dict[str, Any] = {}
     tokens, act_bytes = _activation_estimate(cfg, model)
     # d_model=4 (max out_features), n_layers=2, batch_size=8, seq_len=128
     expected_act = 8 * 128 * 4 * 4 * 2 * 2
@@ -514,10 +515,10 @@ def test_invariant_offload_estimate_mode_selection(
 def test_invariant_estimate_raises_type_error_for_non_mapping_cfg():
     """``estimate()`` raises ``TypeError`` when cfg is not a Mapping (line 312)."""
     with pytest.raises(TypeError, match="estimate: cfg must be a mapping"):
-        estimate("not a dict")
+        estimate("not a dict")  # type: ignore[arg-type]
 
     with pytest.raises(TypeError, match="estimate: cfg must be a mapping"):
-        estimate(42)
+        estimate(42)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

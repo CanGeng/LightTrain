@@ -18,6 +18,8 @@ idempotency). This file adds:
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import torch
 import torch.nn as nn
 
@@ -155,7 +157,7 @@ def test_invariant_topk_transform_returns_values_and_indices_matching_torch_topk
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
         # drive the hook by running the Identity submodule directly
-        model.core(src)
+        cast(Any, model).core(src)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -179,7 +181,7 @@ def test_invariant_slice_transform_returns_subview_exact():
     model = _model_with_identity(src)
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(src)
+        cast(Any, model).core(src)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -199,7 +201,7 @@ def test_invariant_mean_dim_transform_returns_mean_along_dim():
     model = _model_with_identity(src)
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(src)
+        cast(Any, model).core(src)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -220,7 +222,7 @@ def test_invariant_layer_transform_picks_index_along_dim_zero():
     model = _model_with_identity(src)
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(src)
+        cast(Any, model).core(src)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -236,7 +238,7 @@ def test_invariant_no_transform_passes_tensor_through_unchanged():
     model = _model_with_identity(src)
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(src)
+        cast(Any, model).core(src)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -264,7 +266,7 @@ def test_invariant_captured_tensor_is_detached_by_default():
     model = _model_with_identity(src)
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(routed)
+        cast(Any, model).core(routed)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -289,7 +291,7 @@ def test_pin_detach_false_preserves_grad_fn():
     model = _model_with_identity(src)
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(routed)
+        cast(Any, model).core(routed)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -470,7 +472,7 @@ def test_flatten_expands_extras_mapping_values_with_dotted_subkey():
     idx = torch.tensor([10, 20])
     mo = ModelOutput(
         outputs={"logits": torch.zeros(1, 4)},
-        extras={"top": {"values": vals, "indices": idx}},
+        extras={"top": {"values": vals, "indices": idx}},  # type: ignore[dict-item]
     )
     flat = flatten_model_output_tensors(mo)
     assert "top.values" in flat and "top.indices" in flat
@@ -487,7 +489,7 @@ def test_extract_extra_outputs_flattens_topk_mapping():
     mo = ModelOutput(
         outputs={"logits": torch.zeros(1, 4)},
         extras={
-            "scores": {"values": torch.tensor([5.0]), "indices": torch.tensor([2])},
+            "scores": {"values": torch.tensor([5.0]), "indices": torch.tensor([2])},  # type: ignore[dict-item]
             "plain": torch.tensor([7.0]),
         },
     )

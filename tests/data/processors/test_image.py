@@ -289,6 +289,7 @@ def test_invariant_hf_call_wraps_non_list_image_in_list(monkeypatch):
     img = _make_pil_rgb(w=8, h=8)
     proc(img)
     # Result should have the processor called with a list of 1 PIL image.
+    assert proc._processor is not None
     hf_proc: _FakeHFProcessor = proc._processor
     assert len(hf_proc.calls) == 1
     passed_images = hf_proc.calls[0]["images"]
@@ -306,6 +307,7 @@ def test_invariant_hf_call_list_input_not_double_wrapped(monkeypatch):
     proc = HFImageProcessor(model_name_or_path="m")
     imgs = [_make_pil_rgb(), _make_pil_rgb()]
     proc(imgs)
+    assert proc._processor is not None
     hf_proc: _FakeHFProcessor = proc._processor
     passed_images = hf_proc.calls[0]["images"]
     assert isinstance(passed_images, list)
@@ -321,6 +323,7 @@ def test_invariant_hf_call_passes_return_tensors_np(monkeypatch):
 
     proc = HFImageProcessor(model_name_or_path="m")
     proc(_make_pil_rgb())
+    assert proc._processor is not None
     hf_proc: _FakeHFProcessor = proc._processor
     assert hf_proc.calls[0]["return_tensors"] == "np"
 
@@ -337,6 +340,7 @@ def test_invariant_hf_call_opens_ndarray_images(monkeypatch):
     result = proc(arr)
     assert result["modality"] == "image"
     # The _open_image should have produced a PIL image passed to the HF processor.
+    assert proc._processor is not None
     hf_proc: _FakeHFProcessor = proc._processor
     pil_images = hf_proc.calls[0]["images"]
     assert all(isinstance(im, Image.Image) for im in pil_images)
@@ -364,6 +368,7 @@ def test_invariant_hf_call_tuple_input_wrapped(monkeypatch):
     proc = HFImageProcessor(model_name_or_path="m")
     imgs = (_make_pil_rgb(), _make_pil_rgb())
     proc(imgs)
+    assert proc._processor is not None
     hf_proc: _FakeHFProcessor = proc._processor
     passed_images = hf_proc.calls[0]["images"]
     # Tuple input: isinstance(images, (list, tuple)) is True → not wrapped

@@ -56,7 +56,7 @@ def test_compose_defaults_internal_interpolation(tmp_yaml):
     """
     p = tmp_yaml("base: 10\nderived: ${base}\n")
     cfg = load_config(p, validate=False)
-    assert cfg.derived == 10
+    assert cfg.derived == 10  # type: ignore[union-attr]
 
 
 def test_compose_defaults_env_interpolation(tmp_yaml, monkeypatch):
@@ -68,7 +68,7 @@ def test_compose_defaults_env_interpolation(tmp_yaml, monkeypatch):
     monkeypatch.setenv("LT_TEST_VAR", "hello")
     p = tmp_yaml("greeting: ${oc.env:LT_TEST_VAR}\n")
     cfg = load_config(p, validate=False)
-    assert cfg.greeting == "hello"
+    assert cfg.greeting == "hello"  # type: ignore[union-attr]
 
 
 def test_compose_defaults_yaml_suffix_tried_first(tmp_config_dir):

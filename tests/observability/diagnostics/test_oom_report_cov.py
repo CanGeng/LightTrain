@@ -142,7 +142,7 @@ def test_invariant_fmt_bytes_all_units(n, expected):
 
 def test_invariant_fmt_bytes_accepts_float_coercion():
     """``_fmt_bytes`` coerces its input via ``int()`` so float inputs work (line 209)."""
-    assert _fmt_bytes(1024.9) == "1.0 KiB"
+    assert _fmt_bytes(1024.9) == "1.0 KiB"  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

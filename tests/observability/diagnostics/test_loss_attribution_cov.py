@@ -288,7 +288,7 @@ def test_invariant_ctor_clamps_every_n_steps_to_at_least_one(raw, expected):
 
 def test_invariant_ctor_coerces_levels_and_on_nan():
     """``levels`` is tuple-ified and ``on_nan`` is coerced to ``bool``."""
-    cb = LossAttributionCallback(levels=["sample"], on_nan=0)
+    cb = LossAttributionCallback(levels=["sample"], on_nan=0)  # type: ignore[arg-type]
     assert cb.levels == ("sample",)
     assert cb.on_nan is False
     assert cb._run_dir is None and cb._model is None

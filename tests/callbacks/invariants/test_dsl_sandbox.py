@@ -208,7 +208,7 @@ def test_non_string_expression_raises_invariant_error():
     (line 68-69 of _dsl.py).
     """
     with pytest.raises(InvariantError, match="must be a string"):
-        evaluate_check(123)
+        evaluate_check(123)  # type: ignore[arg-type]
 
 
 def test_expression_runtime_error_wrapped_in_invariant_error():

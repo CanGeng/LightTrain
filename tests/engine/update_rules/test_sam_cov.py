@@ -181,7 +181,7 @@ def test_invariant_current_lr_normal_optimizer():
 def test_invariant_setup_returns_none():
     """SAMUpdateRule.setup() is a no-op hook that returns None (line 82)."""
     rule = SAMUpdateRule()
-    result = rule.setup(model=object(), sample=object())
+    result = rule.setup(model=object(), sample=object())  # type: ignore[func-returns-value]
     assert result is None
 
 

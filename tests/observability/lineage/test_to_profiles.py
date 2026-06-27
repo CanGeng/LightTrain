@@ -104,7 +104,7 @@ def test_cli_to_profiles_in_place(tmp_yaml):
     assert "migrated" in res.output
     cfg = load_config(p)
     assert cfg.model == "default"
-    assert cfg.model_profiles["default"]["name"] == "tiny_lm"
+    assert cfg.model_profiles["default"]["name"] == "tiny_lm"  # type: ignore[index]
 
 
 def test_cli_to_profiles_print_mode_does_not_write(tmp_yaml):

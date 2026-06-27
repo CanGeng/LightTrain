@@ -19,6 +19,9 @@ Pins / coverage targets
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import numpy as np
 import pytest
 import torch
@@ -127,7 +130,7 @@ def test_invariant_pure_text_batch_no_modality_inputs_key():
     Expected: ``"modality_inputs"`` absent from output.
     """
     coll = MultiModalCollator(pad_id=0, max_len=16)
-    samples = [{"input_ids": [1, 2, 3]}, {"input_ids": [4, 5]}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1, 2, 3]}, {"input_ids": [4, 5]}]
     out = coll(samples)
     assert "modality_inputs" not in out
     assert out["input_ids"].shape == (2, 3)
@@ -167,7 +170,7 @@ def test_invariant_image_tensor_shape_single_image_per_sample():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_images=1)
     img = np.ones((3, 4, 4), dtype=np.float32)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2], "modality_inputs": {"image": img}},
         {"input_ids": [3, 4], "modality_inputs": {"image": img}},
     ]
@@ -187,7 +190,7 @@ def test_invariant_image_4d_input_treated_as_multiple_images():
     coll = MultiModalCollator(pad_id=0, max_len=16, max_images=2)
     two_imgs = np.ones((2, 3, 4, 4), dtype=np.float32)
     one_img = np.zeros((1, 3, 4, 4), dtype=np.float32)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2], "modality_inputs": {"image": two_imgs}},
         {"input_ids": [3, 4], "modality_inputs": {"image": one_img}},
     ]
@@ -209,7 +212,7 @@ def test_invariant_max_images_caps_image_count():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_images=2)
     three_imgs = np.ones((3, 3, 4, 4), dtype=np.float32)
-    samples = [{"input_ids": [1, 2], "modality_inputs": {"image": three_imgs}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1, 2], "modality_inputs": {"image": three_imgs}}]
     out = coll(samples)
     mi = out["modality_inputs"]
     assert mi["image"].shape == (1, 2, 3, 4, 4)
@@ -225,7 +228,7 @@ def test_invariant_image_shape_mismatch_raises_value_error():
     coll = MultiModalCollator(pad_id=0, max_len=16, max_images=1)
     img_small = np.zeros((3, 4, 4), dtype=np.float32)
     img_large = np.zeros((3, 8, 8), dtype=np.float32)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2], "modality_inputs": {"image": img_small}},
         {"input_ids": [3, 4], "modality_inputs": {"image": img_large}},
     ]
@@ -237,7 +240,7 @@ def test_invariant_image_tensor_dtype_is_float32():
     """Output image tensor dtype is float32 (from np.zeros float32 init)."""
     coll = MultiModalCollator(pad_id=0, max_len=16, max_images=1)
     img = np.ones((3, 4, 4), dtype=np.float32)
-    samples = [{"input_ids": [1, 2], "modality_inputs": {"image": img}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1, 2], "modality_inputs": {"image": img}}]
     out = coll(samples)
     assert out["modality_inputs"]["image"].dtype == torch.float32
 
@@ -251,7 +254,7 @@ def test_invariant_sample_without_image_gets_zero_slot_and_zero_mask():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_images=1)
     img = np.ones((3, 4, 4), dtype=np.float32)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2], "modality_inputs": {"image": img}},
         {"input_ids": [3, 4], "modality_inputs": {}},
     ]
@@ -275,7 +278,7 @@ def test_invariant_audio_2d_input_auto_unsqueezed():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_audios=1)
     audio = np.ones((20, 50), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"audio": audio}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"audio": audio}}]
     out = coll(samples)
     mi = out["modality_inputs"]
     assert mi["audio"].shape == (1, 1, 20, 50)
@@ -294,7 +297,7 @@ def test_invariant_audio_time_axis_padded_to_max():
     coll = MultiModalCollator(pad_id=0, max_len=16, max_audios=1)
     a0 = np.ones((16, 30), dtype=np.float32)
     a1 = np.ones((16, 70), dtype=np.float32)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1], "modality_inputs": {"audio": a0}},
         {"input_ids": [2], "modality_inputs": {"audio": a1}},
     ]
@@ -310,7 +313,7 @@ def test_invariant_audio_mask_dtype_is_long():
     """``audio_mask`` tensor is dtype ``torch.long`` (int64)."""
     coll = MultiModalCollator(pad_id=0, max_len=16, max_audios=1)
     audio = np.ones((8, 20), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"audio": audio}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"audio": audio}}]
     out = coll(samples)
     assert out["modality_inputs"]["audio_mask"].dtype == torch.long
 
@@ -323,7 +326,7 @@ def test_invariant_max_audios_caps_audio_count():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_audios=2)
     three_clips = np.ones((3, 16, 50), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"audio": three_clips}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"audio": three_clips}}]
     out = coll(samples)
     mi = out["modality_inputs"]
     assert mi["audio"].shape == (1, 2, 16, 50)
@@ -335,7 +338,7 @@ def test_invariant_sample_without_audio_gets_zero_slot_and_zero_mask():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_audios=1)
     audio = np.ones((8, 20), dtype=np.float32)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1], "modality_inputs": {"audio": audio}},
         {"input_ids": [2], "modality_inputs": {}},
     ]
@@ -359,7 +362,7 @@ def test_invariant_video_4d_input_auto_unsqueezed():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_videos=1)
     vid = np.ones((8, 3, 4, 4), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"video": vid}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"video": vid}}]
     out = coll(samples)
     mi = out["modality_inputs"]
     assert mi["video"].shape == (1, 1, 8, 3, 4, 4)
@@ -376,7 +379,7 @@ def test_invariant_video_5d_input_treated_as_multiple_clips():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_videos=2)
     two_clips = np.ones((2, 8, 3, 4, 4), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"video": two_clips}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"video": two_clips}}]
     out = coll(samples)
     mi = out["modality_inputs"]
     assert mi["video"].shape == (1, 2, 8, 3, 4, 4)
@@ -391,7 +394,7 @@ def test_invariant_max_videos_caps_video_count():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_videos=1)
     three_clips = np.ones((3, 8, 3, 4, 4), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"video": three_clips}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"video": three_clips}}]
     out = coll(samples)
     mi = out["modality_inputs"]
     assert mi["video"].shape == (1, 1, 8, 3, 4, 4)
@@ -408,7 +411,7 @@ def test_invariant_video_shape_mismatch_raises_value_error():
     coll = MultiModalCollator(pad_id=0, max_len=16, max_videos=1)
     vid0 = np.ones((8, 3, 4, 4), dtype=np.float32)
     vid1 = np.ones((16, 3, 4, 4), dtype=np.float32)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1], "modality_inputs": {"video": vid0}},
         {"input_ids": [2], "modality_inputs": {"video": vid1}},
     ]
@@ -426,7 +429,7 @@ def test_invariant_video_tensor_values_and_mask():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16, max_videos=1)
     vid = np.full((8, 3, 4, 4), 0.5, dtype=np.float32)
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1], "modality_inputs": {"video": vid}},
         {"input_ids": [2], "modality_inputs": {}},
     ]
@@ -445,7 +448,7 @@ def test_invariant_video_tensor_dtype_is_float32():
     """Output video tensor dtype is float32 (from np.zeros float32 init)."""
     coll = MultiModalCollator(pad_id=0, max_len=16, max_videos=1)
     vid = np.ones((4, 3, 2, 2), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"video": vid}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"video": vid}}]
     out = coll(samples)
     assert out["modality_inputs"]["video"].dtype == torch.float32
 
@@ -454,7 +457,7 @@ def test_invariant_video_mask_dtype_is_long():
     """``video_mask`` tensor is dtype ``torch.long`` (int64)."""
     coll = MultiModalCollator(pad_id=0, max_len=16, max_videos=1)
     vid = np.ones((4, 3, 2, 2), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"video": vid}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"video": vid}}]
     out = coll(samples)
     assert out["modality_inputs"]["video_mask"].dtype == torch.long
 
@@ -478,7 +481,7 @@ def test_invariant_image_audio_video_combined_in_single_batch():
     img = np.ones((3, 4, 4), dtype=np.float32)
     aud = np.ones((16, 30), dtype=np.float32)
     vid = np.ones((8, 3, 4, 4), dtype=np.float32)
-    samples = [{
+    samples: list[Mapping[str, Any]] = [{
         "input_ids": [1, 2],
         "modality_inputs": {"image": img, "audio": aud, "video": vid},
     }]
@@ -496,7 +499,7 @@ def test_invariant_image_only_no_audio_video_keys():
     """A batch with only images does not produce audio or video keys."""
     coll = MultiModalCollator(pad_id=0, max_len=16)
     img = np.ones((3, 4, 4), dtype=np.float32)
-    samples = [{"input_ids": [1], "modality_inputs": {"image": img}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {"image": img}}]
     out = coll(samples)
     mi = out["modality_inputs"]
     assert "image" in mi
@@ -510,7 +513,7 @@ def test_invariant_text_keys_always_present_in_multimodal_batch():
     """
     coll = MultiModalCollator(pad_id=0, max_len=16)
     img = np.ones((3, 4, 4), dtype=np.float32)
-    samples = [{"input_ids": [1, 2], "modality_inputs": {"image": img}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1, 2], "modality_inputs": {"image": img}}]
     out = coll(samples)
     assert "input_ids" in out
     assert "attention_mask" in out
@@ -526,7 +529,7 @@ def test_invariant_text_keys_always_present_in_multimodal_batch():
 def test_has_modality_returns_false_when_no_modality_inputs():
     """``_has_modality`` returns False when no sample has 'modality_inputs'."""
     from lighttrain.builtin_plugins.data.collators.multimodal import _has_modality
-    samples = [{"input_ids": [1, 2]}, {"input_ids": [3, 4]}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1, 2]}, {"input_ids": [3, 4]}]
     assert _has_modality(samples) is False
 
 
@@ -535,7 +538,7 @@ def test_has_modality_returns_true_when_any_sample_has_modality_inputs():
     'modality_inputs' value.
     """
     from lighttrain.builtin_plugins.data.collators.multimodal import _has_modality
-    samples = [
+    samples: list[Mapping[str, Any]] = [
         {"input_ids": [1, 2]},
         {"input_ids": [3, 4], "modality_inputs": {"image": np.ones((3, 4, 4))}},
     ]
@@ -550,6 +553,6 @@ def test_has_modality_returns_false_when_modality_inputs_is_empty_dict():
     trigger the multimodal path.
     """
     from lighttrain.builtin_plugins.data.collators.multimodal import _has_modality
-    samples = [{"input_ids": [1], "modality_inputs": {}}]
+    samples: list[Mapping[str, Any]] = [{"input_ids": [1], "modality_inputs": {}}]
     # {} is falsy → _has_modality returns False (current behavior)
     assert _has_modality(samples) is False

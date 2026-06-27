@@ -262,7 +262,7 @@ def test_invariant_print_plan_none_console_empty_plan(capsys):
 
 def test_invariant_print_plan_none_console_returns_none(capsys):
     """print_plan(None, ...) returns None (early return, line 54)."""
-    result = print_plan(None, [])
+    result = print_plan(None, [])  # type: ignore[func-returns-value]
     assert result is None
 
 

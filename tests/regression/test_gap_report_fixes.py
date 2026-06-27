@@ -13,6 +13,7 @@ import os
 import tempfile
 import textwrap
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 import torch
@@ -51,6 +52,7 @@ def test_loss_and_objective_mutually_exclusive():
 def test_nested_objective_loss_is_accepted():
     # The recommended nested form must NOT be flagged as a conflict (TC-3).
     c = load_config(_write("mode: lab\nobjective: {name: supervised, loss: {name: my_loss}}\n"))
+    assert c.objective is not None
     assert c.objective["loss"]["name"] == "my_loss"
 
 
@@ -64,8 +66,8 @@ def test_top_level_update_rule_rejected():
 # ---------------------------------------------------------------------------
 
 def test_build_objective_sources():
-    assert _build_objective(SimpleNamespace(objective=None, loss=None)) == (None, "none")
-    obj, src = _build_objective(SimpleNamespace(objective=None, loss={"name": "cross_entropy"}))
+    assert _build_objective(SimpleNamespace(objective=None, loss=None)) == (None, "none")  # type: ignore[arg-type]
+    obj, src = _build_objective(SimpleNamespace(objective=None, loss={"name": "cross_entropy"}))  # type: ignore[arg-type]
     assert src == "loss" and isinstance(obj, LossOnlyObjective)
     # family inherited from the wrapped loss (CrossEntropyLoss.loss_family) — A1
     assert obj.loss_family == "next_token"
@@ -158,7 +160,7 @@ def test_arch_profile_resolves_rwkv_string():
 
     C.import_all_components()
     cfg = SimpleNamespace(trainer=SimpleNamespace(arch_profile="rwkv"))
-    prof = _build_arch_profile(cfg)
+    prof = _build_arch_profile(cfg)  # type: ignore[arg-type]
     assert isinstance(prof, ArchitectureProfile)
     assert prof.state_mode == "stateful" and prof.name == "rwkv"
 
@@ -169,13 +171,13 @@ def test_arch_profile_unknown_raises():
     C.import_all_components()
     cfg = SimpleNamespace(trainer=SimpleNamespace(arch_profile="nope"))
     with pytest.raises(ConfigError):
-        _build_arch_profile(cfg)
+        _build_arch_profile(cfg)  # type: ignore[arg-type]
 
 
 def test_arch_profile_object_passthrough_and_none():
     obj = ArchitectureProfile(name="x", loss_family="next_token")
-    assert _build_arch_profile(SimpleNamespace(trainer=SimpleNamespace(arch_profile=obj))) is obj
-    assert _build_arch_profile(SimpleNamespace(trainer=SimpleNamespace(arch_profile=None))) is None
+    assert _build_arch_profile(SimpleNamespace(trainer=SimpleNamespace(arch_profile=obj))) is obj  # type: ignore[arg-type]
+    assert _build_arch_profile(SimpleNamespace(trainer=SimpleNamespace(arch_profile=None))) is None  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -239,8 +241,8 @@ def test_rwkv_doc_boundary_resets_only_at_boundaries():
     n_chunks = len(ds.samples)
     assert n_chunks > n_docs  # boundaries strictly fewer than steps
 
-    loader = DataLoader(
-        ds, batch_size=1, sampler=SequentialSampler(ds),
+    loader: DataLoader[Any] = DataLoader(
+        ds, batch_size=1, sampler=SequentialSampler(ds),  # type: ignore[arg-type]
         collate_fn=CausalLMCollator(pad_id=tok.pad_id, max_len=64),
     )
     calls = {"n": 0}
@@ -285,7 +287,7 @@ def test_eval_strips_doc_boundary_before_model_forward():
 
     dm = MagicMock()
     dm.val_loader.return_value = DataLoader(
-        [{"input_ids": torch.zeros(2, dtype=torch.long),
+        [{"input_ids": torch.zeros(2, dtype=torch.long),  # type: ignore[arg-type]
           "labels": torch.zeros(2, dtype=torch.long),
           "_doc_boundary": True}],
         batch_size=1, collate_fn=lambda xs: {
@@ -348,7 +350,7 @@ def test_demo_recipe_runs(recipe, tmp_path):
             "trainer.log_every=1",
         ],
     )
-    bundle = setup_run_from_config(cfg)
+    bundle = setup_run_from_config(cfg)  # type: ignore[arg-type]
     trainer = bundle["trainer"]
     assert type(trainer.objective).__name__ == _DEMO_OBJECTIVE[recipe]
     metrics = trainer.fit()
@@ -366,7 +368,7 @@ def test_jepa_recipe_advances_target_encoder(tmp_path):
         overrides=[f"run_root={tmp_path}", "trainer.max_steps=3",
                    "trainer.ckpt_every=0", "trainer.log_every=1"],
     )
-    bundle = setup_run_from_config(cfg)
+    bundle = setup_run_from_config(cfg)  # type: ignore[arg-type]
     trainer = bundle["trainer"]
     p = next(iter(trainer.model.target_encoder.parameters()))
     before = p.detach().clone()
@@ -385,13 +387,13 @@ def test_rwkv_recipe_wires_arch_profile_object(tmp_path):
         overrides=[f"run_root={tmp_path}", "trainer.max_steps=3",
                    "trainer.ckpt_every=0", "trainer.log_every=1"],
     )
-    bundle = setup_run_from_config(cfg)
+    bundle = setup_run_from_config(cfg)  # type: ignore[arg-type]
     trainer = bundle["trainer"]
     assert isinstance(trainer.arch_profile, ArchitectureProfile)
     assert trainer.arch_profile.state_mode == "stateful"
     calls = {"n": 0}
     orig = trainer.arch_profile.reset_state_fn
-    trainer.arch_profile.reset_state_fn = lambda m: (calls.__setitem__("n", calls["n"] + 1), orig(m))[1]
+    trainer.arch_profile.reset_state_fn = lambda m: (calls.__setitem__("n", calls["n"] + 1), orig(m))[1]  # type: ignore[func-returns-value, misc]
     trainer.fit()
     assert calls["n"] >= 1  # the document-boundary reset path fired
 

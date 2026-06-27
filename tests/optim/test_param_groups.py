@@ -14,6 +14,8 @@ Layered on top of ``tests/test_optim_param_groups.py``. New coverage:
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 import torch
 
@@ -128,7 +130,7 @@ def test_invariant_frozen_params_excluded_from_all_buckets():
     """
     model = _toy_model()
     # Freeze layer 0's weight specifically
-    layer0_weight = model[0].weight
+    layer0_weight = cast(Any, model)[0].weight
     layer0_weight.requires_grad_(False)
 
     specs = [
@@ -234,6 +236,7 @@ def test_predicates_parsed_from_wrapper_param_groups_dict():
         lr=1e-3,
         param_groups=[{"pattern": r".*", "min_ndim": 2, "module_type": "Linear", "lr": 5e-4}],
     )
+    assert w.param_groups is not None
     spec = w.param_groups[0]
     assert spec.min_ndim == 2
     assert spec.module_type == "Linear"

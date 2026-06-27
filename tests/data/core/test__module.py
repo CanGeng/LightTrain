@@ -319,7 +319,7 @@ def test_invariant_seek_coerces_args_to_int():
     dm = _make_dm(sampler=sampler, batch_size=2)
     dm._train_sampler = sampler
 
-    dm.seek(epoch="1", consumed_batches="3")
+    dm.seek(epoch="1", consumed_batches="3")  # type: ignore[arg-type]
     assert sampler.seek_calls == [(1, 6)]
 
 

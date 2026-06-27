@@ -34,7 +34,7 @@ def test_cli_build_model_builds_on_both_forms(recipe):
     """#1 — cli ``_build_model`` (dry-run / produce-artifact path) builds on a
     ``model_profiles:`` recipe AND a ``models:`` set (the latter used to raise
     'recipe is missing model:/model_profiles:')."""
-    model = _build_model(load_config(recipe))
+    model = _build_model(load_config(recipe))  # type: ignore[arg-type]
     assert isinstance(model, torch.nn.Module)
     assert sum(p.numel() for p in model.parameters()) > 0
 
@@ -45,7 +45,7 @@ def test_estimate_builds_on_both_forms(recipe):
     to raise via estimate's own removed ``_build_model``)."""
     from lighttrain.lab.estimate import estimate
 
-    rpt = estimate(load_config(recipe))
+    rpt = estimate(load_config(recipe))  # type: ignore[arg-type]
     assert rpt.all_params > 0
     assert rpt.model_name
 

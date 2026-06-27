@@ -20,7 +20,7 @@ def test_string_selector_resolves_to_profile_dict():
     assert spec == {"name": "tiny_lm", "d_model": 128}
     # Returned dict is a copy — mutating it must not corrupt the profiles.
     spec["d_model"] = 999
-    assert profiles["a"]["d_model"] == 128
+    assert profiles["a"]["d_model"] == 128  # type: ignore[index]
 
 
 def test_unknown_profile_raises_with_available_list():

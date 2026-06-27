@@ -158,7 +158,7 @@ def test_invariant_device_argument_moves_input_ids():
 
 def test_invariant_name_is_coerced_to_str():
     """A non-str ``name`` is coerced (used as ``task_name`` and node name)."""
-    task = GenerationEvalTask(_StubJudge(), _StubTokenizer(), ["p0"], name=123)
+    task = GenerationEvalTask(_StubJudge(), _StubTokenizer(), ["p0"], name=123)  # type: ignore[arg-type]
     assert task.name == "123"
     assert task.run(_StubModel())["task_name"] == "123"
 
@@ -260,7 +260,7 @@ def test_invariant_lineage_write_failure_is_swallowed():
 
     task = GenerationEvalTask(
         _StubJudge(scores=[0.5]), _StubTokenizer(), ["p0"],
-        lineage_store=_BoomStore(), artifact_id=1,  # int → goes straight to upsert_node
+        lineage_store=_BoomStore(), artifact_id=1,  # type: ignore[arg-type]  # int → goes straight to upsert_node
     )
     out = task.run(_StubModel())
     assert out["mean_score"] == 0.5  # results returned despite lineage failure
@@ -270,4 +270,4 @@ def test_invariant_write_lineage_edge_defensive_return_when_store_none():
     """Directly calling ``_write_lineage_edge`` with no store returns early
     (defensive guard not reachable through ``run``)."""
     task = GenerationEvalTask(_StubJudge(), _StubTokenizer(), ["p0"], lineage_store=None)
-    assert task._write_lineage_edge(0.5, 1) is None
+    assert task._write_lineage_edge(0.5, 1) is None  # type: ignore[func-returns-value]

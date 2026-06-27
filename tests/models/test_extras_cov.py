@@ -13,6 +13,8 @@ Targets the lines NOT reached by ``tests/models/test_extras.py``:
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import torch
 import torch.nn as nn
 
@@ -118,7 +120,7 @@ def test_pin_current_behavior_unknown_transform_key_returns_tensor_unchanged():
     model = _wrap(_Identity())
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(src)
+        cast(Any, model).core(src)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -144,7 +146,7 @@ def test_invariant_hook_unpacks_tuple_output_and_captures_first_element():
     spec = ExtraOutputSpec(name="t", source="core")
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(src)
+        cast(Any, model).core(src)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -170,7 +172,7 @@ def test_invariant_hook_skips_non_tensor_output_leaving_cache_empty():
     spec = ExtraOutputSpec(name="nt", source="core")
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(torch.zeros(1, 3))
+        cast(Any, model).core(torch.zeros(1, 3))
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -192,7 +194,7 @@ def test_invariant_hook_skips_non_tensor_input_side_leaving_cache_empty():
     spec = ExtraOutputSpec(name="ni", source="core.input")
     mgr = ExtrasHookManager(model, [spec]).attach()
     try:
-        model.core(42)
+        cast(Any, model).core(42)
         captured = mgr.collect()
     finally:
         mgr.detach()
@@ -256,7 +258,7 @@ def test_pin_current_behavior_extract_extra_outputs_with_specs_arg_returns_same_
     mo = ModelOutput(
         outputs={"logits": torch.zeros(1, 4)},
         extras={
-            "top": {"values": vals, "indices": idx},
+            "top": {"values": vals, "indices": idx},  # type: ignore[dict-item]
             "plain": torch.tensor([7.0]),
         },
     )
@@ -342,7 +344,7 @@ def test_invariant_flatten_skips_non_tensor_items_in_attentions():
     """
     a0 = torch.ones(1, 2, 4)
     a1 = torch.ones(1, 2, 4) * 2.0
-    mo = ModelOutput(outputs={}, attentions=(a0, "garbage", a1))
+    mo = ModelOutput(outputs={}, attentions=(a0, "garbage", a1))  # type: ignore[arg-type]
     flat = flatten_model_output_tensors(mo)
     assert flat["attentions_layers"].shape[0] == 2
 
@@ -351,7 +353,7 @@ def test_invariant_flatten_omits_attentions_key_when_all_non_tensor():
     """If every element in ``attentions`` is a non-tensor, ``ats`` is empty
     so ``if ats:`` is False and ``"attentions_layers"`` is not emitted.
     """
-    mo = ModelOutput(outputs={}, attentions=("a", "b"))
+    mo = ModelOutput(outputs={}, attentions=("a", "b"))  # type: ignore[arg-type]
     flat = flatten_model_output_tensors(mo)
     assert "attentions_layers" not in flat
 

@@ -13,7 +13,7 @@ re-derived from epoch when no signal is available).
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sized
+from collections.abc import Iterator, Sized
 from typing import Any
 
 from .length_grouped import _materialize_lengths
@@ -68,7 +68,7 @@ class CurriculumSampler:
             return 0.0, max(self.p_start, min(1.0, hi))
         raise ValueError(f"unknown curriculum schedule: {self.schedule!r}")
 
-    def __iter__(self) -> Iterable[int]:
+    def __iter__(self) -> Iterator[int]:
         lo, hi = self._band()
         n = self._n
         i_lo = max(0, int(lo * n))

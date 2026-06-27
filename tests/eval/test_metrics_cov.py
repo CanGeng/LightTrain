@@ -327,7 +327,7 @@ def test_invariant_lm_eval_harness_hook_import_error():
     lm_eval is not installed (lines 275-278)."""
     # Temporarily make `lm_eval` unimportable
     original = sys.modules.get("lm_eval", None)
-    sys.modules["lm_eval"] = None
+    sys.modules["lm_eval"] = None  # type: ignore[assignment]
     try:
         with pytest.raises(ImportError, match="lm-eval"):
             lm_eval_harness_hook("hellaswag", model=None, tokenizer=None)
@@ -347,7 +347,7 @@ def test_invariant_lm_eval_harness_hook_returns_task_results():
     per-task result dict (lines 283-289)."""
     fake_lm_eval = types.ModuleType("lm_eval")
     task_result = {"acc": 0.75, "acc_stderr": 0.01}
-    fake_lm_eval.simple_evaluate = MagicMock(
+    fake_lm_eval.simple_evaluate = MagicMock(  # type: ignore[attr-defined]
         return_value={"results": {"hellaswag": task_result}}
     )
 
@@ -377,7 +377,7 @@ def test_invariant_lm_eval_harness_hook_missing_task_key_returns_empty():
     """If the task name is absent from results, hook returns {} (line 289
     .get(task_name, {}))."""
     fake_lm_eval = types.ModuleType("lm_eval")
-    fake_lm_eval.simple_evaluate = MagicMock(
+    fake_lm_eval.simple_evaluate = MagicMock(  # type: ignore[attr-defined]
         return_value={"results": {}}  # task key absent
     )
 
@@ -400,7 +400,7 @@ def test_invariant_lm_eval_harness_hook_missing_results_key_returns_empty():
     """If simple_evaluate returns a dict without 'results', hook returns {}
     (lines 288-289: .get('results', {}))."""
     fake_lm_eval = types.ModuleType("lm_eval")
-    fake_lm_eval.simple_evaluate = MagicMock(
+    fake_lm_eval.simple_evaluate = MagicMock(  # type: ignore[attr-defined]
         return_value={}  # no 'results' key at all
     )
 

@@ -126,8 +126,8 @@ def test_sam_two_passes_fire_perturb_then_restore_then_optimizer_step():
         ordered.append("restore")
         return real_restore(model, perts)
 
-    rule._compute_perturbation = _spy_perturb
-    rule._restore = _spy_restore
+    rule._compute_perturbation = _spy_perturb  # type: ignore[method-assign]
+    rule._restore = _spy_restore  # type: ignore[method-assign]
 
     # Track forward and optimizer.step
     ctx, model, optim = _build_ctx()
@@ -216,7 +216,7 @@ def test_sam_accumulation_boundary_skips_perturbation():
     rule = SAMUpdateRule(rho=0.05, accumulate_grad_batches=2)
 
     compute_called = [0]
-    rule._compute_perturbation = lambda m: (compute_called.__setitem__(0, compute_called[0] + 1) or [])
+    rule._compute_perturbation = lambda m: (compute_called.__setitem__(0, compute_called[0] + 1) or [])  # type: ignore[method-assign, assignment]
 
     ctx, model, optim = _build_ctx()
     fwd_count = [0]

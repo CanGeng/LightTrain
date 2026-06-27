@@ -8,6 +8,8 @@ The bit-identity of the defaults is guarded by the existing golden tests
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 import torch
 import torch.nn as nn
@@ -142,7 +144,7 @@ def test_f2_pairwise_adapter_is_deferred_seam_open_not_implemented():
 def test_f3_rm_grad_clip_knob():
     from lighttrain.builtin_plugins.trainers.rm import RewardModelTrainer
     m = _TinyLM()
-    base = dict(engine=_FakeEngine(), data_module=_FakeDM(),
+    base: dict[str, Any] = dict(engine=_FakeEngine(), data_module=_FakeDM(),
                 optimizer=torch.optim.SGD(m.parameters(), lr=1e-2), model=m, max_steps=1)
     # default is now 1.0 (matches ppo/grpo/preference); legacy no-clip via 0.0
     assert RewardModelTrainer(**base).grad_clip == 1.0

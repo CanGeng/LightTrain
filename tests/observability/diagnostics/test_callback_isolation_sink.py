@@ -356,6 +356,7 @@ def test_write_callback_report_includes_quarantined_list(tmp_path):
         bus.dispatch("on_step_end", step=s)
 
     out = write_callback_report(tmp_path, bus=bus)
+    assert out is not None
     body = out.read_text(encoding="utf-8")
     # Header mentions Currently quarantined: _Boomer
     quarantined_line = [ln for ln in body.splitlines() if "Currently quarantined" in ln][0]
@@ -375,6 +376,7 @@ def test_write_callback_report_tolerates_malformed_lines(tmp_path):
         encoding="utf-8",
     )
     out = write_callback_report(tmp_path)
+    assert out is not None
     body = out.read_text(encoding="utf-8")
     # The valid entries are reported; the malformed line is silently dropped.
     assert "X" in body and "Y" in body
@@ -392,6 +394,7 @@ def test_write_callback_report_omits_last_failures_section_when_empty(tmp_path):
     (tmp_path / "diagnostics" / "callback_failures.jsonl").write_text("", encoding="utf-8")
 
     out = write_callback_report(tmp_path)
+    assert out is not None
     body = out.read_text(encoding="utf-8")
     assert "Last 5 failures" not in body
     assert "Total isolated failures: **0**" in body
@@ -412,6 +415,7 @@ def test_write_callback_report_includes_last_5_when_present(tmp_path):
         bus.dispatch("on_step_end", step=i)
 
     out = write_callback_report(tmp_path, bus=bus)
+    assert out is not None
     body = out.read_text(encoding="utf-8")
     assert "Last 5 failures" in body
     # Count lines under the "Last 5 failures" section
@@ -429,8 +433,10 @@ def test_write_callback_report_idempotent_regenerates(tmp_path):
     sink.on_train_start(trainer=_Trainer(tmp_path, bus))
     bus.dispatch("on_step_end", step=1)
     out1 = write_callback_report(tmp_path)
+    assert out1 is not None
     body1 = out1.read_text(encoding="utf-8")
     out2 = write_callback_report(tmp_path)
+    assert out2 is not None
     body2 = out2.read_text(encoding="utf-8")
     # bodies are functionally equivalent (totals match); we don't compare
     # byte-for-byte because the failure count is the same in both runs.

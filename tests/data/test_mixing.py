@@ -212,7 +212,7 @@ def test_invariant_mixed_dataset_materializes_len_and_getitem():
 def test_invariant_mixed_dataset_getitem_coerces_float_index_to_int():
     """``__getitem__`` coerces its index to int (``self._rows[int(idx)]``)."""
     ds = MixedDataset([_src("a1", "a2")], strategy="round_robin")
-    assert ds[1.0] == {"id": "a2"}
+    assert ds[1.0] == {"id": "a2"}  # type: ignore[index]
 
 
 def test_invariant_mixed_dataset_accepts_generator_sources():
