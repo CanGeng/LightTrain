@@ -1,0 +1,87 @@
+# Fine-tune GPT-2 on Tiny Shakespeare (BPE tokenization).
+#
+# Equivalent to nanoGPT's config/finetune_shakespeare.py
+# Loads OpenAI GPT-2 weights, then fine-tunes on Shakespeare for ~20 steps.
+#
+# First prepare the data (BPE, not char-level):
+#   python examples/nanoGPT/data/shakespeare/prepare.py
+#
+#   lighttrain train -c examples/nanoGPT/configs/finetune_shakespeare.yaml
+
+user_modules:
+  - examples/nanoGPT/model.py
+  - examples/nanoGPT/components.py
+
+mode: lab
+seed: 1337
+exp: nanogpt_finetune_shakespeare
+run_root: runs
+
+model: default
+model_profiles:
+  default:
+    name: nano_gpt
+    block_size: 1024
+    vocab_size: 50257
+    n_layer: 12
+    n_head: 12
+    n_embd: 768
+    dropout: 0.1
+    bias: true
+    pretrained: gpt2    # load OpenAI GPT-2 weights before fine-tuning
+
+data:
+  name: simple
+  dataset:
+    name: memmap_bin
+    path: examples/nanoGPT/data/shakespeare/train.bin
+    block_size: 1024
+  val_dataset:
+    name: memmap_bin
+    path: examples/nanoGPT/data/shakespeare/val.bin
+    block_size: 1024
+  tokenizer:
+    name: byte
+  collator:
+    name: stack_xy
+  sampler:
+    name: shuffle
+    seed: ${seed}
+  batch_size: 1
+  num_workers: 0
+
+loss:
+  name: cross_entropy
+
+optim:
+  name: adamw
+  lr: 3.0e-5
+  betas: [0.9, 0.95]
+  weight_decay: 0.1
+
+scheduler:
+  name: warmup_cosine
+  warmup_steps: 2
+  total_steps: ${trainer.max_steps}
+  min_lr_ratio: 0.333
+
+engine:
+  name: standard
+  mixed_precision: bf16
+
+trainer:
+  name: pretrain
+  max_steps: 20
+  val_every: 5
+  ckpt_every: 20
+  log_every: 1
+  grad_clip: 1.0
+  accumulate: 5
+
+callbacks:
+  - { name: throughput, window: 10 }
+  - { name: best_ckpt, monitor: val/loss, mode: min }
+
+logger:
+  - { name: console, log_every: 1 }
+  - { name: jsonl }
