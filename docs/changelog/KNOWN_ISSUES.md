@@ -8,11 +8,12 @@
 
 ## 开放（Open）
 
-### B2 — `check_untyped_defs` 仅生产代码已纳入，tests/ 余量待清
-`[tool.mypy]` 已于 **v0.5.1 启用 `check_untyped_defs=true`**，整个 `lighttrain/` 生产代码 0 新错;但 `tests/` 仍有约 358 个未注解函数体错，经 `[[tool.mypy.overrides]] module=["tests.*"] check_untyped_defs=false` 收缩 opt-out 暂避。
-**状态：开放**（下一个 ratchet 目标 = 逐测试模块清，清完即删 `tests.*` opt-out；估 5-7 个分批 PR）
+_（空）—— 截至 v0.5.2,历次 changelog 审计的所有开放问题均已解决或勾销。新发现的问题登记于此。_
 
 ## 已解决 / 已勾销（Resolved / Dismissed）
+
+### B2 — `check_untyped_defs` 未启用 / tests/ 余量未清
+✅ 已解决 → v0.5.1（生产）+ v0.5.2（tests/）（见 [v0.5.2](v0/v0.5/v0.5.2.md)）：v0.5.1 启用 `check_untyped_defs=true` 覆盖 `lighttrain/`;v0.5.2 注解优先清空 `tests/` 的 358 个未注解 body 错并删除 `tests.*` opt-out,check_untyped_defs 现覆盖整个仓库。
 
 ### B1 — mypy `ignore_errors` 隔离区未清空
 ✅ 已解决 → v0.5.1（见 [v0.5.1](v0/v0.5/v0.5.1.md)）：建 CPU-torch parity venv 复现 CI 视角后，torch-stub 批 + 中难批一次真修到零，删除整个 `ignore_errors` 隔离块（12 → 0，env-invariant 双绿）。
