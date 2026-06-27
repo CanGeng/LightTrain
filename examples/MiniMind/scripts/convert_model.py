@@ -1,15 +1,23 @@
-import os
-import sys
 import json
+import os
+import pathlib as _pl
+import sys as _sys
 
-import sys as _sys, pathlib as _pl
 _sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1]))
+import warnings
+
 import torch
 import transformers
-import warnings
-from transformers import AutoTokenizer, AutoModelForCausalLM, Qwen3Config, Qwen3ForCausalLM, Qwen3MoeConfig, Qwen3MoeForCausalLM
-from model.model_minimind import MiniMindConfig, MiniMindForCausalLM
 from model.model_lora import apply_lora, merge_lora
+from model.model_minimind import MiniMindConfig, MiniMindForCausalLM
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    Qwen3Config,
+    Qwen3ForCausalLM,
+    Qwen3MoeConfig,
+    Qwen3MoeForCausalLM,
+)
 
 warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -29,9 +37,11 @@ def convert_torch2transformers_minimind(torch_path, transformers_path, dtype=tor
     # ======= transformers-5.0的兼容低版本写法 =======
     if int(transformers.__version__.split('.')[0]) >= 5:
         tokenizer_config_path, config_path = os.path.join(transformers_path, "tokenizer_config.json"), os.path.join(transformers_path, "config.json")
-        json.dump({**json.load(open(tokenizer_config_path, 'r', encoding='utf-8')), "tokenizer_class": "PreTrainedTokenizerFast", "extra_special_tokens": {}}, open(tokenizer_config_path, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
-        config = json.load(open(config_path, 'r', encoding='utf-8'))
-        config['rope_theta'] = lm_config.rope_theta; config['rope_scaling'] = None; del config['rope_parameters']
+        json.dump({**json.load(open(tokenizer_config_path, encoding='utf-8')), "tokenizer_class": "PreTrainedTokenizerFast", "extra_special_tokens": {}}, open(tokenizer_config_path, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
+        config = json.load(open(config_path, encoding='utf-8'))
+        config['rope_theta'] = lm_config.rope_theta
+        config['rope_scaling'] = None
+        del config['rope_parameters']
         json.dump(config, open(config_path, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
     print(f"模型已保存为 Transformers-MiniMind 格式: {transformers_path}")
 
@@ -55,8 +65,8 @@ def convert_torch2transformers(torch_path, transformers_path, dtype=torch.float1
     }
     if not lm_config.use_moe:
         qwen_config = Qwen3Config(
-            **common_config, 
-            use_sliding_window=False, 
+            **common_config,
+            use_sliding_window=False,
             sliding_window=None
         )
         qwen_model = Qwen3ForCausalLM(qwen_config)
@@ -72,8 +82,8 @@ def convert_torch2transformers(torch_path, transformers_path, dtype=torch.float1
         # ======= transformers-5.0的兼容低版本写法 =======
         if int(transformers.__version__.split('.')[0]) >= 5:
             new_sd = {k: v for k, v in state_dict.items() if 'experts.' not in k or 'gate.weight' in k}
-            for l in range(lm_config.num_hidden_layers):
-                p = f'model.layers.{l}.mlp.experts'
+            for layer in range(lm_config.num_hidden_layers):
+                p = f'model.layers.{layer}.mlp.experts'
                 new_sd[f'{p}.gate_up_proj'] = torch.cat([torch.stack([state_dict[f'{p}.{e}.gate_proj.weight'] for e in range(lm_config.num_experts)]), torch.stack([state_dict[f'{p}.{e}.up_proj.weight'] for e in range(lm_config.num_experts)])], dim=1)
                 new_sd[f'{p}.down_proj'] = torch.stack([state_dict[f'{p}.{e}.down_proj.weight'] for e in range(lm_config.num_experts)])
             state_dict = new_sd
@@ -89,9 +99,11 @@ def convert_torch2transformers(torch_path, transformers_path, dtype=torch.float1
     # ======= transformers-5.0的兼容低版本写法 =======
     if int(transformers.__version__.split('.')[0]) >= 5:
         tokenizer_config_path, config_path = os.path.join(transformers_path, "tokenizer_config.json"), os.path.join(transformers_path, "config.json")
-        json.dump({**json.load(open(tokenizer_config_path, 'r', encoding='utf-8')), "tokenizer_class": "PreTrainedTokenizerFast", "extra_special_tokens": {}}, open(tokenizer_config_path, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
-        config = json.load(open(config_path, 'r', encoding='utf-8'))
-        config['rope_theta'] = lm_config.rope_theta; config['rope_scaling'] = None; del config['rope_parameters']
+        json.dump({**json.load(open(tokenizer_config_path, encoding='utf-8')), "tokenizer_class": "PreTrainedTokenizerFast", "extra_special_tokens": {}}, open(tokenizer_config_path, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
+        config = json.load(open(config_path, encoding='utf-8'))
+        config['rope_theta'] = lm_config.rope_theta
+        config['rope_scaling'] = None
+        del config['rope_parameters']
         json.dump(config, open(config_path, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
     print(f"模型已保存为 Transformers 格式: {transformers_path}")
 
@@ -113,15 +125,18 @@ def convert_merge_base_lora(base_torch_path, lora_path, merged_torch_path):
 
 
 def convert_jinja_to_json(jinja_path):
-    with open(jinja_path, 'r') as f: template = f.read()
+    with open(jinja_path) as f:
+        template = f.read()
     escaped = json.dumps(template)
     print(f'"chat_template": {escaped}')
 
 
 def convert_json_to_jinja(json_file_path, output_path):
-    with open(json_file_path, 'r') as f: config = json.load(f)
+    with open(json_file_path) as f:
+        config = json.load(f)
     template = config['chat_template']
-    with open(output_path, 'w') as f: f.write(template)
+    with open(output_path, 'w') as f:
+        f.write(template)
     print(f"模板已保存为 jinja 文件: {output_path}")
 
 

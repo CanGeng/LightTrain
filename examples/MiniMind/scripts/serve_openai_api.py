@@ -1,24 +1,23 @@
 import argparse
 import json
+import pathlib as _pl
 import re
-import os
-import sys
+import sys as _sys
 
-import sys as _sys, pathlib as _pl
 _sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1]))
 import time
-import torch
 import warnings
-import uvicorn
-
-from threading import Thread
 from queue import Queue
+from threading import Thread
+
+import torch
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
-from model.model_minimind import MiniMindConfig, MiniMindForCausalLM
 from model.model_lora import apply_lora, load_lora
+from model.model_minimind import MiniMindConfig, MiniMindForCausalLM
+from pydantic import BaseModel
+from transformers import AutoModelForCausalLM, AutoTokenizer, TextStreamer
 
 warnings.filterwarnings('ignore')
 
@@ -57,7 +56,7 @@ class ChatRequest(BaseModel):
     tools: list = []
     open_thinking: bool = False
     chat_template_kwargs: dict = None
-    
+
     def get_open_thinking(self) -> bool:
         """兼容多种方式开启 thinking"""
         if self.open_thinking:
@@ -95,7 +94,7 @@ def parse_response(text):
         try:
             call = json.loads(m.strip())
             tool_calls.append({"id": f"call_{int(time.time())}_{i}", "type": "function", "function": {"name": call.get("name", ""), "arguments": json.dumps(call.get("arguments", {}), ensure_ascii=False)}})
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     if tool_calls:
         text = re.sub(r'<tool_call>.*?</tool_call>', '', text, flags=re.DOTALL)
@@ -164,7 +163,7 @@ def generate_stream_response(messages, temperature, top_p, max_tokens, tools=Non
             yield json.dumps({"choices": [{"delta": {"tool_calls": tool_calls}}]}, ensure_ascii=False)
         yield json.dumps({"choices": [{"delta": {}, "finish_reason": "tool_calls" if tool_calls else "stop"}]}, ensure_ascii=False)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         yield json.dumps({"error": str(e)})
 
 
@@ -223,8 +222,8 @@ async def chat_completions(request: ChatRequest):
                     }
                 ]
             }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":

@@ -1,12 +1,12 @@
-import random
-import re
 import json
 import os
+import random
+import re
 from threading import Thread
 
-import torch
 import numpy as np
 import streamlit as st
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 
 st.set_page_config(page_title="MiniMind", initial_sidebar_state="collapsed")
@@ -39,7 +39,7 @@ st.markdown("""
         .stApp > div:last-child {
             margin-bottom: -35px !important;
         }
-        
+
         /* 重置按钮基础样式 */
         .stButton > button {
             all: unset !important;  /* 重置所有默认样式 */
@@ -127,7 +127,6 @@ def execute_tool(tool_name, args):
         if tool_name == 'calculate_math':
             return {"result": eval(args.get('expression', '0'))}
         elif tool_name == 'get_current_time':
-            tz = args.get('timezone', 'Asia/Shanghai')
             return {"result": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         elif tool_name == 'random_number':
             return {"result": random.randint(args.get('min', 0), args.get('max', 100))}
@@ -140,9 +139,9 @@ def execute_tool(tool_name, args):
         elif tool_name == 'get_exchange_rate':
             return {"result": f"1 {args.get('from_currency', 'USD')} = 7.2 {args.get('to_currency', 'CNY')}"}
         elif tool_name == 'translate_text':
-            return {"result": f"[翻译结果]: hello world"}
+            return {"result": "[翻译结果]: hello world"}
         return {"result": "Unknown tool"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"error": str(e)}
 
 
@@ -155,10 +154,10 @@ def process_assistant_content(content, is_streaming=False):
                 name = tc.get('name', 'unknown')
                 args = tc.get('arguments', {})
                 return f'<div style="background: rgba(80, 110, 150, 0.20); border: 1px solid rgba(140, 170, 210, 0.30); padding: 10px 12px; border-radius: 12px; margin: 6px 0;"><div style="font-size:12px;opacity:.75;display:block;margin:0 0 6px 0;line-height:1;">ToolCalling</div><div><b>{name}</b>: {json.dumps(args, ensure_ascii=False)}</div></div>'
-            except:
+            except Exception:  # noqa: BLE001
                 return match.group(0)
         content = re.sub(r'<tool_call>(.*?)</tool_call>', format_tool_call, content, flags=re.DOTALL)
-    
+
     # 流式生成且开启思考时，一开始就放到折叠里
     if is_streaming and st.session_state.get('enable_thinking', False) and '</think>' not in content and '<think>' not in content:
         m = re.search(r'(\n\n(?:我是|您好|你好)[^\n]*)', content)
@@ -216,7 +215,7 @@ def clear_chat_messages():
 
 def init_chat_messages():
     if "messages" in st.session_state:
-        for i, message in enumerate(st.session_state.messages):
+        for _i, message in enumerate(st.session_state.messages):
             if message["role"] == "assistant":
                 st.markdown(process_assistant_content(message["content"]), unsafe_allow_html=True)
             else:
@@ -318,7 +317,7 @@ def main():
 
     messages = st.session_state.messages
 
-    for i, message in enumerate(messages):
+    for _i, message in enumerate(messages):
         if message["role"] == "assistant":
             st.markdown(process_assistant_content(message["content"]), unsafe_allow_html=True)
         else:
@@ -330,7 +329,6 @@ def main():
 
     if hasattr(st.session_state, 'regenerate') and st.session_state.regenerate:
         prompt = st.session_state.last_user_message
-        regenerate_index = st.session_state.regenerate_index
         delattr(st.session_state, 'regenerate')
         delattr(st.session_state, 'last_user_message')
         delattr(st.session_state, 'regenerate_index')
@@ -393,7 +391,7 @@ def main():
                     result = execute_tool(tc.get('name', ''), tc.get('arguments', {}))
                     st.session_state.chat_messages.append({"role": "tool", "content": json.dumps(result, ensure_ascii=False)})
                     tool_results.append(f'<div style="background: rgba(90, 130, 110, 0.20); border: 1px solid rgba(150, 200, 170, 0.30); padding: 10px 12px; border-radius: 12px; margin: 6px 0;"><div style="font-size:12px;opacity:.75;display:block;margin:0 0 6px 0;line-height:1;">ToolCalled</div><div><b>{tc.get("name", "")}</b>: {json.dumps(result, ensure_ascii=False)}</div></div>')
-                except:
+                except Exception:  # noqa: BLE001
                     pass
             full_answer += "\n" + "\n".join(tool_results) + "\n"
             placeholder.markdown(process_assistant_content(full_answer, is_streaming=True), unsafe_allow_html=True)

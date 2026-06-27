@@ -1,17 +1,21 @@
-import sys as _sys, pathlib as _pl
+import pathlib as _pl
+import sys as _sys
+
 _sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1]))
-import re
-import json
-import time
-import random
 import argparse
+import json
+import random
+import re
+import time
 import warnings
-import torch
 from datetime import datetime
-from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
-from openai import OpenAI
+
+import torch
 from model.model_minimind import MiniMindConfig, MiniMindForCausalLM
-from trainer.trainer_utils import setup_seed, get_model_params
+from openai import OpenAI
+from trainer.trainer_utils import get_model_params, setup_seed
+from transformers import AutoModelForCausalLM, AutoTokenizer, TextStreamer
+
 warnings.filterwarnings('ignore')
 
 TOOLS = [
@@ -72,7 +76,7 @@ def parse_tool_calls(text):
     for m in matches:
         try:
             calls.append(json.loads(m.strip()))
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     return calls
 
@@ -90,7 +94,7 @@ def parse_tool_call_from_text(content):
                 "id": f"call_{i}",
                 "function": {"name": data.get("name", ""), "arguments": json.dumps(data.get("arguments", {}), ensure_ascii=False)}
             })
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     return tool_calls if tool_calls else None
 
@@ -100,14 +104,14 @@ def execute_tool(call, arguments=None):
     try:
         raw_args = call.get("arguments", {}) if isinstance(call, dict) else arguments
         args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-    except Exception:
+    except Exception:  # noqa: BLE001
         args = {}
     fn = MOCK_RESULTS.get(name)
     if not fn:
         return {"error": f"未知工具: {name}"}
     try:
         return fn(args)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"error": f"工具执行失败: {str(e)[:80]}"}
 
 
@@ -219,14 +223,17 @@ def main():
     args = parser.parse_args()
 
     model = tokenizer = client = None
-    if args.backend == 'local': model, tokenizer = init_model(args)
-    else: client = OpenAI(api_key=args.api_key, base_url=args.api_base_url)
+    if args.backend == 'local':
+        model, tokenizer = init_model(args)
+    else:
+        client = OpenAI(api_key=args.api_key, base_url=args.api_base_url)
 
     input_mode = int(input('[0] 自动测试\n[1] 手动输入\n'))
 
     cases = [{"prompt": case["prompt"], "tools": get_tools(case["tools"]), "tool_names": case["tools"]} for case in TEST_CASES] if input_mode == 0 else iter(lambda: {"prompt": input('💬: '), "tools": TOOLS, "tool_names": [t["function"]["name"] for t in TOOLS]}, {"prompt": "", "tools": TOOLS, "tool_names": []})
     for case in cases:
-        if not case["prompt"]: break
+        if not case["prompt"]:
+            break
         setup_seed(random.randint(0, 31415926))
         if input_mode == 0:
             print(f'📦 可用工具: {case["tool_names"]}\n')
