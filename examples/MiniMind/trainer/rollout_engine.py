@@ -1,3 +1,6 @@
+# Copyright (c) jingyaogong (https://github.com/jingyaogong/minimind)
+# SPDX-License-Identifier: Apache-2.0
+# Verbatim copy from MiniMind; see LICENSE in this directory.
 # ruff: noqa
 """
 # 如果使用sglang加速，需通过以下命令首先启动（transformers格式）模型：
