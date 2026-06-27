@@ -137,11 +137,11 @@ def export_cmd(
 
       # Export as HuggingFace model directory (requires --config)
       lighttrain export --to hf --ckpt runs/exp/run_001/checkpoints/step_500 \\
-                        --config recipes/pretrain_causal.yaml --out hf_model/
+                        --config examples/references/recipes/pretrain_causal.yaml --out hf_model/
 
       # Export as GGUF (requires llama.cpp convert script on PATH)
       lighttrain export --to gguf --ckpt runs/exp/run_001/checkpoints/step_500 \\
-                        --config recipes/pretrain_causal.yaml --out model.gguf
+                        --config examples/references/recipes/pretrain_causal.yaml --out model.gguf
     """
     import torch
 

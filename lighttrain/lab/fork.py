@@ -9,7 +9,7 @@ Typical workflow::
     from lighttrain.lab.fork import fork
     from lighttrain.config import load_config
 
-    cfg = load_config("recipes/pretrain_causal.yaml", ["++optim.lr=1e-4"])
+    cfg = load_config("examples/references/recipes/pretrain_causal.yaml", ["++optim.lr=1e-4"])
     report = fork(Path("runs/my_exp/run_001/checkpoints/step_1000"), cfg)
     # → runs/my_fork_exp/20250524-…/
     #   fork_meta.json  ← parent provenance

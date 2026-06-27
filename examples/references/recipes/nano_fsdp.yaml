@@ -1,0 +1,62 @@
+# nano_fsdp.yaml — real-GPU FSDP (ZeRO-3) smoke on the tiny_lm model.
+# Same model/data as nano_model.yaml but FSDP FULL_SHARD over NCCL instead of CPU-gloo DDP.
+# Launch: torchrun --nproc_per_node=4 -m lighttrain.cli train -c examples/references/recipes/nano_fsdp.yaml
+
+parallel:
+  backend: nccl
+  dp: 4
+  grad_sync:
+    name: fsdp
+    sharding_strategy: FULL_SHARD
+    mixed_precision_policy: bf16
+    state_dict_type: full
+
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 256
+    d_model: 64
+    n_layers: 2
+    n_heads: 4
+    max_seq_len: 32
+
+data:
+  name: simple
+  dataset:
+    name: line_file_text
+    path: tests/fixtures/tiny_corpus.txt
+    max_len: 32
+  tokenizer:
+    name: byte
+  collator:
+    name: causal_lm
+    max_len: 32
+  sampler:
+    name: shuffle
+    seed: 42
+  batch_size: 8
+  num_workers: 0
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  weight_decay: 0.01
+
+loss:
+  name: cross_entropy
+
+logger:
+  - { name: console, log_every: 5 }  # loss 打到 stdout
+  - { name: jsonl }                   # 写 run_dir/metrics.jsonl
+
+engine:
+  name: standard
+  mixed_precision: "no"  # FSDP handles mixed precision internally
+
+trainer:
+  name: pretrain
+  max_steps: 20
+  ckpt_every: 0
+  log_every: 5
+  grad_clip: 1.0

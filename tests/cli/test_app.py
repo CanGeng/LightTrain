@@ -248,7 +248,7 @@ def test_eval_cmd_does_not_crash_on_config_path(runner, tmp_path):
 # ===========================================================================
 
 _REPO = Path(__file__).resolve().parents[2]
-_PROFILES = _REPO / "recipes" / "pretrain_causal.yaml"  # model: + model_profiles:
+_PROFILES = _REPO / "examples" / "references" / "recipes" / "pretrain_causal.yaml"  # model: + model_profiles:
 
 
 def _write_models_set_recipe(tmp_path: Path) -> Path:

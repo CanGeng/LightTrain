@@ -6,12 +6,12 @@
 一样选用：
 
 ```bash
-lighttrain train -c recipes/pretrain_rwkv.yaml   # RWKV 有状态预训练
-lighttrain train -c recipes/diffusion_eps.yaml   # diffusion eps 预测
-lighttrain train -c recipes/jepa.yaml            # JEPA 掩码 patch 预测
-lighttrain train -c recipes/pcn_demo.yaml        # 预测编码网络
-lighttrain train -c recipes/ff_demo.yaml         # Forward-Forward
-lighttrain train -c recipes/mezo_sft.yaml        # MeZO 零阶 SFT
+lighttrain train -c examples/references/recipes/pretrain_rwkv.yaml   # RWKV 有状态预训练
+lighttrain train -c examples/references/recipes/diffusion_eps.yaml   # diffusion eps 预测
+lighttrain train -c examples/references/recipes/jepa.yaml            # JEPA 掩码 patch 预测
+lighttrain train -c examples/references/recipes/pcn_demo.yaml        # 预测编码网络
+lighttrain train -c examples/references/recipes/ff_demo.yaml         # Forward-Forward
+lighttrain train -c examples/references/recipes/mezo_sft.yaml        # MeZO 零阶 SFT
 ```
 
 内置 objective 带 `loss_family`：`next_token`、`masked_denoising`、

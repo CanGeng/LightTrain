@@ -2,8 +2,8 @@
 
 > [English](recipes.md) · [文档索引](../README.md)
 
-最快的起步方式：从 [`recipes/`](../../recipes/) 拷一个内置 recipe 改。多数 recipe 用
-`lighttrain train -c recipes/<名字>.yaml` 运行；分布式 overlay（见下）是例外——
+最快的起步方式：从 [`examples/references/recipes/`](../../examples/references/recipes/) 拷一个内置 recipe 改。多数 recipe 用
+`lighttrain train -c examples/references/recipes/<名字>.yaml` 运行；分布式 overlay（见下）是例外——
 需叠加到完整 recipe 之上，并用多进程启动器。
 
 ## 预训练与 SFT

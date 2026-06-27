@@ -54,8 +54,8 @@ lighttrain train   -c cfg.yaml ++trainer.max_steps=50   # 50 步冒烟
 ## 示例：训练，然后分叉与恢复
 
 ```bash
-lighttrain train -c recipes/pretrain_causal.yaml
-lighttrain fork  --from runs/<...>/checkpoints/step_500 -c recipes/finetune.yaml
+lighttrain train -c examples/references/recipes/pretrain_causal.yaml
+lighttrain fork  --from runs/<...>/checkpoints/step_500 -c examples/references/recipes/finetune.yaml
 lighttrain resume --run runs/<...>
 ```
 
@@ -72,7 +72,7 @@ judge:   { name: verifier, verify_pattern: "\\d+" }   # → reward_fn
 多模型（冻结 teacher + 可训练 student）是命名模型集；自定义 trainer 读
 `self.models["teacher"]`。可跑的端到端模板：
 [examples/online_distill.py](examples/online_distill.py)
-（`lighttrain train -c recipes/online_distill_demo.yaml`）。
+（`lighttrain train -c examples/references/recipes/online_distill_demo.yaml`）。
 → [训练范式](docs/concepts/training.zh-CN.md)
 
 ## 训练产出

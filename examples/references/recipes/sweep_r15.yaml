@@ -1,0 +1,17 @@
+# Sweep spec for R15 acceptance test — grid over LR × weight_decay.
+#
+# 3 × 3 = 9 trials (≥ 8 required by R15).
+#
+# Usage:
+#   lighttrain sweep -c examples/references/recipes/sweep_demo.yaml -s examples/references/recipes/sweep_r15.yaml
+
+name: r15_lr_wd
+metric: loss
+direction: minimize
+stop:
+  type: median
+  grace: 3
+
+params:
+  optim.lr: [1.0e-4, 3.0e-4, 1.0e-3]
+  optim.weight_decay: [0.0, 0.05, 0.1]

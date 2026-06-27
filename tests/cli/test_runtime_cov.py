@@ -81,8 +81,8 @@ from lighttrain.engine._context import StepContext
 # ---------------------------------------------------------------------------
 
 _REPO = Path(__file__).resolve().parent.parent.parent
-_PRETRAIN_RECIPE = _REPO / "recipes" / "pretrain_causal.yaml"
-_SFT_RECIPE = _REPO / "recipes" / "sft_chat.yaml"
+_PRETRAIN_RECIPE = _REPO / "examples" / "references" / "recipes" / "pretrain_causal.yaml"
+_SFT_RECIPE = _REPO / "examples" / "references" / "recipes" / "sft_chat.yaml"
 
 # Import all components once so the registry is populated.
 import_all_components()

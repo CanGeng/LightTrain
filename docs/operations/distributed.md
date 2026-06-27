@@ -60,7 +60,7 @@ engine:   { mixed_precision: "no" }
 ```
 
 Full recipe examples live under
-[`recipes/`](../../recipes).
+[`examples/references/recipes/`](../../recipes).
 
 ## See also
 

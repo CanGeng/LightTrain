@@ -345,7 +345,7 @@ import json  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_PRETRAIN_RECIPE = _REPO_ROOT / "recipes" / "pretrain_causal.yaml"
+_PRETRAIN_RECIPE = _REPO_ROOT / "examples" / "references" / "recipes" / "pretrain_causal.yaml"
 
 
 def _loss_windows(jsonl_path: Path, fraction: float = 0.25) -> tuple[float, float]:

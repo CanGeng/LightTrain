@@ -16,7 +16,7 @@ import torch
 # Force eager registration of frontier plug-ins.
 import lighttrain.builtin_plugins.quant  # noqa: F401
 
-_RECIPE = Path("recipes/qlora.yaml")
+_RECIPE = Path("examples/references/recipes/qlora.yaml")
 _HAS_BNB = False
 try:
     import bitsandbytes  # noqa: F401

@@ -1,0 +1,106 @@
+# R5 — Online PPO with HFGenerateBackend + VerifierJudge (DESIGN §15.3 / §26.8).
+#
+# Training loop:
+#   1. Sample a prompt batch from the data loader.
+#   2. Roll out `rollout_steps` episodes via model.generate().
+#   3. Score responses with the VerifierJudge (regex match on digits).
+#   4. Compute GAE advantages; run K PPO inner epochs over the buffer.
+#
+# Run with:
+#   lighttrain train -c examples/references/recipes/ppo_online.yaml
+#
+# Note: the reward_fn is wired in code by PPOTrainer; this recipe shows the
+# config structure. For a real task, replace `verify_pattern` with a task-
+# specific answer regex or `verify_fn` callable path.
+
+mode: lab
+seed: 7
+exp: r5_ppo_online
+run_root: runs
+
+model: default
+model_profiles:
+  default:
+    name: tiny_lm
+    vocab_size: 260
+    d_model: 256
+    n_layers: 4
+    n_heads: 8
+    max_seq_len: 256
+    dropout: 0.0
+
+# ----- data ——————————————————————————————————————————————————————————————————
+# Prompt-only dataset. PPO collects its own responses via rollout.
+# Each sample needs `input_ids` / `attention_mask`; labels are ignored.
+data:
+  name: simple
+  dataset:
+    name: line_file_text
+    path: tests/fixtures/tiny_corpus.txt
+    max_len: 64          # prompt length only
+  tokenizer:
+    name: byte
+  collator:
+    name: causal_lm
+    max_len: 64
+  sampler:
+    name: shuffle
+    seed: ${seed}
+  batch_size: 4
+  num_workers: 0
+
+# ----- judge (reward) ————————————————————————————————————————————————————————
+# VerifierJudge scores each response; PPOTrainer exposes it as reward_fn.
+judge:
+  name: verifier
+  verify_pattern: "\\d+"   # score 1.0 if the response contains a digit
+
+# ----- optimiser + scheduler ————————————————————————————————————————————————
+optim:
+  name: adamw
+  lr: 1.0e-5
+  betas: [0.9, 0.95]
+  weight_decay: 0.01
+
+scheduler:
+  name: warmup_cosine
+  warmup_steps: 10
+  total_steps: ${trainer.max_steps}
+  min_lr_ratio: 0.1
+
+# ----- loss ——————————————————————————————————————————————————————————————————
+# The PPO surrogate is now selected via the loss: seam (keystone step 3).
+loss:
+  name: ppo_surrogate
+  clip_eps: 0.2
+  vf_coef: 0.0           # no value head in this demo
+  ent_coef: 0.01
+
+# ----- engine ————————————————————————————————————————————————————————————————
+engine:
+  name: standard
+  mixed_precision: "no"
+
+# ----- trainer ———————————————————————————————————————————————————————————————
+trainer:
+  name: ppo
+  max_steps: 50          # outer steps (each triggers a full rollout + PPO update)
+  ckpt_every: 50
+  log_every: 10
+  rollout_steps: 8       # episodes per outer step
+  ppo_epochs: 2
+  mini_batch_size: 4
+  gamma: 0.99
+  lam: 0.95
+  target_kl: 0.05
+  max_new_tokens: 64
+  lora_base_as_ref: false
+
+# ----- callbacks + logger ————————————————————————————————————————————————————
+callbacks:
+  - { name: throughput, window: 10 }
+  - { name: nan_skip, max_skips: 5 }
+
+logger:
+  - { name: console, log_every: 10 }
+  - { name: jsonl }

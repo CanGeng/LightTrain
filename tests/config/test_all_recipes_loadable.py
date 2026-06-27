@@ -22,10 +22,10 @@ from lighttrain.config import load_config
 from lighttrain.config._resolver import select_model_spec
 
 _ROOT = Path(__file__).resolve().parents[2]
-# Distributed/sweep overlays now live alongside the rest under recipes/ (they
+# Distributed/sweep overlays now live alongside the rest under examples/references/recipes/ (they
 # were moved out of the old distributed-recipes location back when the bundled
 # extensions package was renamed to lighttrain.builtin_plugins).
-_RECIPES = sorted((_ROOT / "recipes").glob("*.yaml"))
+_RECIPES = sorted((_ROOT / "examples" / "references" / "recipes").glob("*.yaml"))
 
 
 def _ids(p: Path) -> str:
