@@ -120,5 +120,5 @@ Everything lives under [`docs/`](docs/README.md) (English + 中文, split by top
 
 ## License
 
-MIT. Built with the assistance of Claude Code; architecture, test design, and
+MIT. Built with the assistance of Claude Code （Opus-4.8） and OpenCode（GLM-5.2）; architecture, test design, and
 quality gates are human-directed.
